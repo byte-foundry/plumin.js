@@ -1,0 +1,36 @@
+{
+  "name": "plumin.js",
+  "version": "0.0.0",
+  "description": "client-side font creation and scripting, based on paper.js and opentype.js",
+  "main": "dist/plumin.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/byte-foundry/plumin.js.git"
+  },
+  "keywords": [
+    "opentype",
+    "font",
+    "paper"
+  ],
+  "author": "Louis-Rémi <lrbabe@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/byte-foundry/plumin.js/issues"
+  },
+  "homepage": "https://github.com/byte-foundry/plumin.js",
+  "dependencies": {
+    "opentype.js": "git://github.com/byte-foundry/opentype.js.git#perfOptim",
+    "paper": "git://github.com/paperjs/paper.js.git"
+  },
+  "devDependencies": {
+    "browserify": "^6.2.0",
+    "watchify": "^2.1.1",
+    "exorcist": "^0.1.6"
+  },
+  "scripts": {
+    "browserify": "browserify src/plumin.js -u fs --dg false --debug --standalone plumin | exorcist dist/plumin.js.map > dist/plumin.js"
+  }
+}
