@@ -1,0 +1,115 @@
+<!doctype html>
+<html class="no-js">
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<title>Plumin.js | create and script fonts in JS</title>
+		<meta name="description" content="">
+		<!-- it's an app, disable zooming on mobile devices -->
+		<meta name="viewport" content="target-densitydpi=device-dpi, initial-scale=1.0, user-scalable=no" />
+		<!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+
+		<link rel="stylesheet" href="http://www.knacss.com/css/knacss.css">
+		<style>
+
+		</style>
+
+	</head>
+	<body ng-app="prototypoApp">
+		<!--[if lt IE 10]>
+			<p class="chromeframe">You are using an outdated browser. <a href="http://browsehappy.com/">Upgrade your browser today</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to better experience this site.</p>
+		<![endif]-->
+
+		<textarea style="font-family: 'Demo', sans-serif; font-size: 20px;">A B C</textarea>
+		<a href="#" class="btn" onclick="font.prepareOT().download();" download="demo.otf">Download</a>
+		<canvas id="demo">
+
+		<script src="dist/plumin.js"></script>
+		<script>
+			plumin.paper.setup('demo');
+
+			var font = new plumin.Font({
+					familyName: 'Demo'
+				}),
+
+				// glyphs
+				A = new plumin.Glyph({
+					name: 'A',
+					advanceWidth: 512
+				}),
+				B = new plumin.Glyph({
+					name: 'B',
+					advanceWidth: 512
+				}),
+				C = new plumin.Glyph({
+					name: 'C',
+					advanceWidth: 512
+				}),
+
+				// contours
+				ctA = new plumin.Contour({ closed: true }),
+				ctB = new plumin.Contour({ closed: true }),
+				ctC = new plumin.Contour({ closed: true });
+
+			ctA.addNodes([
+				new plumin.Node({ point: [50, 0] }),
+				new plumin.Node({ point: [256, 800] }),
+				new plumin.Node({ point: [462, 0] })
+			]);
+
+			ctB.addNodes([
+				new plumin.Node({ point: [50, 0] }),
+				new plumin.Node({ point: [50, 800] }),
+				new plumin.Node({ point: [462, 800] }),
+				new plumin.Node({ point: [462, 0] })
+			]);
+
+			ctC.addNodes([
+				new plumin.Node({
+					point: [50, 400],
+					handleIn: [50, 200],
+					handleOut: [50, 600]
+				}),
+				new plumin.Node({
+					point: [256, 800],
+					handleIn: [56, 800],
+					handleOut: [456, 800]
+				}),
+				new plumin.Node({
+					point: [462, 400],
+					handleIn: [462, 600],
+					handleOut: [462, 200]
+				}),
+				new plumin.Node({
+					point: [256, 0],
+					handleIn: [456, 0],
+					handleOut: [56, 0]
+				})
+			]);
+
+			A.addContour(ctA);
+			B.addContour(ctB);
+			C.addContour(ctC);
+
+			font.addGlyphs([
+					A,
+					B,
+					C
+				])
+				.prepareOT()
+				.addToFonts();
+
+		</script>
+
+		<script>
+			/* jshint ignore:start */
+			// HANDJS shouldn't process the css
+			//HANDJS.doNotProcessCSS = true;
+			// google analytics
+			var _gaq=[['_setAccount','UA-41962243-3'],['_trackPageview']];
+			(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
+			g.src=('https:'==location.protocol?'//ssl':'//www')+'.google-analytics.com/ga.js';
+			s.parentNode.insertBefore(g,s)}(document,'script'));
+		</script>
+	</body>
+</html>

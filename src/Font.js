@@ -1,21 +1,44 @@
-var opentype = require('../node_modules/opentype.js/src/opentype.js');
+var opentype = require('../node_modules/opentype.js/src/opentype.js'),
+	Glyph = require('./Glyph.js');
 
 function Font( args ) {
+	if ( !args.styleName ) {
+		args.styleName = 'Regular';
+	}
+
+	if ( !args.unitsPerEm ) {
+		args.unitsPerEm = 1024;
+	}
+
 	this.ot = new opentype.Font( args );
 
 	this.glyphs = [];
 	this.glyphMap = {};
 	this._subset = false;
+
+	this.addGlyph(new Glyph({
+		name: '.notdef',
+		unicode: 0
+	}));
 }
 
 Font.prototype.addGlyph = function( glyph ) {
 	this.glyphs.push( glyph );
 	this.glyphMap[glyph.name] = glyph;
 
-	this.item.addChild( glyph );
+	return this;
 };
 
-Object.defineProperty( Font.prototype, subset, {
+Font.prototype.addGlyphs = function( glyphs ) {
+	glyphs.forEach(function( glyph ) {
+		this.addGlyph(glyph);
+
+	}, this);
+
+	return this;
+};
+
+Object.defineProperty( Font.prototype, 'subset', {
 	get: function() {
 		return this._subset;
 	},
@@ -42,15 +65,15 @@ Font.prototype.getGlyphSubset = function( set ) {
 	}
 
 	// reuse last subset if possible
-	if ( this._lastSubset && this._lastSubset[0] === ( this._subset || '' ).join() ) {
+	if ( this._lastSubset && this._lastSubset[0] === ( this._subset || [] ).join() ) {
 		return this._lastSubset[1];
 	}
 
 	// memoize last subset
 	this._lastSubset = [
-		( this._subset || '' ).join(),
+		( this._subset || [] ).join(),
 		this.glyphs.filter(function( glyph ) {
-			if ( this._subset === false && ( glyph.unicode !== undefined || glyph.unicodes.length ) ) {
+			if ( this._subset === false && ( glyph.unicode !== false || glyph.unicodes.length ) ) {
 				return true;
 			}
 
@@ -61,14 +84,14 @@ Font.prototype.getGlyphSubset = function( set ) {
 			// TODO: handle multiple unicodes
 
 			return false;
-		})
+		}, this)
 	];
 
 	return this._lastSubset[1];
 };
 
-Font.prototype.prepareOT = function() {
-	this.ot.glyphs = this.getGlyphSubset().map(function( glyph ) {
+Font.prototype.prepareOT = function( set ) {
+	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
 		return glyph.prepareOT();
 	});
 
@@ -82,7 +105,7 @@ Font.prototype.addToFonts = document.fonts ?
 	function( buffer ) {
 		document.fonts.add(
 			new FontFace(
-				this.familyName,
+				this.ot.familyName,
 				buffer || this.ot.toBuffer()
 			)
 		);
@@ -102,11 +125,26 @@ Font.prototype.addToFonts = document.fonts ?
 		}
 
 		ruleIndex = document.styleSheets[0].insertRule(
-			'@font-face { font-family: "' + this.familyName + '"; src: url(' + url + '); }',
+			'@font-face { font-family: "' + this.ot.familyName + '"; src: url(' + url + '); }',
 			ruleIndex || document.styleSheets[0].cssRules.length
 		);
 
 		return this;
 	};
+
+Font.prototype.download = function( buffer ) {
+	var reader = new FileReader();
+
+	reader.onloadend = function() {
+		window.location = reader.result;
+	};
+
+	reader.readAsDataURL(new Blob(
+		[ new DataView( buffer || this.ot.toBuffer() ) ],
+		{type: 'font/opentype'}
+	));
+
+	return this;
+};
 
 module.exports = Font;

@@ -2,7 +2,15 @@ var opentype = require('../node_modules/opentype.js/src/opentype.js'),
 	paper = require('../node_modules/paper/dist/paper-core.js');
 
 function Glyph( args ) {
-	paper.Group.constructor.apply( this );
+	paper.Group.prototype.constructor.apply( this );
+
+	if ( args.unicode === undefined ) {
+		args.unicode = args.name.charCodeAt(0);
+	}
+
+	if ( typeof args.unicode === 'string' ) {
+		args.unicode = args.unicode.charCodeAt(0);
+	}
 
 	this.ot = new opentype.Glyph( args );
 	this.ot.path = new opentype.Path();
@@ -46,7 +54,7 @@ Glyph.prototype.prepareOT = function( path ) {
 
 	this.contours.forEach(function( contour ) {
 		contour.prepareOT( this.ot.path );
-	});
+	}, this);
 
 	return this.ot;
 };
