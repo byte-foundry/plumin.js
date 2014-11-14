@@ -30,7 +30,9 @@
 			textarea.editor,
 			textarea.result {
 				width: 100%;
-				height: calc( 100% - 100px );
+				/* Doesn't work in Chrome :-/
+				height: calc( 100% - 100px ); */
+				height: 400px;
 
 				margin: 0;
 			}
@@ -70,7 +72,7 @@
 			<p class="chromeframe">You are using an outdated browser. <a href="http://browsehappy.com/">Upgrade your browser today</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to better experience this site.</p>
 		<![endif]-->
 
-		<h1>Plumin.js | Create and Manipulate Fonts like no one's watching.</h1>
+		<h1 class="pam">Plumin.js | Create and Manipulate Fonts like no one's watching.</h1>
 
 		<div class="row">
 			<div class="col w50 plm">
@@ -180,12 +182,15 @@ return font;
 
 		<script src="bower_components/codemirror/lib/codemirror.js"></script>
 		<script src="bower_components/codemirror/mode/javascript/javascript.js"></script>
+		<script src="bower_components/codemirror/addon/edit/closebrackets.js"></script>
 		<script src="dist/plumin.js"></script>
 
 		<script>
 			plumin.paper.setup('demo');
 
-			var cm = CodeMirror.fromTextArea( document.getElementById('editor') );
+			var cm = CodeMirror.fromTextArea( document.getElementById('editor'), {
+				autoCloseBrackets: true
+			});
 			cm.setSize('100%', document.getElementById('result').offsetHeight );
 
 			function _run() {
@@ -202,93 +207,6 @@ return font;
 					.prepareOT()
 					.download();
 			}
-		</script>
-
-		<script type="test">
-			var font = new plumin.Font({
-					familyName: 'Demo'
-				}),
-
-				// glyphs
-				A = new plumin.Glyph({
-					name: 'A',
-					advanceWidth: 512
-				}),
-				B = new plumin.Glyph({
-					name: 'B',
-					advanceWidth: 512
-				}),
-				C = new plumin.Glyph({
-					name: 'C',
-					advanceWidth: 512
-				}),
-
-				// contours
-				ctA = new plumin.Contour({ closed: true }),
-				ctB = new plumin.Contour({ closed: true }),
-				ctC = new plumin.Contour({ closed: true });
-
-			ctA.addNodes([
-				new plumin.Node({ point: [50, 0] }),
-				new plumin.Node({ point: [256, 800] }),
-				new plumin.Node({ point: [462, 0] })
-			]);
-
-			ctB.addNodes([
-				new plumin.Node({ point: [50, 0] }),
-				new plumin.Node({ point: [50, 800] }),
-				new plumin.Node({ point: [462, 800] }),
-				new plumin.Node({ point: [462, 0] })
-			]);
-
-			ctC.addNodes([
-				new plumin.Node({
-					point: [50, 400],
-					handleIn: [50, 200],
-					handleOut: [50, 600]
-				}),
-				new plumin.Node({
-					point: [256, 800],
-					handleIn: [56, 800],
-					handleOut: [456, 800]
-				}),
-				new plumin.Node({
-					point: [462, 400],
-					handleIn: [462, 600],
-					handleOut: [462, 200]
-				}),
-				new plumin.Node({
-					point: [256, 0],
-					handleIn: [456, 0],
-					handleOut: [56, 0]
-				})
-			]);
-
-			A.addContour(ctA);
-			B.addContour(ctB);
-			C.addContour(ctC);
-
-			font.addGlyphs([
-					A,
-					B,
-					C
-				])
-				.prepareOT()
-				.addToFonts();
-
-			var center = new plumin.Point(256, 400);
-			(function onFrame() {
-				ctA.rotate(3, center);
-				ctB.rotate(-3, center);
-				ctC.rotate(3, center);
-
-				font.prepareOT()
-					.addToFonts();
-
-				window.request = requestAnimationFrame(onFrame);
-			})();
-
-			return font;
 		</script>
 
 		<script>
