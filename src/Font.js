@@ -103,12 +103,18 @@ var _URL = window.URL || window.webkitURL,
 Font.prototype.addToFonts = document.fonts ?
 	// CSS font loading, lightning fast
 	function( buffer ) {
-		document.fonts.add(
-			new FontFace(
-				this.ot.familyName,
-				buffer || this.ot.toBuffer()
-			)
+		var fontface = new FontFace(
+			this.ot.familyName,
+			buffer || this.ot.toBuffer()
 		);
+
+		document.fonts.add( fontface );
+
+		// if ( this.lastFontFace ) {
+		// 	document.fonts.delete( this.lastFontFace );
+		// }
+
+		// this.lastFontFace = fontface;
 
 		return this;
 	}:

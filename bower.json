@@ -1,0 +1,32 @@
+{
+  "name": "plumin.js",
+  "version": "0.1.0",
+  "homepage": "https://github.com/byte-foundry/plumin.js",
+  "authors": [
+    "louisremi <lrbabe@gmail.com>"
+  ],
+  "description": "Create and manipulate fonts in JS",
+  "main": "dist/plumin.js",
+  "moduleType": [
+    "amd",
+    "globals"
+  ],
+  "keywords": [
+    "prototypo",
+    "font",
+    "opentype",
+    "paper"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "knacss": "~3.1.0",
+    "codemirror": "~4.7.0"
+  }
+}

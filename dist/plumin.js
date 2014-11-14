@@ -4396,11 +4396,11 @@ encode.OPERAND = function (v, type) {
 encode.OP = encode.BYTE;
 sizeOf.OP = sizeOf.BYTE;
 
-var wmm = new WeakMap();
+var cwm = new WeakMap();
 // Convert a list of CharString operations to bytes.
 encode.CHARSTRING = function (ops) {
-    if ( wmm.has( ops ) ) {
-        return wmm.get( ops );
+    if ( cwm.has( ops ) ) {
+        return cwm.get( ops );
     }
 
     var d = [],
@@ -4413,7 +4413,7 @@ encode.CHARSTRING = function (ops) {
         d = d.concat( encode[op.type](op.value) );
     }
 
-    wmm.set( ops, d );
+    cwm.set( ops, d );
 
     return d;
 };
@@ -17175,12 +17175,18 @@ var _URL = window.URL || window.webkitURL,
 Font.prototype.addToFonts = document.fonts ?
 	// CSS font loading, lightning fast
 	function( buffer ) {
-		document.fonts.add(
-			new FontFace(
-				this.ot.familyName,
-				buffer || this.ot.toBuffer()
-			)
+		var fontface = new FontFace(
+			this.ot.familyName,
+			buffer || this.ot.toBuffer()
 		);
+
+		document.fonts.add( fontface );
+
+		// if ( this.lastFontFace ) {
+		// 	document.fonts.delete( this.lastFontFace );
+		// }
+
+		// this.lastFontFace = fontface;
 
 		return this;
 	}:

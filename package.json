@@ -32,6 +32,7 @@
     "uglify-js": "^2.4.14"
   },
   "scripts": {
+    "prepublish": "bower install",
     "browserify": "browserify src/plumin.js -u fs --debug --standalone plumin | exorcist dist/plumin.js.map > dist/plumin.js",
     "uglify": "uglifyjs dist/plumin.js > dist/plumin.min.js"
   }
