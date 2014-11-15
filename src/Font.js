@@ -110,11 +110,11 @@ Font.prototype.addToFonts = document.fonts ?
 
 		document.fonts.add( fontface );
 
-		// if ( this.lastFontFace ) {
-		// 	document.fonts.delete( this.lastFontFace );
-		// }
+		if ( this.lastFontFace ) {
+			document.fonts.delete( this.lastFontFace );
+		}
 
-		// this.lastFontFace = fontface;
+		this.lastFontFace = fontface;
 
 		return this;
 	}:
