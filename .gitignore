@@ -1,10 +1,28 @@
 node_modules
-bower_components
+bower_components/*
 
 # include just the files we use in gh-pages
+!bower_components/knacss
+bower_components/knacss/*
+!bower_components/knacss/css
+bower_components/knacss/css/*
 !bower_components/knacss/css/knacss.css
-!bower_components/codemirror/lib/codemirror.css
 
+!bower_components/codemirror
+bower_components/codemirror/*
+!bower_components/codemirror/lib
+bower_components/codemirror/lib/*
+!bower_components/codemirror/lib/codemirror.css
 !bower_components/codemirror/lib/codemirror.js
+
+!bower_components/codemirror/mode
+bower_components/codemirror/mode/*
+!bower_components/codemirror/mode/javascript
+bower_components/codemirror/mode/javascript/*
 !bower_components/codemirror/mode/javascript/javascript.js
+
+!bower_components/codemirror/addon
+bower_components/codemirror/addon/*
+!bower_components/codemirror/addon/edit
+bower_components/codemirror/addon/edit/*
 !bower_components/codemirror/addon/edit/closebrackets.js
