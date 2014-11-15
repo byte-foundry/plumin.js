@@ -17047,22 +17047,24 @@ Contour.prototype.prepareOT = function( path ) {
 	});
 
 	this.curves.forEach(function( curve ) {
-		path.commands.push( curve.isLinear() ?
-			{
+		if ( curve.isLinear() ) {
+			path.commands.push({
 				type: 'L',
 				x: Math.round( curve.point2.x ) || 0,
 				y: Math.round( curve.point2.y ) || 0
-			}:
-			{
+			});
+
+		} else {
+			path.commands.push({
 				type: 'C',
-				x1: Math.round( curve.handle1.x ) || 0,
-				y1: Math.round( curve.handle1.y ) || 0,
-				x2: Math.round( curve.handle2.x ) || 0,
-				y2: Math.round( curve.handle2.y ) || 0,
+				x1: Math.round( curve.point1.x + curve.handle1.x ) || 0,
+				y1: Math.round( curve.point1.y + curve.handle1.y ) || 0,
+				x2: Math.round( curve.point2.x + curve.handle2.x ) || 0,
+				y2: Math.round( curve.point2.y + curve.handle2.y ) || 0,
 				x: Math.round( curve.point2.x ) || 0,
 				y: Math.round( curve.point2.y ) || 0
-			}
-		);
+			});
+		}
 	});
 
 	return path;

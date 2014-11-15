@@ -121,29 +121,29 @@ ctB.addNodes([
 ctC.addNodes([
 	new plumin.Node({
 		point: [50, 400],
-		handleIn: [50, 200],
-		handleOut: [50, 600]
+		handleIn: [0, -200],
+		handleOut: [0, 200]
 	}),
 	new plumin.Node({
 		point: [256, 800],
-		handleIn: [56, 800],
-		handleOut: [456, 800]
+		handleIn: [-200, 0],
+		handleOut: [200, 0]
 	}),
 	new plumin.Node({
 		point: [462, 400],
-		handleIn: [462, 600],
-		handleOut: [462, 200]
+		handleIn: [0, 200],
+		handleOut: [0, -200]
 	}),
 	new plumin.Node({
 		point: [256, 0],
-		handleIn: [456, 0],
-		handleOut: [56, 0]
+		handleIn: [200, 0],
+		handleOut: [-200, 0]
 	})
 ]);
 
 A.addContour(ctA);
 B.addContour(ctB);
-C.addContour(ctC);
+C.addContour(ctC.rotate(90));
 
 font.addGlyphs([
 		A,
