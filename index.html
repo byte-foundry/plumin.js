@@ -168,7 +168,7 @@ window.onFrame = function() {
 				</textarea>
 
 				<div class="mtm txtcenter">
-					<a href="#" class="btn" onclick="_run();">▷ Run</a>
+					<a href="#" class="btn" onclick="_run();">▷ Run</a> <label><input id="workerSwitch" type="checkbox"/> Using a WebWorker</label>
 				</div>
 			</div>
 			<div class="col w50">
@@ -199,29 +199,12 @@ window.onFrame = function() {
 			});
 			cm.setSize('100%', document.getElementById('result').offsetHeight );
 
-			// var request;
-			// function _run() {
-			// 	if ( request ) {
-			// 		cancelAnimationFrame(request);
-			// 		window.onFrame = false;
-			// 	}
-
-			// 	/*jslint evil: true */
-			// 	( new Function( cm.getValue() ) )();
-
-			// 	if ( window.onFrame ) {
-			// 		(function _onFrame() {
-			// 			window.onFrame();
-
-			// 			request = requestAnimationFrame(_onFrame);
-			// 		})();
-			// 	}
-			// }
-
 			var _URL = window.URL || window.webkitURL,
+				lastBuffer,
 				request,
 				worker,
 				pluminSource,
+				workerSwitch = document.getElementById('workerSwitch'),
 				xhr = new XMLHttpRequest(),
 				_font = new plumin.Font({
 					familyName: 'Demo'
@@ -236,11 +219,34 @@ window.onFrame = function() {
 			xhr.send();
 
 			function _run() {
+				// stop previous run
 				if ( request ) {
 					cancelAnimationFrame(request);
-					worker.terminate();
+					window.onFrame = false;
+					if ( worker ) {
+						worker.terminate();
+					}
 				}
 
+				return workerSwitch.checked ?
+					_runWorker():
+					_runNoWorker();
+			}
+
+			function _runNoWorker() {
+				/*jslint evil: true */
+				( new Function( cm.getValue() ) )();
+
+				if ( window.onFrame ) {
+					(function _onFrame() {
+						window.onFrame();
+
+						request = requestAnimationFrame(_onFrame);
+					})();
+				}
+			}
+
+			function _runWorker() {
 				worker = new Worker(
 					_URL.createObjectURL( new Blob(
 						[
@@ -253,13 +259,18 @@ window.onFrame = function() {
 							'	height: 1024\n' +
 							'});\n' +
 
+							'var acceptMessage = true;\n' +
+
 							'plumin.Font.prototype.addToFonts = function() {\n' +
 							'	var buffer = this.ot.toBuffer();\n' +
 							'	postMessage( buffer, [buffer] );\n' +
+							'	acceptMessage = true;\n' +
 							'};\n' +
 
 							'onmessage = function() {\n' +
-							'	if ( self.onFrame ) {\n' +
+							'	if ( acceptMessage && self.onFrame ) {\n' +
+							// don't accept new messages until we have finished generating this font
+							'		acceptMessage = false;\n' +
 							'		self.onFrame();\n' +
 							'	}\n' +
 							'};\n' +
@@ -270,7 +281,7 @@ window.onFrame = function() {
 				);
 
 				worker.onmessage = function(e) {
-					_font.addToFonts( e.data );
+					_font.addToFonts( lastBuffer = e.data );
 				};
 
 				(function _onFrame() {
@@ -281,9 +292,11 @@ window.onFrame = function() {
 			}
 
 			function _download() {
-				window.font
-					.prepareOT()
-					.download();
+				return lastBuffer ?
+					_font.download( lastBuffer ):
+					window.font
+						.prepareOT()
+						.download();
 			}
 		</script>
 
