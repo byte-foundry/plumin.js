@@ -1,5 +1,5 @@
 var opentype = require('../node_modules/opentype.js/src/opentype.js'),
-	paper = require('../node_modules/paper/dist/paper-core.js');
+	paper = require('../node_modules/paper/dist/paper-worker.js');
 
 function Glyph( args ) {
 	paper.Group.prototype.constructor.apply( this );

@@ -98,45 +98,47 @@ Font.prototype.prepareOT = function( set ) {
 	return this;
 };
 
-var _URL = window.URL || window.webkitURL,
-	ruleIndex;
-Font.prototype.addToFonts = document.fonts ?
-	// CSS font loading, lightning fast
-	function( buffer ) {
-		var fontface = new FontFace(
-			this.ot.familyName,
-			buffer || this.ot.toBuffer()
-		);
+if ( window.document ) {
+	var _URL = window.URL || window.webkitURL,
+		ruleIndex;
+	Font.prototype.addToFonts = document.fonts ?
+		// CSS font loading, lightning fast
+		function( buffer ) {
+			var fontface = new FontFace(
+				this.ot.familyName,
+				buffer || this.ot.toBuffer()
+			);
 
-		document.fonts.add( fontface );
+			document.fonts.add( fontface );
 
-		if ( this.lastFontFace ) {
-			document.fonts.delete( this.lastFontFace );
-		}
+			if ( this.lastFontFace ) {
+				document.fonts.delete( this.lastFontFace );
+			}
 
-		this.lastFontFace = fontface;
+			this.lastFontFace = fontface;
 
-		return this;
-	}:
-	function( buffer ) {
-		var url = _URL.createObjectURL(
-			new Blob(
-				[ new DataView( buffer || this.ot.toBuffer() ) ],
-				{type: 'font/opentype'}
-			)
-		);
+			return this;
+		}:
+		function( buffer ) {
+			var url = _URL.createObjectURL(
+				new Blob(
+					[ new DataView( buffer || this.ot.toBuffer() ) ],
+					{type: 'font/opentype'}
+				)
+			);
 
-		if ( ruleIndex ) {
-			document.styleSheets[0].deleteRule( ruleIndex );
-		}
+			if ( ruleIndex ) {
+				document.styleSheets[0].deleteRule( ruleIndex );
+			}
 
-		ruleIndex = document.styleSheets[0].insertRule(
-			'@font-face { font-family: "' + this.ot.familyName + '"; src: url(' + url + '); }',
-			ruleIndex || document.styleSheets[0].cssRules.length
-		);
+			ruleIndex = document.styleSheets[0].insertRule(
+				'@font-face { font-family: "' + this.ot.familyName + '"; src: url(' + url + '); }',
+				ruleIndex || document.styleSheets[0].cssRules.length
+			);
 
-		return this;
-	};
+			return this;
+		};
+}
 
 Font.prototype.download = function( buffer ) {
 	var reader = new FileReader();

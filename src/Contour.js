@@ -1,4 +1,4 @@
-var paper = require('../node_modules/paper/dist/paper-core.js');
+var paper = require('../node_modules/paper/dist/paper-worker.js');
 
 function Contour( args ) {
 	paper.Path.prototype.constructor.call( this, args );

@@ -34,6 +34,7 @@
   "scripts": {
     "prepublish": "bower install",
     "browserify": "browserify src/plumin.js -u fs --debug --standalone plumin | exorcist dist/plumin.js.map > dist/plumin.js",
+    "watchify": "watchify src/plumin.js -u fs --debug --standalone plumin -o dist/plumin.js -v",
     "uglify": "uglifyjs dist/plumin.js > dist/plumin.min.js"
   }
 }

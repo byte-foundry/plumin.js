@@ -82,7 +82,7 @@
 		<div class="row">
 			<div class="col w50 plm">
 				<textarea id="editor" class="editor">
-var font = new plumin.Font({
+window.font = new plumin.Font({
 		familyName: 'Demo'
 	}),
 
@@ -156,19 +156,15 @@ font.addGlyphs([
 /*
 // animation are only fluid in Chrome
 var center = new plumin.Point(256, 400);
-(function onFrame() {
+window.onFrame = function() {
 	ctA.rotate(3, center);
 	ctB.rotate(-3, center);
 	ctC.rotate(3, center);
 
 	font.prepareOT()
 		.addToFonts();
-
-	requestAnimationFrame(onFrame);
-})();
+};
 */
-
-return font;
 				</textarea>
 
 				<div class="mtm txtcenter">
@@ -187,28 +183,101 @@ return font;
 			</div>
 		</div>
 
-		<canvas id="demo" style="display: none;">
-
 		<script src="bower_components/codemirror/lib/codemirror.js"></script>
 		<script src="bower_components/codemirror/mode/javascript/javascript.js"></script>
 		<script src="bower_components/codemirror/addon/edit/closebrackets.js"></script>
 		<script src="dist/plumin.js"></script>
 
 		<script>
-			plumin.paper.setup('demo');
+			plumin.setup({
+				width: 1024,
+				height: 1024
+			});
 
 			var cm = CodeMirror.fromTextArea( document.getElementById('editor'), {
 				autoCloseBrackets: true
 			});
 			cm.setSize('100%', document.getElementById('result').offsetHeight );
 
+			// var request;
+			// function _run() {
+			// 	if ( request ) {
+			// 		cancelAnimationFrame(request);
+			// 		window.onFrame = false;
+			// 	}
+
+			// 	/*jslint evil: true */
+			// 	( new Function( cm.getValue() ) )();
+
+			// 	if ( window.onFrame ) {
+			// 		(function _onFrame() {
+			// 			window.onFrame();
+
+			// 			request = requestAnimationFrame(_onFrame);
+			// 		})();
+			// 	}
+			// }
+
+			var _URL = window.URL || window.webkitURL,
+				request,
+				worker,
+				pluminSource,
+				xhr = new XMLHttpRequest(),
+				_font = new plumin.Font({
+					familyName: 'Demo'
+				});
+
+			xhr.open('GET', 'dist/plumin.js', true);
+			xhr.onload = function(e) {
+				if ( this.status === 200 ) {
+					pluminSource = this.response;
+				}
+			};
+			xhr.send();
+
 			function _run() {
-				if ( window.request ) {
-					cancelAnimationFrame( request );
+				if ( request ) {
+					cancelAnimationFrame(request);
+					worker.terminate();
 				}
 
-				/*jslint evil: true */
-				window.font = ( new Function( cm.getValue() ) )();
+				worker = new Worker(
+					_URL.createObjectURL( new Blob(
+						[
+							'var window = self;\n' +
+
+							pluminSource + '\n' +
+
+							'plumin.setup({\n' +
+							'	width: 1024,\n' +
+							'	height: 1024\n' +
+							'});\n' +
+
+							'plumin.Font.prototype.addToFonts = function() {\n' +
+							'	var buffer = this.ot.toBuffer();\n' +
+							'	postMessage( buffer, [buffer] );\n' +
+							'};\n' +
+
+							'onmessage = function() {\n' +
+							'	if ( self.onFrame ) {\n' +
+							'		self.onFrame();\n' +
+							'	}\n' +
+							'};\n' +
+							cm.getValue()
+						],
+						{type: "text/javascript"}
+					))
+				);
+
+				worker.onmessage = function(e) {
+					_font.addToFonts( e.data );
+				};
+
+				(function _onFrame() {
+					worker.postMessage('frame');
+
+					request = requestAnimationFrame(_onFrame);
+				})();
 			}
 
 			function _download() {
