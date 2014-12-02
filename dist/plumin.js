@@ -17328,8 +17328,7 @@ var opentype = require('../node_modules/opentype.js/src/opentype.js'),
 	paper = require('../node_modules/paper/dist/paper-core.js'),
 	Font = require('./Font.js'),
 	Glyph = require('./Glyph.js'),
-	Contour = require('./Contour.js'),
-	utils = require('./utils.js');
+	Contour = require('./Contour.js');
 
 function plumin() {}
 
@@ -17341,32 +17340,10 @@ plumin.Contour = Contour;
 plumin.Node = paper.Segment;
 plumin.Point = paper.Point;
 plumin.Matrix = paper.Matrix;
-plumin.utils = utils;
 plumin.setup = paper.setup.bind(paper);
 
 module.exports = plumin;
-},{"../node_modules/opentype.js/src/opentype.js":8,"../node_modules/paper/dist/paper-core.js":27,"./Contour.js":28,"./Font.js":29,"./Glyph.js":30,"./utils.js":32}],32:[function(require,module,exports){
-(function (global){
-// Object.mixin polyfill for IE9+
-if ( !global.Object.mixin ) {
-	global.Object.mixin = function( target, source ) {
-		var props = Object.getOwnPropertyNames(source),
-			p,
-			descriptor,
-			length = props.length;
-
-		for (p = 0; p < length; p++) {
-			descriptor = Object.getOwnPropertyDescriptor(source, props[p]);
-			Object.defineProperty(target, props[p], descriptor);
-		}
-
-		return target;
-	};
-}
-
-module.exports.mixin = global.Object.mixin;
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}]},{},[31])(31)
+},{"../node_modules/opentype.js/src/opentype.js":8,"../node_modules/paper/dist/paper-core.js":27,"./Contour.js":28,"./Font.js":29,"./Glyph.js":30}]},{},[31])(31)
 });
 
 
