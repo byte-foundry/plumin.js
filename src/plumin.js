@@ -1,5 +1,5 @@
 var opentype = require('../node_modules/opentype.js/src/opentype.js'),
-	paper = require('../node_modules/paper/dist/paper-worker.js'),
+	paper = require('../node_modules/paper/dist/paper-core.js'),
 	Font = require('./Font.js'),
 	Glyph = require('./Glyph.js'),
 	Contour = require('./Contour.js'),
