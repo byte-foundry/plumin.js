@@ -1,6 +1,6 @@
 {
   "name": "plumin.js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "client-side font creation and scripting, based on paper.js and opentype.js",
   "main": "dist/plumin.js",
   "scripts": {
@@ -25,8 +25,7 @@
     "url": "https://github.com/byte-foundry/plumin.js/issues"
   },
   "homepage": "https://github.com/byte-foundry/plumin.js",
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "opentype.js": "^0.4.3",
     "paper": "^0.9.21",
