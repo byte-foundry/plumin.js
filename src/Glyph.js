@@ -12,6 +12,9 @@ function Glyph( args ) {
 		args.unicode = args.unicode.charCodeAt(0);
 	}
 
+	this.name = args.name;
+	this.unicode = args.unicode;
+
 	this.ot = new opentype.Glyph( args );
 	this.ot.path = new opentype.Path();
 

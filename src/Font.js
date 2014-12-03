@@ -2,6 +2,10 @@ var opentype = require('../node_modules/opentype.js/src/opentype.js'),
 	Glyph = require('./Glyph.js');
 
 function Font( args ) {
+	if ( !args ) {
+		args = {};
+	}
+
 	if ( !args.styleName ) {
 		args.styleName = 'Regular';
 	}
@@ -14,6 +18,8 @@ function Font( args ) {
 
 	this.glyphs = [];
 	this.glyphMap = {};
+	this.charMap = {};
+	this.altMap = {};
 	this._subset = false;
 
 	this.addGlyph(new Glyph({
@@ -25,6 +31,20 @@ function Font( args ) {
 Font.prototype.addGlyph = function( glyph ) {
 	this.glyphs.push( glyph );
 	this.glyphMap[glyph.name] = glyph;
+
+	// build the default cmap
+	// if multiple glyphs share the same unicode, use the glyph where unicode and name are equal
+	if ( !this.charMap[glyph.unicode] ||
+			( glyph.name.length === 1 && glyph.name.charCodeAt(0) === glyph.unicode ) ) {
+
+		this.charMap[glyph.unicode] = glyph;
+	}
+
+	// build the alternates map
+	if ( !this.altMap[glyph.unicode] ) {
+		this.altMap[glyph.unicode] = [];
+	}
+	this.altMap[glyph.unicode].push( glyph );
 
 	return this;
 };
@@ -98,7 +118,8 @@ Font.prototype.prepareOT = function( set ) {
 	return this;
 };
 
-if ( window.document ) {
+if ( typeof window === 'object' && window.document ) {
+
 	var _URL = window.URL || window.webkitURL,
 		ruleIndex;
 	Font.prototype.addToFonts = document.fonts ?
@@ -138,21 +159,22 @@ if ( window.document ) {
 
 			return this;
 		};
-}
 
-Font.prototype.download = function( buffer ) {
-	var reader = new FileReader();
+	Font.prototype.download = function( buffer ) {
+		var reader = new FileReader();
 
-	reader.onloadend = function() {
-		window.location = reader.result;
+		reader.onloadend = function() {
+			window.location = reader.result;
+		};
+
+		reader.readAsDataURL(new Blob(
+			[ new DataView( buffer || this.ot.toBuffer() ) ],
+			{type: 'font/opentype'}
+		));
+
+		return this;
 	};
 
-	reader.readAsDataURL(new Blob(
-		[ new DataView( buffer || this.ot.toBuffer() ) ],
-		{type: 'font/opentype'}
-	));
-
-	return this;
-};
+}
 
 module.exports = Font;
