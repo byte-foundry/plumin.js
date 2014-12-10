@@ -5,8 +5,8 @@
   "main": "dist/plumin.js",
   "scripts": {
     "prepublish": "bower install",
-    "browserify": "browserify src/plumin.js -u fs --debug --standalone plumin | exorcist dist/plumin.js.map > dist/plumin.js",
-    "watchify": "watchify src/plumin.js -u fs --debug --standalone plumin -o dist/plumin.js -v",
+    "browserify": "browserify src/plumin.js --debug --standalone plumin | exorcist dist/plumin.js.map > dist/plumin.js",
+    "watchify": "watchify src/plumin.js --debug --standalone plumin -o dist/plumin.js -v",
     "uglify": "uglifyjs dist/plumin.js > dist/plumin.min.js",
     "test": "./node_modules/mocha/bin/mocha test/*.js"
   },
@@ -27,7 +27,7 @@
   "homepage": "https://github.com/byte-foundry/plumin.js",
   "dependencies": {},
   "devDependencies": {
-    "opentype.js": "^0.4.3",
+    "opentype.js": "~0.4.4",
     "paper": "^0.9.21",
     "browserify": "^6.2.0",
     "watchify": "^2.1.1",

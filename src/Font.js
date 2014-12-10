@@ -1,4 +1,4 @@
-var opentype = require('../node_modules/opentype.js/src/opentype.js'),
+var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	Glyph = require('./Glyph.js');
 
 function Font( args ) {
