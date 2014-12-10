@@ -4,8 +4,9 @@
   "description": "client-side font creation and scripting, based on paper.js and opentype.js",
   "main": "dist/plumin.js",
   "scripts": {
-    "prepublish": "bower install",
-    "browserify": "browserify src/plumin.js --debug --standalone plumin | exorcist dist/plumin.js.map > dist/plumin.js",
+    "prepublish": "bower install && npm run build",
+    "build": "npm run browserify && npm run uglify",
+    "browserify": "browserify src/plumin.js --debug --standalone plumin | derequire | exorcist dist/plumin.js.map > dist/plumin.js",
     "watchify": "watchify src/plumin.js --debug --standalone plumin -o dist/plumin.js -v",
     "uglify": "uglifyjs dist/plumin.js > dist/plumin.min.js",
     "test": "./node_modules/mocha/bin/mocha test/*.js"
@@ -29,11 +30,12 @@
   "devDependencies": {
     "opentype.js": "~0.4.4",
     "paper": "^0.9.21",
-    "browserify": "^6.2.0",
+    "browserify": "^7.0.0",
     "watchify": "^2.1.1",
     "exorcist": "^0.1.6",
     "uglify-js": "^2.4.14",
     "mocha": "^2.0.1",
-    "chai": "^1.10.0"
+    "chai": "^1.10.0",
+    "derequire": "~1.2.0"
   }
 }

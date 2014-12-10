@@ -1,4 +1,4 @@
-!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.plumin=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.plumin=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -86,9 +86,9 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}],2:[function(require,module,exports){
+},{}],2:[function(_dereq_,module,exports){
 (function (global){
-!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.opentype=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
+!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.opentype=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof _dereq_=="function"&&_dereq_;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof _dereq_=="function"&&_dereq_;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
 // Run-time checking of preconditions.
 
 'use strict';
@@ -4367,7 +4367,7 @@ exports.sizeOf = sizeOf;
 (6)
 });
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],3:[function(require,module,exports){
+},{}],3:[function(_dereq_,module,exports){
 (function (process){
 /*!
  * Paper.js v0.9.21 - The Swiss Army Knife of Vector Graphics Scripting.
@@ -16962,9 +16962,9 @@ if (typeof define === 'function' && define.amd) {
 return paper;
 };
 
-}).call(this,require('_process'))
-},{"_process":1}],4:[function(require,module,exports){
-var paper = require('../node_modules/paper/dist/paper-core.js');
+}).call(this,_dereq_('_process'))
+},{"_process":1}],4:[function(_dereq_,module,exports){
+var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
 
 function Contour( args ) {
 	paper.Path.prototype.constructor.call( this, args );
@@ -17009,9 +17009,9 @@ Contour.prototype.prepareOT = function( path ) {
 };
 
 module.exports = Contour;
-},{"../node_modules/paper/dist/paper-core.js":3}],5:[function(require,module,exports){
-var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
-	Glyph = require('./Glyph.js');
+},{"../node_modules/paper/dist/paper-core.js":3}],5:[function(_dereq_,module,exports){
+var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
+	Glyph = _dereq_('./Glyph.js');
 
 function Font( args ) {
 	if ( !args ) {
@@ -17190,9 +17190,9 @@ if ( typeof window === 'object' && window.document ) {
 }
 
 module.exports = Font;
-},{"../node_modules/opentype.js/dist/opentype.js":2,"./Glyph.js":6}],6:[function(require,module,exports){
-var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
-	paper = require('../node_modules/paper/dist/paper-core.js');
+},{"../node_modules/opentype.js/dist/opentype.js":2,"./Glyph.js":6}],6:[function(_dereq_,module,exports){
+var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
+	paper = _dereq_('../node_modules/paper/dist/paper-core.js');
 
 function Glyph( args ) {
 	paper.Group.prototype.constructor.apply( this );
@@ -17256,8 +17256,8 @@ Glyph.prototype.prepareOT = function( path ) {
 };
 
 module.exports = Glyph;
-},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3}],7:[function(require,module,exports){
-var paper = require('../node_modules/paper/dist/paper-core.js');
+},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3}],7:[function(_dereq_,module,exports){
+var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
 
 Object.defineProperty( paper.Segment.prototype, 'x', {
 	get: function() {
@@ -17278,13 +17278,13 @@ Object.defineProperty( paper.Segment.prototype, 'y', {
 });
 
 module.exports = paper.Segment;
-},{"../node_modules/paper/dist/paper-core.js":3}],8:[function(require,module,exports){
-var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
-	paper = require('../node_modules/paper/dist/paper-core.js'),
-	Font = require('./Font.js'),
-	Glyph = require('./Glyph.js'),
-	Contour = require('./Contour.js'),
-	Node = require('./Node.js');
+},{"../node_modules/paper/dist/paper-core.js":3}],8:[function(_dereq_,module,exports){
+var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
+	paper = _dereq_('../node_modules/paper/dist/paper-core.js'),
+	Font = _dereq_('./Font.js'),
+	Glyph = _dereq_('./Glyph.js'),
+	Contour = _dereq_('./Contour.js'),
+	Node = _dereq_('./Node.js');
 
 function plumin() {}
 
@@ -17301,6 +17301,7 @@ plumin.setup = paper.setup.bind(paper);
 module.exports = plumin;
 },{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3,"./Contour.js":4,"./Font.js":5,"./Glyph.js":6,"./Node.js":7}]},{},[8])(8)
 });
+
 
 
 //# sourceMappingURL=plumin.js.map
