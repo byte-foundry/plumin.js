@@ -1,6 +1,6 @@
 {
   "name": "plumin.js",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "client-side font creation and scripting, based on paper.js and opentype.js",
   "main": "dist/plumin.js",
   "scripts": {
