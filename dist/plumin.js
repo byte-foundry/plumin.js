@@ -17195,7 +17195,7 @@ var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	paper = _dereq_('../node_modules/paper/dist/paper-core.js');
 
 function Glyph( args ) {
-	paper.Group.prototype.constructor.apply( this );
+	paper.CompoundPath.prototype.constructor.apply( this );
 
 	if ( args.unicode === undefined ) {
 		args.unicode = args.name.charCodeAt(0);
@@ -17217,7 +17217,7 @@ function Glyph( args ) {
 	this.parentAnchors = [];
 }
 
-Glyph.prototype = Object.create(paper.Group.prototype);
+Glyph.prototype = Object.create(paper.CompoundPath.prototype);
 Glyph.prototype.constructor = Glyph;
 
 Glyph.prototype.addContour = function( item ) {
@@ -17285,6 +17285,10 @@ var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	Glyph = _dereq_('./Glyph.js'),
 	Contour = _dereq_('./Contour.js'),
 	Node = _dereq_('./Node.js');
+
+// The orientation of paths in a CompoundPath is altered in a strange way by paper
+// Fix that behavior, see https://github.com/paperjs/paper.js/issues/590
+paper.CompoundPath.prototype.insertChildren = paper.PathItem.prototype.insertChildren;
 
 function plumin() {}
 
