@@ -5,6 +5,10 @@ var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	Contour = require('./Contour.js'),
 	Node = require('./Node.js');
 
+// The orientation of paths in a CompoundPath is altered in a strange way by paper
+// Fix that behavior, see https://github.com/paperjs/paper.js/issues/590
+paper.CompoundPath.prototype.insertChildren = paper.PathItem.prototype.insertChildren;
+
 function plumin() {}
 
 plumin.opentype = opentype;
