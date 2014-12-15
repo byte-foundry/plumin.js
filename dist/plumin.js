@@ -4380,7 +4380,7 @@ exports.sizeOf = sizeOf;
  *
  * All rights reserved.
  *
- * Date: Wed Dec 3 14:47:05 2014 +0100
+ * Date: Mon Dec 15 15:07:22 2014 +0100
  *
  ***
  *
@@ -13311,6 +13311,13 @@ var PathFitter = Base.extend({
 				prev = point;
 			}
 		}
+
+		if ( path._closed ) {
+			this._closed = true;
+			this.points.unshift( segments[l - 1].point.clone() );
+			this.points.push( segments[0].point.clone() );
+		}
+
 		this.error = error;
 	},
 
@@ -13322,6 +13329,12 @@ var PathFitter = Base.extend({
 			this.fitCubic(0, length - 1,
 				points[1].subtract(points[0]).normalize(),
 				points[length - 2].subtract(points[length - 1]).normalize());
+
+		if ( this._closed ) {
+			this.segments.shift();
+			this.segments.pop();
+		}
+
 		return this.segments;
 	},
 
@@ -16141,11 +16154,11 @@ new function() {
 					scale = decomposed.scaling;
 				if (trans && !trans.isZero())
 					parts.push('translate(' + formatter.point(trans) + ')');
-				if (angle)
-					parts.push('rotate(' + formatter.number(angle) + ')');
 				if (!Numerical.isZero(scale.x - 1)
 						|| !Numerical.isZero(scale.y - 1))
 					parts.push('scale(' + formatter.point(scale) +')');
+				if (angle)
+					parts.push('rotate(' + formatter.number(angle) + ')');
 				attrs.transform = parts.join(' ');
 			} else {
 				attrs.transform = 'matrix(' + matrix.getValues().join(',') + ')';
@@ -16964,52 +16977,6 @@ return paper;
 
 }).call(this,_dereq_('_process'))
 },{"_process":1}],4:[function(_dereq_,module,exports){
-var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
-
-function Contour( args ) {
-	paper.Path.prototype.constructor.call( this, args );
-
-	this.nodes = this.segments;
-}
-
-Contour.prototype = Object.create(paper.Path.prototype);
-Contour.prototype.constructor = Contour;
-
-Contour.prototype.addNodes = paper.Path.prototype.addSegments;
-
-Contour.prototype.prepareOT = function( path ) {
-	path.commands.push({
-		type: 'M',
-		x: Math.round( this.firstSegment.point.x ) || 0,
-		y: Math.round( this.firstSegment.point.y ) || 0
-	});
-
-	this.curves.forEach(function( curve ) {
-		if ( curve.isLinear() ) {
-			path.commands.push({
-				type: 'L',
-				x: Math.round( curve.point2.x ) || 0,
-				y: Math.round( curve.point2.y ) || 0
-			});
-
-		} else {
-			path.commands.push({
-				type: 'C',
-				x1: Math.round( curve.point1.x + curve.handle1.x ) || 0,
-				y1: Math.round( curve.point1.y + curve.handle1.y ) || 0,
-				x2: Math.round( curve.point2.x + curve.handle2.x ) || 0,
-				y2: Math.round( curve.point2.y + curve.handle2.y ) || 0,
-				x: Math.round( curve.point2.x ) || 0,
-				y: Math.round( curve.point2.y ) || 0
-			});
-		}
-	});
-
-	return path;
-};
-
-module.exports = Contour;
-},{"../node_modules/paper/dist/paper-core.js":3}],5:[function(_dereq_,module,exports){
 var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	Glyph = _dereq_('./Glyph.js');
 
@@ -17190,7 +17157,7 @@ if ( typeof window === 'object' && window.document ) {
 }
 
 module.exports = Font;
-},{"../node_modules/opentype.js/dist/opentype.js":2,"./Glyph.js":6}],6:[function(_dereq_,module,exports){
+},{"../node_modules/opentype.js/dist/opentype.js":2,"./Glyph.js":5}],5:[function(_dereq_,module,exports){
 var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	paper = _dereq_('../node_modules/paper/dist/paper-core.js');
 
@@ -17256,7 +17223,7 @@ Glyph.prototype.prepareOT = function( path ) {
 };
 
 module.exports = Glyph;
-},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3}],7:[function(_dereq_,module,exports){
+},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3}],6:[function(_dereq_,module,exports){
 var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
 
 Object.defineProperty( paper.Segment.prototype, 'x', {
@@ -17278,12 +17245,63 @@ Object.defineProperty( paper.Segment.prototype, 'y', {
 });
 
 module.exports = paper.Segment;
+},{"../node_modules/paper/dist/paper-core.js":3}],7:[function(_dereq_,module,exports){
+/* Extend the Path prototype to add OpenType conversion
+ * and alias *segments methods and properties to *nodes
+ */
+var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
+
+// alias *Segments methods to *Nodes equivalents
+['addSegments', 'insertSegment', 'removeSegments'].forEach(function(name) {
+	paper.Path.prototype[name.replace('Segments', 'Nodes')] =
+		paper.Path.prototype[name];
+});
+
+// alias .segments to .nodes
+Object.defineProperty(paper.Path.prototype, 'nodes', {
+	get: function() {
+		return this.segments;
+	}
+});
+
+paper.Path.prototype.prepareOT = function( path ) {
+	path.commands.push({
+		type: 'M',
+		x: Math.round( this.firstSegment.point.x ) || 0,
+		y: Math.round( this.firstSegment.point.y ) || 0
+	});
+
+	this.curves.forEach(function( curve ) {
+		if ( curve.isLinear() ) {
+			path.commands.push({
+				type: 'L',
+				x: Math.round( curve.point2.x ) || 0,
+				y: Math.round( curve.point2.y ) || 0
+			});
+
+		} else {
+			path.commands.push({
+				type: 'C',
+				x1: Math.round( curve.point1.x + curve.handle1.x ) || 0,
+				y1: Math.round( curve.point1.y + curve.handle1.y ) || 0,
+				x2: Math.round( curve.point2.x + curve.handle2.x ) || 0,
+				y2: Math.round( curve.point2.y + curve.handle2.y ) || 0,
+				x: Math.round( curve.point2.x ) || 0,
+				y: Math.round( curve.point2.y ) || 0
+			});
+		}
+	});
+
+	return path;
+};
+
+module.exports = paper.Path;
 },{"../node_modules/paper/dist/paper-core.js":3}],8:[function(_dereq_,module,exports){
 var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	paper = _dereq_('../node_modules/paper/dist/paper-core.js'),
 	Font = _dereq_('./Font.js'),
 	Glyph = _dereq_('./Glyph.js'),
-	Contour = _dereq_('./Contour.js'),
+	Path = _dereq_('./Path.js'),
 	Node = _dereq_('./Node.js');
 
 // The orientation of paths in a CompoundPath is altered in a strange way by paper
@@ -17292,18 +17310,23 @@ paper.CompoundPath.prototype.insertChildren = paper.PathItem.prototype.insertChi
 
 function plumin() {}
 
-plumin.opentype = opentype;
-plumin.paper = paper;
 plumin.Font = Font;
 plumin.Glyph = Glyph;
-plumin.Contour = Contour;
 plumin.Node = Node;
+plumin.Path = Path;
+
 plumin.Point = paper.Point;
+plumin.Size = paper.Size;
+plumin.Rectangle = paper.Rectangle;
 plumin.Matrix = paper.Matrix;
+
 plumin.setup = paper.setup.bind(paper);
+plumin.opentype = opentype;
+plumin.paper = paper;
+
 
 module.exports = plumin;
-},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3,"./Contour.js":4,"./Font.js":5,"./Glyph.js":6,"./Node.js":7}]},{},[8])(8)
+},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3,"./Font.js":4,"./Glyph.js":5,"./Node.js":6,"./Path.js":7}]},{},[8])(8)
 });
 
 
