@@ -101,9 +101,9 @@ window.font = new plumin.Font({
 	}),
 
 	// contours
-	ctA = new plumin.Contour({ closed: true }),
-	ctB = new plumin.Contour({ closed: true }),
-	ctC = new plumin.Contour({ closed: true });
+	ctA = new plumin.Path({ closed: true }),
+	ctB = new plumin.Path({ closed: true }),
+	ctC = new plumin.Path({ closed: true });
 
 ctA.addNodes([
 	new plumin.Node({ point: [50, 0] }),

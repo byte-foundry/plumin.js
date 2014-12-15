@@ -2,7 +2,7 @@ var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	paper = require('../node_modules/paper/dist/paper-core.js'),
 	Font = require('./Font.js'),
 	Glyph = require('./Glyph.js'),
-	Contour = require('./Contour.js'),
+	Path = require('./Path.js'),
 	Node = require('./Node.js');
 
 // The orientation of paths in a CompoundPath is altered in a strange way by paper
@@ -11,14 +11,19 @@ paper.CompoundPath.prototype.insertChildren = paper.PathItem.prototype.insertChi
 
 function plumin() {}
 
-plumin.opentype = opentype;
-plumin.paper = paper;
 plumin.Font = Font;
 plumin.Glyph = Glyph;
-plumin.Contour = Contour;
 plumin.Node = Node;
+plumin.Path = Path;
+
 plumin.Point = paper.Point;
+plumin.Size = paper.Size;
+plumin.Rectangle = paper.Rectangle;
 plumin.Matrix = paper.Matrix;
+
 plumin.setup = paper.setup.bind(paper);
+plumin.opentype = opentype;
+plumin.paper = paper;
+
 
 module.exports = plumin;

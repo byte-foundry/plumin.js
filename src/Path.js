@@ -1,17 +1,22 @@
+/* Extend the Path prototype to add OpenType conversion
+ * and alias *segments methods and properties to *nodes
+ */
 var paper = require('../node_modules/paper/dist/paper-core.js');
 
-function Contour( args ) {
-	paper.Path.prototype.constructor.call( this, args );
+// alias *Segments methods to *Nodes equivalents
+['addSegments', 'insertSegment', 'removeSegments'].forEach(function(name) {
+	paper.Path.prototype[name.replace('Segments', 'Nodes')] =
+		paper.Path.prototype[name];
+});
 
-	this.nodes = this.segments;
-}
+// alias .segments to .nodes
+Object.defineProperty(paper.Path.prototype, 'nodes', {
+	get: function() {
+		return this.segments;
+	}
+});
 
-Contour.prototype = Object.create(paper.Path.prototype);
-Contour.prototype.constructor = Contour;
-
-Contour.prototype.addNodes = paper.Path.prototype.addSegments;
-
-Contour.prototype.prepareOT = function( path ) {
+paper.Path.prototype.prepareOT = function( path ) {
 	path.commands.push({
 		type: 'M',
 		x: Math.round( this.firstSegment.point.x ) || 0,
@@ -42,4 +47,4 @@ Contour.prototype.prepareOT = function( path ) {
 	return path;
 };
 
-module.exports = Contour;
+module.exports = paper.Path;
