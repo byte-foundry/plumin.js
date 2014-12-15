@@ -1,8 +1,8 @@
-var opentype = require('../node_modules/opentype.js/src/opentype.js'),
-	paper = require('../node_modules/paper/dist/paper-worker.js');
+var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
+	paper = require('../node_modules/paper/dist/paper-core.js');
 
 function Glyph( args ) {
-	paper.Group.prototype.constructor.apply( this );
+	paper.CompoundPath.prototype.constructor.apply( this );
 
 	if ( args.unicode === undefined ) {
 		args.unicode = args.name.charCodeAt(0);
@@ -11,6 +11,9 @@ function Glyph( args ) {
 	if ( typeof args.unicode === 'string' ) {
 		args.unicode = args.unicode.charCodeAt(0);
 	}
+
+	this.name = args.name;
+	this.unicode = args.unicode;
 
 	this.ot = new opentype.Glyph( args );
 	this.ot.path = new opentype.Path();
@@ -21,7 +24,7 @@ function Glyph( args ) {
 	this.parentAnchors = [];
 }
 
-Glyph.prototype = Object.create(paper.Group.prototype);
+Glyph.prototype = Object.create(paper.CompoundPath.prototype);
 Glyph.prototype.constructor = Glyph;
 
 Glyph.prototype.addContour = function( item ) {

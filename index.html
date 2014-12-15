@@ -101,9 +101,9 @@ window.font = new plumin.Font({
 	}),
 
 	// contours
-	ctA = new plumin.Contour({ closed: true }),
-	ctB = new plumin.Contour({ closed: true }),
-	ctC = new plumin.Contour({ closed: true });
+	ctA = new plumin.Path({ closed: true }),
+	ctB = new plumin.Path({ closed: true }),
+	ctC = new plumin.Path({ closed: true });
 
 ctA.addNodes([
 	new plumin.Node({ point: [50, 0] }),
@@ -183,16 +183,15 @@ window.onFrame = function() {
 			</div>
 		</div>
 
+		<canvas id="hidden-canvas" width="1024" height="1024" hidden />
+
 		<script src="bower_components/codemirror/lib/codemirror.js"></script>
 		<script src="bower_components/codemirror/mode/javascript/javascript.js"></script>
 		<script src="bower_components/codemirror/addon/edit/closebrackets.js"></script>
 		<script src="dist/plumin.js"></script>
 
 		<script>
-			plumin.setup({
-				width: 1024,
-				height: 1024
-			});
+			plumin.setup('hidden-canvas');
 
 			var cm = CodeMirror.fromTextArea( document.getElementById('editor'), {
 				autoCloseBrackets: true
