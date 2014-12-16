@@ -5,7 +5,7 @@
   "authors": [
     "louisremi <lrbabe@gmail.com>"
   ],
-  "description": "Create and manipulate fonts in JS",
+  "description": "Create and manipulate fonts using javascript",
   "main": "dist/plumin.js",
   "moduleType": [
     "amd",
@@ -25,7 +25,7 @@
     "test",
     "tests"
   ],
-  "dependencies": {
+  "devDependencies": {
     "knacss": "~3.1.0",
     "codemirror": "~4.7.0"
   }

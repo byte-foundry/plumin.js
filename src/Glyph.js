@@ -18,10 +18,10 @@ function Glyph( args ) {
 	this.ot = new opentype.Glyph( args );
 	this.ot.path = new opentype.Path();
 
-	this.contours = [];
-	this.anchors = [];
-	this.components = [];
-	this.parentAnchors = [];
+	this.contours = ( args && args.contours ) || [];
+	this.anchors = ( args && args.anchors ) || [];
+	this.components = ( args && args.components ) || [];
+	this.parentAnchors = ( args && args.parentAnchors ) || [];
 }
 
 Glyph.prototype = Object.create(paper.CompoundPath.prototype);

@@ -26,6 +26,10 @@ function Font( args ) {
 		name: '.notdef',
 		unicode: 0
 	}));
+
+	if ( args && args.glyphs ) {
+		this.addGlyphs( args.glyphs );
+	}
 }
 
 Font.prototype.addGlyph = function( glyph ) {
