@@ -1,0 +1,48 @@
+0 info it worked if it ends with ok
+1 verbose cli [ '/usr/local/bin/node', '/usr/local/bin/npm', 'publish' ]
+2 info using npm@1.4.28
+3 info using node@v0.10.33
+4 verbose publish [ '.' ]
+5 verbose cache add [ '.', null ]
+6 verbose cache add name=undefined spec="." args=[".",null]
+7 verbose parsed url { protocol: null,
+7 verbose parsed url   slashes: null,
+7 verbose parsed url   auth: null,
+7 verbose parsed url   host: null,
+7 verbose parsed url   port: null,
+7 verbose parsed url   hostname: null,
+7 verbose parsed url   hash: null,
+7 verbose parsed url   search: null,
+7 verbose parsed url   query: null,
+7 verbose parsed url   pathname: '.',
+7 verbose parsed url   path: '.',
+7 verbose parsed url   href: '.' }
+8 silly lockFile 3a52ce78- .
+9 verbose lock . /home/louisremi/.npm/3a52ce78-.lock
+10 verbose tar pack [ '/home/louisremi/.npm/plumin.js/0.3.0/package.tgz', '.' ]
+11 verbose tarball /home/louisremi/.npm/plumin.js/0.3.0/package.tgz
+12 verbose folder .
+13 info prepublish plumin.js@0.3.0
+14 verbose unsafe-perm in lifecycle true
+15 info plumin.js@0.3.0 Failed to exec prepublish script
+16 error addLocalDirectory Could not pack "." to "/home/louisremi/.npm/plumin.js/0.3.0/package.tgz"
+17 silly lockFile 3a52ce78- .
+18 silly lockFile 3a52ce78- .
+19 error addLocal Could not install .
+20 error plumin.js@0.3.0 prepublish: `npm run build && npm test`
+20 error Exit status 1
+21 error Failed at the plumin.js@0.3.0 prepublish script.
+21 error This is most likely a problem with the plumin.js package,
+21 error not with npm itself.
+21 error Tell the author that this fails on your system:
+21 error     npm run build && npm test
+21 error You can get their info via:
+21 error     npm owner ls plumin.js
+21 error There is likely additional logging output above.
+22 error System Linux 3.16.0-29-generic
+23 error command "/usr/local/bin/node" "/usr/local/bin/npm" "publish"
+24 error cwd /home/louisremi/Workspace/plumin.js
+25 error node -v v0.10.33
+26 error npm -v 1.4.28
+27 error code ELIFECYCLE
+28 verbose exit [ 1, true ]

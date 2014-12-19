@@ -17005,6 +17005,10 @@ function Font( args ) {
 		name: '.notdef',
 		unicode: 0
 	}));
+
+	if ( args && args.glyphs ) {
+		this.addGlyphs( args.glyphs );
+	}
 }
 
 Font.prototype.addGlyph = function( glyph ) {
@@ -17025,7 +17029,7 @@ Font.prototype.addGlyph = function( glyph ) {
 	}
 	this.altMap[glyph.unicode].push( glyph );
 
-	return this;
+	return glyph;
 };
 
 Font.prototype.addGlyphs = function( glyphs ) {
@@ -17034,7 +17038,7 @@ Font.prototype.addGlyphs = function( glyphs ) {
 
 	}, this);
 
-	return this;
+	return glyphs;
 };
 
 Object.defineProperty( Font.prototype, 'subset', {
@@ -17178,10 +17182,10 @@ function Glyph( args ) {
 	this.ot = new opentype.Glyph( args );
 	this.ot.path = new opentype.Path();
 
-	this.contours = [];
-	this.anchors = [];
-	this.components = [];
-	this.parentAnchors = [];
+	this.contours = ( args && args.contours ) || [];
+	this.anchors = ( args && args.anchors ) || [];
+	this.components = ( args && args.components ) || [];
+	this.parentAnchors = ( args && args.parentAnchors ) || [];
 }
 
 Glyph.prototype = Object.create(paper.CompoundPath.prototype);
@@ -17190,23 +17194,23 @@ Glyph.prototype.constructor = Glyph;
 Glyph.prototype.addContour = function( item ) {
 	this.addChild( item );
 	this.contours.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.addComponent = function( item ) {
 	this.addChild( item );
 	this.components.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.addAnchor = function( item ) {
 	this.anchors.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.addParentAnchor = function( item ) {
 	this.parentAnchors.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.prepareOT = function( path ) {
