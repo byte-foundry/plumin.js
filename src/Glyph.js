@@ -30,23 +30,23 @@ Glyph.prototype.constructor = Glyph;
 Glyph.prototype.addContour = function( item ) {
 	this.addChild( item );
 	this.contours.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.addComponent = function( item ) {
 	this.addChild( item );
 	this.components.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.addAnchor = function( item ) {
 	this.anchors.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.addParentAnchor = function( item ) {
 	this.parentAnchors.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.prepareOT = function( path ) {

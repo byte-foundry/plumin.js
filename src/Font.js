@@ -50,7 +50,7 @@ Font.prototype.addGlyph = function( glyph ) {
 	}
 	this.altMap[glyph.unicode].push( glyph );
 
-	return this;
+	return glyph;
 };
 
 Font.prototype.addGlyphs = function( glyphs ) {
@@ -59,7 +59,7 @@ Font.prototype.addGlyphs = function( glyphs ) {
 
 	}, this);
 
-	return this;
+	return glyphs;
 };
 
 Object.defineProperty( Font.prototype, 'subset', {
