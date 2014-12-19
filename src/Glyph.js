@@ -18,10 +18,10 @@ function Glyph( args ) {
 	this.ot = new opentype.Glyph( args );
 	this.ot.path = new opentype.Path();
 
-	this.contours = [];
-	this.anchors = [];
-	this.components = [];
-	this.parentAnchors = [];
+	this.contours = ( args && args.contours ) || [];
+	this.anchors = ( args && args.anchors ) || [];
+	this.components = ( args && args.components ) || [];
+	this.parentAnchors = ( args && args.parentAnchors ) || [];
 }
 
 Glyph.prototype = Object.create(paper.CompoundPath.prototype);
@@ -30,23 +30,23 @@ Glyph.prototype.constructor = Glyph;
 Glyph.prototype.addContour = function( item ) {
 	this.addChild( item );
 	this.contours.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.addComponent = function( item ) {
 	this.addChild( item );
 	this.components.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.addAnchor = function( item ) {
 	this.anchors.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.addParentAnchor = function( item ) {
 	this.parentAnchors.push( item );
-	return this;
+	return item;
 };
 
 Glyph.prototype.prepareOT = function( path ) {
