@@ -28,6 +28,11 @@ Glyph.prototype = Object.create(paper.CompoundPath.prototype);
 Glyph.prototype.constructor = Glyph;
 
 Glyph.prototype.addContour = function( item ) {
+	// prevent CompoundPath from arbitrarily changing the direction of paths
+	if ( item._clockwise === undefined ) {
+		item._clockwise = null;
+	}
+
 	this.addChild( item );
 	this.contours.push( item );
 	return item;
