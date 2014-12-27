@@ -1,5 +1,6 @@
 test/test_bundle.js
 
+.tmp
 node_modules
 bower_components/*
 
