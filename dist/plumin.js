@@ -4380,7 +4380,7 @@ exports.sizeOf = sizeOf;
  *
  * All rights reserved.
  *
- * Date: Mon Dec 15 15:07:22 2014 +0100
+ * Date: Wed Dec 24 14:50:34 2014 +0100
  *
  ***
  *
@@ -5104,7 +5104,7 @@ var PaperScope = Base.extend({
 						if (n === 'trident') {
 							v = rv;
 							n = 'msie';
-						} 
+						}
 						browser.version = v;
 						browser.versionNumber = parseFloat(v);
 						browser.name = n;
@@ -5504,6 +5504,7 @@ var Point = Base.extend({
 				this.y * scale
 			);
 		}
+		return this;
 	},
 	getAngle: function() {
 		return this.getAngleInRadians.apply(this, arguments) * 180 / Math.PI;
@@ -5511,6 +5512,7 @@ var Point = Base.extend({
 
 	setAngle: function(angle) {
 		this.setAngleInRadians.call(this, angle * Math.PI / 180);
+		return this;
 	},
 
 	getAngleInDegrees: '#getAngle',
@@ -5531,6 +5533,7 @@ var Point = Base.extend({
 				return Math.acos(a < -1 ? -1 : a > 1 ? 1 : a);
 			}
 		}
+		return this;
 	},
 
 	setAngleInRadians: function(angle) {
@@ -5542,6 +5545,7 @@ var Point = Base.extend({
 				Math.sin(angle) * length
 			);
 		}
+		return this;
 	},
 
 	getQuadrant: function() {
@@ -5722,6 +5726,7 @@ var LinkedPoint = Point.extend({
 	setX: function(x) {
 		this._x = x;
 		this._owner[this._setter](this);
+		return this;
 	},
 
 	getY: function() {
@@ -5731,6 +5736,7 @@ var LinkedPoint = Point.extend({
 	setY: function(y) {
 		this._y = y;
 		this._owner[this._setter](this);
+		return this;
 	}
 });
 
@@ -7239,6 +7245,8 @@ var Item = Base.extend(Emitter, {
 		}
 		this._name = name || undefined;
 		this._changed(128);
+
+		return this;
 	},
 
 	getStyle: function() {
@@ -7247,6 +7255,8 @@ var Item = Base.extend(Emitter, {
 
 	setStyle: function(style) {
 		this.getStyle().set(style);
+
+		return this;
 	}
 }, Base.each(['locked', 'visible', 'blendMode', 'opacity', 'guide'],
 	function(name) {
@@ -7297,6 +7307,8 @@ var Item = Base.extend(Emitter, {
 			this._project._updateSelection(this);
 			this._changed(129);
 		}
+
+		return this;
 	},
 
 	_selected: false,
@@ -7318,7 +7330,7 @@ var Item = Base.extend(Emitter, {
 			for (var i = 0, l = children.length; i < l; i++)
 				children[i].setFullySelected(selected);
 		}
-		this.setSelected(selected, true);
+		return this.setSelected(selected, true);
 	},
 
 	isClipMask: function() {
@@ -7336,6 +7348,8 @@ var Item = Base.extend(Emitter, {
 			if (this._parent)
 				this._parent._changed(1024);
 		}
+
+		return this;
 	},
 
 	_clipMask: false,
@@ -7348,6 +7362,8 @@ var Item = Base.extend(Emitter, {
 
 	setData: function(data) {
 		this._data = data;
+
+		return this;
 	},
 
 	getPosition: function(_dontLink) {
@@ -7364,6 +7380,8 @@ var Item = Base.extend(Emitter, {
 
 	setPosition: function() {
 		this.translate(Point.read(arguments).subtract(this.getPosition(true)));
+
+		return this;
 	},
 
 	getPivot: function(_dontLink) {
@@ -7378,6 +7396,8 @@ var Item = Base.extend(Emitter, {
 	setPivot: function() {
 		this._pivot = Point.read(arguments);
 		this._position = undefined;
+
+		return this;
 	},
 
 	_pivot: null,
@@ -7443,7 +7463,7 @@ var Item = Base.extend(Emitter, {
 		}
 		center = bounds.getCenter();
 		matrix.translate(-center.x, -center.y);
-		this.transform(matrix);
+		return this.transform(matrix);
 	},
 
 	_getCachedBounds: function(getter, matrix, cacheItem, internalGetter) {
@@ -7512,6 +7532,8 @@ var Item = Base.extend(Emitter, {
 			decomposed.rotation = rotation;
 			this._decomposed = decomposed;
 		}
+
+		return this;
 	},
 
 	getScaling: function(_dontLink) {
@@ -7530,6 +7552,8 @@ var Item = Base.extend(Emitter, {
 			decomposed.scaling = scaling;
 			this._decomposed = decomposed;
 		}
+
+		return this;
 	},
 
 	getMatrix: function() {
@@ -7543,6 +7567,8 @@ var Item = Base.extend(Emitter, {
 		} else {
 			this._changed(9);
 		}
+
+		return this;
 	},
 
 	getGlobalMatrix: function(_dontClone) {
@@ -7567,6 +7593,8 @@ var Item = Base.extend(Emitter, {
 	setApplyMatrix: function(transform) {
 		if (this._applyMatrix = this._canApplyMatrix && !!transform)
 			this.transform(null, true);
+
+		return this;
 	},
 
 	getTransformContent: '#getApplyMatrix',
@@ -7625,6 +7653,8 @@ var Item = Base.extend(Emitter, {
 	setChildren: function(items) {
 		this.removeChildren();
 		this.addChildren(items);
+
+		return this;
 	},
 
 	getFirstChild: function() {
@@ -8547,6 +8577,8 @@ var Group = Item.extend({
 		var child = this.getFirstChild();
 		if (child)
 			child.setClipMask(clipped);
+
+		return this;
 	},
 
 	_draw: function(ctx, param) {
@@ -11070,6 +11102,8 @@ var Path = PathItem.extend({
 			}
 			this._changed(25);
 		}
+
+		return this;
 	}
 }, {
 	beans: true,
@@ -11304,12 +11338,16 @@ var Path = PathItem.extend({
 		if (selected)
 			this._selectSegments(true);
 		this.setSelected(selected);
+
+		return this;
 	},
 
 	setSelected: function setSelected(selected) {
 		if (!selected)
 			this._selectSegments(false);
 		setSelected.base.call(this, selected);
+
+		return this;
 	},
 
 	_selectSegments: function(selected) {
@@ -11339,6 +11377,8 @@ var Path = PathItem.extend({
 			pos += step;
 		}
 		this.setSegments(segments);
+
+		return this;
 	},
 
 	reduce: function() {
@@ -11356,6 +11396,8 @@ var Path = PathItem.extend({
 			var fitter = new PathFitter(this, tolerance || 2.5);
 			this.setSegments(fitter.fit());
 		}
+
+		return this;
 	},
 
 	split: function(index, parameter) {
@@ -11403,6 +11445,8 @@ var Path = PathItem.extend({
 		if (this.isClockwise() != (clockwise = !!clockwise))
 			this.reverse();
 		this._clockwise = clockwise;
+
+		return this;
 	},
 
 	reverse: function() {
@@ -11418,6 +11462,8 @@ var Path = PathItem.extend({
 		if (this._clockwise !== undefined)
 			this._clockwise = !this._clockwise;
 		this._changed(9);
+
+		return this;
 	},
 
 	join: function(path) {
@@ -11455,6 +11501,8 @@ var Path = PathItem.extend({
 			last.remove();
 			this.setClosed(true);
 		}
+
+		return this;
 	},
 
 	toShape: function(insert) {
@@ -11998,6 +12046,8 @@ var Path = PathItem.extend({
 				this.removeSegment(0);
 			if (!segments.length)
 				this._add([ new Segment(Point.read(arguments)) ]);
+
+			return this;
 		},
 
 		moveBy: function() {
@@ -12006,6 +12056,8 @@ var Path = PathItem.extend({
 
 		lineTo: function() {
 			this._add([ new Segment(Point.read(arguments)) ]);
+
+			return this;
 		},
 
 		cubicCurveTo: function() {
@@ -12015,6 +12067,8 @@ var Path = PathItem.extend({
 				current = getCurrentSegment(this);
 			current.setHandleOut(handle1.subtract(current._point));
 			this._add([ new Segment(to, handle2.subtract(to)) ]);
+
+			return this;
 		},
 
 		quadraticCurveTo: function() {
@@ -12026,6 +12080,8 @@ var Path = PathItem.extend({
 				handle.add(to.subtract(handle).multiply(1 / 3)),
 				to
 			);
+
+			return this;
 		},
 
 		curveTo: function() {
@@ -12040,6 +12096,8 @@ var Path = PathItem.extend({
 				throw new Error(
 					'Cannot put a curve through points with parameter = ' + t);
 			this.quadraticCurveTo(handle, to);
+
+			return this;
 		},
 
 		arcTo: function() {
@@ -12158,12 +12216,14 @@ var Path = PathItem.extend({
 				vector = vector.rotate(inc);
 			}
 			this._add(segments);
+
+			return this;
 		},
 
 		lineBy: function() {
 			var to = Point.read(arguments),
 				current = getCurrentSegment(this)._point;
-			this.lineTo(current.add(to));
+			return this.lineTo(current.add(to));
 		},
 
 		curveBy: function() {
@@ -12171,7 +12231,7 @@ var Path = PathItem.extend({
 				to = Point.read(arguments),
 				parameter = Base.read(arguments),
 				current = getCurrentSegment(this)._point;
-			this.curveTo(current.add(through), current.add(to), parameter);
+			return this.curveTo(current.add(through), current.add(to), parameter);
 		},
 
 		cubicCurveBy: function() {
@@ -12179,7 +12239,7 @@ var Path = PathItem.extend({
 				handle2 = Point.read(arguments),
 				to = Point.read(arguments),
 				current = getCurrentSegment(this)._point;
-			this.cubicCurveTo(current.add(handle1), current.add(handle2),
+			return this.cubicCurveTo(current.add(handle1), current.add(handle2),
 					current.add(to));
 		},
 
@@ -12187,24 +12247,24 @@ var Path = PathItem.extend({
 			var handle = Point.read(arguments),
 				to = Point.read(arguments),
 				current = getCurrentSegment(this)._point;
-			this.quadraticCurveTo(current.add(handle), current.add(to));
+			return this.quadraticCurveTo(current.add(handle), current.add(to));
 		},
 
 		arcBy: function() {
 			var current = getCurrentSegment(this)._point,
 				point = current.add(Point.read(arguments)),
 				clockwise = Base.pick(Base.peek(arguments), true);
-			if (typeof clockwise === 'boolean') {
-				this.arcTo(point, clockwise);
-			} else {
+			return typeof clockwise === 'boolean' ?
+				this.arcTo(point, clockwise):
 				this.arcTo(point, current.add(Point.read(arguments)));
-			}
 		},
 
 		closePath: function(join) {
 			this.setClosed(true);
 			if (join)
 				this.join();
+
+			return this;
 		}
 	};
 }, {
@@ -17192,6 +17252,11 @@ Glyph.prototype = Object.create(paper.CompoundPath.prototype);
 Glyph.prototype.constructor = Glyph;
 
 Glyph.prototype.addContour = function( item ) {
+	// prevent CompoundPath from arbitrarily changing the direction of paths
+	if ( item._clockwise === undefined ) {
+		item._clockwise = null;
+	}
+
 	this.addChild( item );
 	this.contours.push( item );
 	return item;
@@ -17307,10 +17372,6 @@ var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	Glyph = _dereq_('./Glyph.js'),
 	Path = _dereq_('./Path.js'),
 	Node = _dereq_('./Node.js');
-
-// The orientation of paths in a CompoundPath is altered in a strange way by paper
-// Fix that behavior, see https://github.com/paperjs/paper.js/issues/590
-paper.CompoundPath.prototype.insertChildren = paper.PathItem.prototype.insertChildren;
 
 function plumin() {}
 
