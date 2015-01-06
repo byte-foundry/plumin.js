@@ -3,23 +3,28 @@ var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	Font = require('./Font.js'),
 	Glyph = require('./Glyph.js'),
 	Path = require('./Path.js'),
-	Node = require('./Node.js');
+	Node = require('./Node.js'),
+	Collection = require('./Collection.js');
 
-function plumin() {}
+paper.PaperScope.prototype.Font = Font;
+paper.PaperScope.prototype.Glyph = Glyph;
+paper.PaperScope.prototype.Path = Path;
+paper.PaperScope.prototype.Node = Node;
+paper.PaperScope.prototype.Collection = Collection;
 
-plumin.Font = Font;
-plumin.Glyph = Glyph;
-plumin.Node = Node;
-plumin.Path = Path;
+function plumin() {
+	if ( arguments[0] instanceof Collection ) {
+		return arguments[0];
+	}
 
-plumin.Point = paper.Point;
-plumin.Size = paper.Size;
-plumin.Rectangle = paper.Rectangle;
-plumin.Matrix = paper.Matrix;
+	var c = Object.create(Collection.prototype);
+	Collection.apply(c, arguments);
+	return c;
+}
 
-plumin.setup = paper.setup.bind(paper);
 plumin.opentype = opentype;
-plumin.paper = paper;
 
+plumin.proxy = Collection.proxy.bind(plumin);
+plumin.proxy(paper);
 
 module.exports = plumin;
