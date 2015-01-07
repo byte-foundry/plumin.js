@@ -20,17 +20,29 @@ var paper = require('../node_modules/paper/dist/paper-core.js'),
 });
 
 // alias .segments to .nodes
-Object.defineProperty(proto, 'nodes', {
-	get: function() {
-		return this.segments;
+Object.defineProperties(proto, {
+	nodes: {
+		get: function() {
+			return this.segments;
+		}
+	},
+	firstNode: {
+		get: function() {
+			return this.firstSegment;
+		}
+	},
+	lastNode: {
+		get: function() {
+			return this.lastSegment;
+		}
 	}
 });
 
 proto.prepareOT = function( path ) {
 	path.commands.push({
 		type: 'M',
-		x: Math.round( this.firstSegment.point.x ) || 0,
-		y: Math.round( this.firstSegment.point.y ) || 0
+		x: Math.round( this._segments[0].point.x ) || 0,
+		y: Math.round( this._segments[0].point.y ) || 0
 	});
 
 	this.curves.forEach(function( curve ) {

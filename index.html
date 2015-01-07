@@ -84,64 +84,59 @@
 				<textarea id="editor" class="editor">
 (function(p) {
 
-var font = p(p.Font, {
+var font = p.Font({
 		familyName: 'Demo'
 	}),
 
 	// glyphs
-	A = p(p.Glyph, {
+	A = p.Glyph({
 		name: 'A',
 		advanceWidth: 512
 	}),
-	B = p(p.Glyph, {
+	B = p.Glyph({
 		name: 'B',
 		advanceWidth: 512
 	}),
-	C = p(p.Glyph, {
+	C = p.Glyph({
 		name: 'C',
 		advanceWidth: 512
 	}),
 
 	// contours
-	ctA = p(p.Path, { closed: true }),
-	ctB = p(p.Path, { closed: true }),
-	ctC = p(p.Path, { closed: true });
+	ctA = p.Path({ closed: true }),
+	ctB = p.Path({ closed: true }),
+	ctC = p.Path({ closed: true });
 
-ctA.addNodes(p.Node, [
+ctA.addNodes(p.Node([
 	{ point: [50, 0] },
 	{ point: [256, 800] },
 	{ point: [462, 0] }
-]);
+]));
 
-ctB.addNodes(p.Node, [
+ctB.addNodes(p.Node([
 	{ point: [50, 0] },
 	{ point: [50, 800] },
 	{ point: [462, 800] },
 	{ point: [462, 0] }
-]);
+]));
 
-ctC.addNodes(p.Node, [
-	{
+ctC.addNodes(p.Node([{
 		point: [50, 400],
 		handleIn: [0, -200],
 		handleOut: [0, 200]
-	},
-	{
+	},{
 		point: [256, 800],
 		handleIn: [-200, 0],
 		handleOut: [200, 0]
-	},
-	{
+	},{
 		point: [462, 400],
 		handleIn: [0, 200],
 		handleOut: [0, -200]
-	},
-	{
+	},{
 		point: [256, 0],
 		handleIn: [200, 0],
 		handleOut: [-200, 0]
-	}
-]);
+	}]));
 
 A.addContour(ctA);
 B.addContour(ctB);
@@ -263,14 +258,14 @@ window.onFrame = function() {
 							// You wouldn't use inline workers and this trick in prod, though.
 							pluminSource + '\n' +
 
-							'plumin.paper.setup({\n' +
+							'plumin.setup({\n' +
 							'	width: 1024,\n' +
 							'	height: 1024\n' +
 							'});\n' +
 
 							'var acceptMessage = true;\n' +
 
-							'plumin.Font.prototype.addToFonts = function() {\n' +
+							'plumin.paper.Font.prototype.addToFonts = function() {\n' +
 							'	var buffer = this.ot.toBuffer();\n' +
 							'	postMessage( buffer, [buffer] );\n' +
 							'	acceptMessage = true;\n' +

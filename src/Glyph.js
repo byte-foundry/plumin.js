@@ -38,15 +38,33 @@ Glyph.prototype.addContour = function( item ) {
 	return item;
 };
 
+Glyph.prototype.addContours = function( contours ) {
+	return contours.forEach(function(contour) {
+		this.addContour(contour);
+	}, this);
+};
+
 Glyph.prototype.addComponent = function( item ) {
 	this.addChild( item );
 	this.components.push( item );
 	return item;
 };
 
+Glyph.prototype.addComponents = function( components ) {
+	return components.forEach(function(component) {
+		this.addComponent(component);
+	}, this);
+};
+
 Glyph.prototype.addAnchor = function( item ) {
 	this.anchors.push( item );
 	return item;
+};
+
+Glyph.prototype.addAnchors = function( anchors ) {
+	return anchors.forEach(function(anchor) {
+		this.addAnchor(anchor);
+	}, this);
 };
 
 Glyph.prototype.addParentAnchor = function( item ) {

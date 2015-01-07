@@ -12,13 +12,13 @@ paper.PaperScope.prototype.Path = Path;
 paper.PaperScope.prototype.Node = Node;
 paper.PaperScope.prototype.Collection = Collection;
 
-function plumin() {
-	if ( arguments[0] instanceof Collection ) {
-		return arguments[0];
+function plumin( arg ) {
+	if ( arguments.length === 1 && arg instanceof Collection ) {
+		return arg;
 	}
 
-	var c = Object.create(Collection.prototype);
-	Collection.apply(c, arguments);
+	var c = Object.create( Collection.prototype );
+	Collection.apply( c, arguments );
 	return c;
 }
 
