@@ -54,12 +54,10 @@ Font.prototype.addGlyph = function( glyph ) {
 };
 
 Font.prototype.addGlyphs = function( glyphs ) {
-	glyphs.forEach(function( glyph ) {
+	return glyphs.forEach(function( glyph ) {
 		this.addGlyph(glyph);
 
 	}, this);
-
-	return glyphs;
 };
 
 Object.defineProperty( Font.prototype, 'subset', {

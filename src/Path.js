@@ -1,26 +1,48 @@
 /* Extend the Path prototype to add OpenType conversion
  * and alias *segments methods and properties to *nodes
  */
-var paper = require('../node_modules/paper/dist/paper-core.js');
+var paper = require('../node_modules/paper/dist/paper-core.js'),
+	proto = paper.PaperScope.prototype.Path.prototype;
+
+// Overwrite the constructor to handle object creator with nodes property
+// proto.constructor = function(obj) {
+// 	if ( obj && 'nodes' in obj ) {
+// 		obj.segments = obj.nodes
+// 	}
+// };
+
+// A mon avis c'est pas sur paper.Path.prototype qu'il faut faire tous ces changements
 
 // alias *Segments methods to *Nodes equivalents
-['addSegments', 'insertSegment', 'removeSegments'].forEach(function(name) {
-	paper.Path.prototype[name.replace('Segments', 'Nodes')] =
-		paper.Path.prototype[name];
+['add', 'insert', 'remove'].forEach(function(name) {
+	proto[name + 'Nodes'] =
+		proto[name + 'Segments'];
 });
 
 // alias .segments to .nodes
-Object.defineProperty(paper.Path.prototype, 'nodes', {
-	get: function() {
-		return this.segments;
+Object.defineProperties(proto, {
+	nodes: {
+		get: function() {
+			return this.segments;
+		}
+	},
+	firstNode: {
+		get: function() {
+			return this.firstSegment;
+		}
+	},
+	lastNode: {
+		get: function() {
+			return this.lastSegment;
+		}
 	}
 });
 
-paper.Path.prototype.prepareOT = function( path ) {
+proto.prepareOT = function( path ) {
 	path.commands.push({
 		type: 'M',
-		x: Math.round( this.firstSegment.point.x ) || 0,
-		y: Math.round( this.firstSegment.point.y ) || 0
+		x: Math.round( this._segments[0].point.x ) || 0,
+		y: Math.round( this._segments[0].point.y ) || 0
 	});
 
 	this.curves.forEach(function( curve ) {

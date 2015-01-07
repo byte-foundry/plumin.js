@@ -1,5 +1,5 @@
 var expect = require('../node_modules/chai').expect,
-	plumin = require('../dist/plumin');
+	plumin = require('../src/plumin');
 
 describe('Font', function() {
 	before(function() {

@@ -4606,16 +4606,6 @@ var Base = new function() {
 if (typeof module !== 'undefined')
 	module.exports = Base;
 
-if (!Array.isArray) {
-	Array.isArray = function(obj) {
-		return Object.prototype.toString.call(obj) === '[object Array]';
-	};
-}
-
-if (!noCanvas && !document.head) {
-	document.head = document.getElementsByTagName('head')[0];
-}
-
 Base.inject({
 	toString: function() {
 		return this._id != null
@@ -6370,10 +6360,10 @@ var Matrix = Base.extend({
 		return this;
 	},
 
-	apply: function() {
+	apply: function(recursively) {
 		var owner = this._owner;
 		if (owner) {
-			owner.transform(null, true);
+			owner.transform(null, true, Base.pick(recursively, true));
 			return this.isIdentity();
 		}
 		return false;
@@ -6884,18 +6874,27 @@ var Project = PaperScopeItem.extend({
 		return items;
 	},
 
-	addChild: function(child) {
-		if (child instanceof Layer) {
-			Base.splice(this.layers, [child]);
+	insertChild: function(index, item, _preserve) {
+		if (item instanceof Layer) {
+			item._remove(false, true);
+			Base.splice(this.layers, [item], index, 0);
+			item._setProject(this, true);
+			if (this._changes)
+				item._changed(5);
 			if (!this._activeLayer)
-				this._activeLayer = child;
-		} else if (child instanceof Item) {
+				this._activeLayer = item;
+		} else if (item instanceof Item) {
 			(this._activeLayer
-				|| this.addChild(new Layer(Item.NO_INSERT))).addChild(child);
+				|| this.insertChild(index, new Layer(Item.NO_INSERT)))
+					.insertChild(index, item, _preserve);
 		} else {
-			child = null;
+			item = null;
 		}
-		return child;
+		return item;
+	},
+
+	addChild: function(item, _preserve) {
+		return this.insertChild(undefined, item, _preserve);
 	},
 
 	_updateSelection: function(item) {
@@ -7027,6 +7026,12 @@ var Symbol = Base.extend({
 
 	clone: function() {
 		return new Symbol(this._definition.clone(false));
+	},
+
+	equals: function(symbol) {
+		return symbol === this
+				|| symbol && this.definition.equals(symbol.definition)
+				|| false;
 	}
 });
 
@@ -7980,7 +7985,7 @@ var Item = Base.extend(Emitter, {
 	},
 
 	insertChild: function(index, item, _preserve) {
-		var res = this.insertChildren(index, [item], _preserve);
+		var res = item ? this.insertChildren(index, [item], _preserve) : null;
 		return res && res[0];
 	},
 
@@ -7997,7 +8002,9 @@ var Item = Base.extend(Emitter, {
 				if (_proto && !(item instanceof _proto)) {
 					items.splice(i, 1);
 				} else {
-					item._remove(false, true);
+					var shift = item._parent === this && item._index < index;
+					if (item._remove(false, true) && shift)
+						index--;
 				}
 			}
 			Base.splice(children, items, index, 0);
@@ -8019,29 +8026,28 @@ var Item = Base.extend(Emitter, {
 		return items;
 	},
 
-	_insert: function(above, item, _preserve) {
-		if (!item._parent)
-			return null;
-		var index = item._index + (above ? 1 : 0);
-		if (item._parent === this._parent && index > this._index)
-			index--;
-		return item._parent.insertChild(index, this, _preserve);
+	_insertSibling: function(index, item, _preserve) {
+		return this._parent
+				? this._parent.insertChild(index, item, _preserve)
+				: null;
 	},
 
 	insertAbove: function(item, _preserve) {
-		return this._insert(true, item, _preserve);
+		return item._insertSibling(item._index + 1, this, _preserve);
 	},
 
 	insertBelow: function(item, _preserve) {
-		return this._insert(false, item, _preserve);
+		return item._insertSibling(item._index, this, _preserve);
 	},
 
 	sendToBack: function() {
-		return this._parent.insertChild(0, this);
+		return (this._parent || this instanceof Layer && this._project)
+				.insertChild(0, this);
 	},
 
 	bringToFront: function() {
-		return this._parent.addChild(this);
+		return (this._parent || this instanceof Layer && this._project)
+				.addChild(this);
 	},
 
 	appendTop: '#addChild',
@@ -8187,7 +8193,7 @@ var Item = Base.extend(Emitter, {
 		return 0;
 	},
 
-	hasChildren: function() {
+	hasChildren: function() {console.log(this, this._children && this._children.length > 0);
 		return this._children && this._children.length > 0;
 	},
 
@@ -8256,17 +8262,19 @@ var Item = Base.extend(Emitter, {
 }, {
 
 }), {
-	transform: function(matrix, _applyMatrix) {
+	transform: function(matrix, _applyMatrix, _applyRecursively) {
 		if (matrix && matrix.isIdentity())
 			matrix = null;
 		var _matrix = this._matrix,
 			applyMatrix = (_applyMatrix || this._applyMatrix)
-				&& (!_matrix.isIdentity() || matrix);
+					&& ((!_matrix.isIdentity() || matrix)
+						|| _applyMatrix && _applyRecursively && this._children);
 		if (!matrix && !applyMatrix)
 			return this;
 		if (matrix)
 			_matrix.preConcatenate(matrix);
-		if (applyMatrix = applyMatrix && this._transformContent(_matrix)) {
+		if (applyMatrix = applyMatrix
+				&& this._transformContent(_matrix, _applyRecursively)) {
 			var pivot = this._pivot,
 				style = this._style,
 				fillColor = style.getFillColor(true),
@@ -8300,11 +8308,11 @@ var Item = Base.extend(Emitter, {
 		return this;
 	},
 
-	_transformContent: function(matrix) {
+	_transformContent: function(matrix, applyRecursively) {
 		var children = this._children;
 		if (children) {
 			for (var i = 0, l = children.length; i < l; i++)
-				children[i].transform(matrix, true);
+				children[i].transform(matrix, true, applyRecursively);
 			return true;
 		}
 	},
@@ -8626,9 +8634,9 @@ var Layer = Group.extend({
 		}
 	},
 
-	_remove: function _remove(notify) {
+	_remove: function _remove(notifySelf, notifyParent) {
 		if (this._parent)
-			return _remove.base.call(this, notify);
+			return _remove.base.call(this, notifySelf, notifyParent);
 		if (this._index != null) {
 			var project = this._project;
 			if (project._activeLayer === this)
@@ -8636,7 +8644,11 @@ var Layer = Group.extend({
 						|| this.getPreviousSibling();
 			Base.splice(project.layers, null, this._index, 1);
 			this._installEvents(false);
-			project._needsUpdate = true;
+			if (notifySelf && project._changes)
+				this._changed(5);
+			if (notifyParent) {
+				project._needsUpdate = true;
+			}
 			return true;
 		}
 		return false;
@@ -8660,15 +8672,10 @@ var Layer = Group.extend({
 		this._project._activeLayer = this;
 	},
 
-	_insert: function _insert(above, item, _preserve) {
-		if (item instanceof Layer && !item._parent) {
-			this._remove(true, true);
-			Base.splice(item._project.layers, [this],
-					item._index + (above ? 1 : 0), 0);
-			this._setProject(item._project, true);
-			return this;
-		}
-		return _insert.base.call(this, above, item, _preserve);
+	_insertSibling: function _insertSibling(index, item, _preserve) {
+		return !this._parent
+				? this._project.insertChild(index, item, _preserve)
+				: _insertSibling.base.call(this, index, item, _preserve);
 	}
 });
 
@@ -9032,37 +9039,53 @@ var Raster = Item.extend({
 		} else if (canvas) {
 			var copyCanvas = CanvasProvider.getCanvas(this._size);
 			copyCanvas.getContext('2d').drawImage(canvas, 0, 0);
-			copy.setCanvas(copyCanvas);
+			copy.setImage(copyCanvas);
 		}
 		return this._clone(copy, insert);
 	},
 
 	getSize: function() {
 		var size = this._size;
-		return new LinkedSize(size.width, size.height, this, 'setSize');
+		return new LinkedSize(size ? size.width : 0, size ? size.height : 0,
+				this, 'setSize');
 	},
 
 	setSize: function() {
 		var size = Size.read(arguments);
-		if (!this._size.equals(size)) {
-			var element = this.getElement();
-			this.setCanvas(CanvasProvider.getCanvas(size));
-			if (element)
-				this.getContext(true).drawImage(element, 0, 0,
-						size.width, size.height);
+		if (!size.equals(this._size)) {
+			if (size.width > 0 && size.height > 0) {
+				var element = this.getElement();
+				this.setImage(CanvasProvider.getCanvas(size));
+				if (element)
+					this.getContext(true).drawImage(element, 0, 0,
+							size.width, size.height);
+			} else {
+				if (this._canvas)
+					CanvasProvider.release(this._canvas);
+				this._size = size.clone();
+			}
 		}
 	},
 
 	getWidth: function() {
-		return this._size.width;
+		return this._size ? this._size.width : 0;
+	},
+
+	setWidth: function(width) {
+		this.setSize(width, this.getHeight());
 	},
 
 	getHeight: function() {
-		return this._size.height;
+		return this._size ? this._size.height : 0;
+	},
+
+	setHeight: function(height) {
+		this.setSize(this.getWidth(), height);
 	},
 
 	isEmpty: function() {
-		return this._size.width === 0 && this._size.height === 0;
+		var size = this._size;
+		return !size || size.width === 0 && size.height === 0;
 	},
 
 	getResolution: function() {
@@ -9178,7 +9201,7 @@ var Raster = Item.extend({
 	getSubRaster: function() {
 		var rect = Rectangle.read(arguments),
 			raster = new Raster(Item.NO_INSERT);
-		raster.setCanvas(this.getSubCanvas(rect));
+		raster.setImage(this.getSubCanvas(rect));
 		raster.translate(rect.getCenter().subtract(this.getSize().divide(2)));
 		raster._matrix.preConcatenate(this._matrix);
 		raster.insertAbove(this);
@@ -11008,7 +11031,8 @@ var Path = PathItem.extend({
 	},
 
 	_equals: function(item) {
-		return Base.equals(this._segments, item._segments);
+		return this._closed === item._closed
+				&& Base.equals(this._segments, item._segments);
 	},
 
 	clone: function(insert) {
@@ -13361,21 +13385,21 @@ var PathIterator = Base.extend({
 
 var PathFitter = Base.extend({
 	initialize: function(path, error) {
-		this.points = [];
-		var segments = path._segments,
+		var points = this.points = [],
+			segments = path._segments,
 			prev;
 		for (var i = 0, l = segments.length; i < l; i++) {
 			var point = segments[i].point.clone();
 			if (!prev || !prev.equals(point)) {
-				this.points.push(point);
+				points.push(point);
 				prev = point;
 			}
 		}
 
-		if ( path._closed ) {
-			this._closed = true;
-			this.points.unshift( segments[l - 1].point.clone() );
-			this.points.push( segments[0].point.clone() );
+		if (path._closed) {
+			this.closed = true;
+			points.unshift(points[points.length - 1]);
+			points.push(points[1]);
 		}
 
 		this.error = error;
@@ -13383,19 +13407,20 @@ var PathFitter = Base.extend({
 
 	fit: function() {
 		var points = this.points,
-			length = points.length;
-		this.segments = length > 0 ? [new Segment(points[0])] : [];
+			length = points.length,
+			segments = this.segments = length > 0
+					? [new Segment(points[0])] : [];
 		if (length > 1)
 			this.fitCubic(0, length - 1,
 				points[1].subtract(points[0]).normalize(),
 				points[length - 2].subtract(points[length - 1]).normalize());
 
-		if ( this._closed ) {
-			this.segments.shift();
-			this.segments.pop();
+		if (this.closed) {
+			segments.shift();
+			segments.pop();
 		}
 
-		return this.segments;
+		return segments;
 	},
 
 	fitCubic: function(first, last, tan1, tan2) {
@@ -13582,9 +13607,9 @@ var TextItem = Item.extend({
 		return this._content === item._content;
 	},
 
-	_clone: function _clone(copy) {
+	_clone: function _clone(copy, insert) {
 		copy.setContent(this._content);
-		return _clone.base.call(this, copy);
+		return _clone.base.call(this, copy, insert);
 	},
 
 	getContent: function() {
@@ -14432,7 +14457,7 @@ var Style = Base.extend(new function() {
 					children[i]._style[set](value);
 			} else {
 				var old = this._values[key];
-				if (old != value) {
+				if (old !== value) {
 					if (isColor) {
 						if (old)
 							old._owner = undefined;
@@ -14460,7 +14485,6 @@ var Style = Base.extend(new function() {
 					value = this._defaults[key];
 					if (value && value.clone)
 						value = value.clone();
-					this._values[key] = value;
 				} else {
 					var ctor = isColor ? Color : isPoint ? Point : null;
 					if (ctor && !(value && value.constructor === ctor)) {
@@ -14777,31 +14801,27 @@ var View = Base.extend(Emitter, {
 				userDrag: none,
 				tapHighlightColor: 'rgba(0,0,0,0)'
 			});
+
+			function getSize(name) {
+				return element[name] || parseInt(element.getAttribute(name), 10);
+			};
+
+			function getCanvasSize() {
+				var size = DomElement.getSize(element);
+				return size.isNaN() || size.isZero()
+						? new Size(getSize('width'), getSize('height'))
+						: size;
+			};
+
 			if (PaperScope.hasAttribute(element, 'resize')) {
-				var offset = DomElement.getOffset(element, true),
-					that = this;
-				size = DomElement.getViewportBounds(element)
-						.getSize().subtract(offset);
-				this._windowEvents = {
+				var that = this;
+				DomEvent.add(window, this._windowEvents = {
 					resize: function() {
-						if (!DomElement.isInvisible(element))
-							offset = DomElement.getOffset(element, true);
-						that.setViewSize(DomElement.getViewportBounds(element)
-								.getSize().subtract(offset));
+						that.setViewSize(getCanvasSize());
 					}
-				};
-				DomEvent.add(window, this._windowEvents);
-			} else {
-				size = DomElement.getSize(element);
-				if (size.isNaN() || size.isZero()) {
-					var getSize = function(name) {
-						return element[name]
-								|| parseInt(element.getAttribute(name), 10);
-					};
-					size = new Size(getSize('width'), getSize('height'));
-				}
+				});
 			}
-			this._setViewSize(size);
+			this._setViewSize(size = getCanvasSize());
 			if (PaperScope.hasAttribute(element, 'stats')
 					&& typeof Stats !== 'undefined') {
 				this._stats = new Stats();
@@ -15221,16 +15241,11 @@ var CanvasView = View.extend({
 	},
 
 	_setViewSize: function(size) {
-		var width = size.width,
-			height = size.height,
-			pixelRatio = this._pixelRatio,
-			element = this._element,
-			style = element.style;
-		element.width = width * pixelRatio;
-		element.height = height * pixelRatio;
+		var element = this._element,
+			pixelRatio = this._pixelRatio;
+		element.width = size.width * pixelRatio;
+		element.height = size.height * pixelRatio;
 		if (pixelRatio !== 1) {
-			style.width = width + 'px';
-			style.height = height + 'px';
 			this._context.scale(pixelRatio, pixelRatio);
 		}
 	},
@@ -17037,6 +17052,358 @@ return paper;
 
 }).call(this,_dereq_('_process'))
 },{"_process":1}],4:[function(_dereq_,module,exports){
+var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
+
+function Collection( args ) {
+	// already a Collection? Job's done
+	if ( arguments.length === 1 && args instanceof Collection ) {
+		return args;
+
+	} else if ( arguments.length > 1 || !Array.isArray( args ) ) {
+		args = [].slice.call( arguments, 0 );
+	}
+
+	this.length = 0;
+
+	args.forEach(function( arg ) {
+		// unwrap any collection
+		if ( arg instanceof Collection ) {
+			for ( var i = -1; ++i < arg.length; ) {
+				this[this.length++] = arg[i];
+			}
+
+		} else {
+			this[this.length++] = arg;
+		}
+
+	}, this);
+
+	return this;
+}
+
+Collection.prototype.forEach = function(cb, scope) {
+	for ( var i = -1; ++i < this.length; ) {
+		cb.call(scope || this[i], this[i], i, this);
+	}
+
+	return this;
+};
+
+Collection.prototype.prop = function(name, val) {
+	var i;
+
+	// object setter
+	if ( typeof name === 'object' ) {
+		for ( i = -1; ++i < this.length; ) {
+			this[i].set( name );
+		}
+
+		return this;
+	}
+
+	// getter
+	if ( val === undefined ) {
+		return this[0][name];
+	}
+
+	// simple setter
+	for ( i = -1; ++i < this.length; ) {
+		this[i][name] = val;
+	}
+
+	return this;
+};
+
+function wrapConstructor( constructor, prototype, useConstructed ) {
+	return function wrapper() {
+		var c,
+			tmp,
+			arr = [];
+
+		// constructor used with new
+		if ( this instanceof wrapper ) {
+			// proxy to paper native constructor
+			c = Object.create(prototype);
+			tmp = constructor.apply(c, arguments);
+			return useConstructed ?
+				tmp:
+				c;
+
+		// without new, build a collection
+		} else {
+			if ( Array.isArray( arguments[0] ) ) {
+				arguments[0].forEach(function(params, i) {
+					arr.push( Object.create(prototype) );
+					c = constructor.call( arr[i], params );
+					if ( useConstructed ) {
+						arr[i] = c;
+					}
+				});
+
+			} else {
+				arr.push( Object.create(prototype) );
+				c = constructor.apply( arr[0], arguments );
+				if ( useConstructed ) {
+					arr[0] = c;
+				}
+			}
+
+			return new Collection( arr );
+		}
+	};
+}
+
+var rconstructor = /(^|\.)[A-Z][a-z]+$/;
+function constructorFilter( name ) {
+	return typeof this[name] === 'function' && rconstructor.test(name);
+}
+
+// unwrap a collection or array of collection
+function unwrapArg( arr, id, isPlural ) {
+	// unwrap a single collection
+	if ( arr && arr[id] instanceof Collection ) {
+		arr[id] = isPlural ?
+			[].slice.call( arr[id], 0 ):
+			arr[id][0];
+
+	// unwrap an array of collection
+	} else if ( arr && arr[id].length && arr[id][0] instanceof Collection ) {
+		for ( i = -1; ++i < arr[id].length; ) {
+			arr[id][i] = arr[id][i][0];
+		}
+	}
+}
+
+function unwrapArgs() {
+	var isPlural = this.isPlural,
+		args = [].slice.call( arguments, 0 ),
+		arr,
+		id,
+		i;
+
+	// first arg is an object and might have a collection or array of collection
+	// Todo: objects should be unwrapped recursively
+	if ( args[0] && args[0].constructor === Object ) {
+		if ( 'children' in args[0] ) {
+			id = 'children';
+
+		} else if ( 'segments' in args[0] ) {
+			id = 'segments';
+
+		} else if ( 'nodes' in args[0] ) {
+			id = 'nodes';
+		}
+
+		unwrapArg( args[0], id, true );
+
+	// otherwise unwrap each arg
+	} else {
+		for ( i = -1; ++i < args.length; ) {
+			// if the method is plural (addChildren) and we're unwrapping
+			// the last argument, we want to keep it in an array
+			unwrapArg( args, i, i === args.length -1 && isPlural );
+		}
+	}
+
+	return args;
+}
+
+Collection.proxy = function( paper ) {
+	var plumin = this;
+
+	plumin.paper = paper;
+
+	var methodNames = {};
+	Object.getOwnPropertyNames( paper.PaperScope.prototype )
+		.filter( constructorFilter, paper.PaperScope.prototype )
+		.forEach(function(name, i) {
+			plumin[name] = wrapConstructor( this[name], this[name].prototype );
+
+			// we don't want to proxy methods of Collection
+			if ( name === 'Collection' ) {
+				return;
+			}
+
+			Object.getOwnPropertyNames( this[name].prototype ).forEach(function(name, i) {
+				// collect unique method names (first test avoids getters)
+				if ( !Object.getOwnPropertyDescriptor(this, name).get &&
+						typeof this[name] === 'function' ) {
+
+					methodNames[name] = true;
+				}
+
+			}, this[name].prototype);
+
+		}, paper.PaperScope.prototype);
+
+	Object.keys( paper.PaperScope.prototype.Path )
+		.filter( constructorFilter, paper.PaperScope.prototype.Path )
+		.forEach(function(name) {
+			plumin.Path[name] = wrapConstructor( this[name], this.prototype, true );
+
+		}, paper.PaperScope.prototype.Path );
+
+	Object.keys( paper.PaperScope.prototype.Shape )
+		.filter( constructorFilter, paper.PaperScope.prototype.Shape )
+		.forEach(function(name) {
+			plumin.Shape[name] = wrapConstructor( this[name], this.prototype, true );
+
+		}, paper.PaperScope.prototype.Shape );
+
+	// proxy the most commonly used method of paper
+	// do it only after proxying constructors otherwise it's overwritten
+	plumin.setup = paper.setup.bind(paper);
+
+	// proxy all methods from every constructor
+	// by default methods aren't chainable
+	Object.keys( methodNames ).sort().forEach(function(name) {
+		// please oh please, don't overwrite my constructor, I need it.
+		if ( name === 'constructor' ) {
+			return;
+		}
+
+		Collection.prototype[name] = function() {
+			var args = unwrapArgs.apply(null, arguments),
+				i,
+				result;
+
+			for ( i = -1; ++i < this.length; ) {
+				result = this[i][name].apply(this[i], args);
+			}
+
+			// by default methods aren't chainable
+			// return the last result
+			return result;
+		};
+	});
+
+		// addChild( item ) and other methods with similar signatures
+		// that we want to turn to addChild([constructor, ] item) and make chainable
+	var chain = [
+			'set',
+			'setX',
+			'setY',
+			'insertAbove',
+			'insertBelow',
+			'sendToBack',
+			'bringToFront',
+			'remove',
+			'removeChildren',
+			'reverseChildren',
+
+			'translate',
+			'rotate',
+			'scale',
+			'shear',
+			'skew',
+			'transform',
+			'fitBounds',
+			'emit',
+
+			'activate',
+
+			'setPixel',
+
+			'smooth',
+			'moveTo',
+			'lineTo',
+			'cubicCurveTo',
+			'quadraticCurveTo',
+			'curveTo',
+			'arcTo',
+			'closePath',
+			'moveBy',
+			'lineBy',
+			'cubicCurveBy',
+			'quadraticCurveBy',
+			'curveBy',
+			'arcBy',
+
+			'removeSegments',
+			'simplify',
+			'reverse',
+
+			// Rectangle
+			'include',
+			'expand',
+			'scale',
+		// ],
+		// createAndChain = [
+			'addChild',
+			'insertChild',
+			'addChildren',
+			'insertChildren',
+			'replaceWith',
+
+			'appendTop',
+			'appendBottom',
+
+			'add',
+			'insert',
+			'addSegments',
+			'insertSegments',
+			'addNode',
+			'addNodes',
+			'insertNodes',
+
+			'addGlyph',
+			'addGlyphs',
+
+			'addAnchor',
+			'addAnchors',
+			'addContour',
+			'addContours',
+			'addComponent',
+			'addComponents'
+		],
+		plural = [
+			'addChildren',
+			'insertChildren',
+			'addSegments',
+			'insertSegments',
+			'addNodes',
+			'insertNodes',
+			'addGlyphs',
+			'addAnchors',
+			'addContours',
+			'addComponents'
+		],
+		mathPoinFn = [
+			'round',
+			'ceil',
+			'floor',
+			'abs'
+		],
+		booleanPathOp = [
+			'unite',
+			'intersect',
+			'subtract',
+			'exclude',
+			'divide'
+		];
+
+	chain.forEach(function(name) {
+		Collection.prototype[name] = function() {
+			var args = unwrapArgs.apply(
+					{ isPlural: plural.indexOf(name) !== -1 },
+					arguments
+				),
+				i;
+
+			for ( i = -1; ++i < this.length; ) {
+				this[i][name].apply(this[i], args);
+			}
+
+			// make method chainable
+			return this;
+		};
+	});
+
+	// singular chainable method
+};
+
+module.exports = Collection;
+},{"../node_modules/paper/dist/paper-core.js":3}],5:[function(_dereq_,module,exports){
 var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	Glyph = _dereq_('./Glyph.js');
 
@@ -17093,12 +17460,10 @@ Font.prototype.addGlyph = function( glyph ) {
 };
 
 Font.prototype.addGlyphs = function( glyphs ) {
-	glyphs.forEach(function( glyph ) {
+	return glyphs.forEach(function( glyph ) {
 		this.addGlyph(glyph);
 
 	}, this);
-
-	return glyphs;
 };
 
 Object.defineProperty( Font.prototype, 'subset', {
@@ -17221,7 +17586,7 @@ if ( typeof window === 'object' && window.document ) {
 }
 
 module.exports = Font;
-},{"../node_modules/opentype.js/dist/opentype.js":2,"./Glyph.js":5}],5:[function(_dereq_,module,exports){
+},{"../node_modules/opentype.js/dist/opentype.js":2,"./Glyph.js":6}],6:[function(_dereq_,module,exports){
 var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	paper = _dereq_('../node_modules/paper/dist/paper-core.js');
 
@@ -17262,15 +17627,33 @@ Glyph.prototype.addContour = function( item ) {
 	return item;
 };
 
+Glyph.prototype.addContours = function( contours ) {
+	return contours.forEach(function(contour) {
+		this.addContour(contour);
+	}, this);
+};
+
 Glyph.prototype.addComponent = function( item ) {
 	this.addChild( item );
 	this.components.push( item );
 	return item;
 };
 
+Glyph.prototype.addComponents = function( components ) {
+	return components.forEach(function(component) {
+		this.addComponent(component);
+	}, this);
+};
+
 Glyph.prototype.addAnchor = function( item ) {
 	this.anchors.push( item );
 	return item;
+};
+
+Glyph.prototype.addAnchors = function( anchors ) {
+	return anchors.forEach(function(anchor) {
+		this.addAnchor(anchor);
+	}, this);
 };
 
 Glyph.prototype.addParentAnchor = function( item ) {
@@ -17292,7 +17675,7 @@ Glyph.prototype.prepareOT = function( path ) {
 };
 
 module.exports = Glyph;
-},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3}],6:[function(_dereq_,module,exports){
+},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3}],7:[function(_dereq_,module,exports){
 var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
 
 Object.defineProperty( paper.Segment.prototype, 'x', {
@@ -17314,30 +17697,52 @@ Object.defineProperty( paper.Segment.prototype, 'y', {
 });
 
 module.exports = paper.Segment;
-},{"../node_modules/paper/dist/paper-core.js":3}],7:[function(_dereq_,module,exports){
+},{"../node_modules/paper/dist/paper-core.js":3}],8:[function(_dereq_,module,exports){
 /* Extend the Path prototype to add OpenType conversion
  * and alias *segments methods and properties to *nodes
  */
-var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
+var paper = _dereq_('../node_modules/paper/dist/paper-core.js'),
+	proto = paper.PaperScope.prototype.Path.prototype;
+
+// Overwrite the constructor to handle object creator with nodes property
+// proto.constructor = function(obj) {
+// 	if ( obj && 'nodes' in obj ) {
+// 		obj.segments = obj.nodes
+// 	}
+// };
+
+// A mon avis c'est pas sur paper.Path.prototype qu'il faut faire tous ces changements
 
 // alias *Segments methods to *Nodes equivalents
-['addSegments', 'insertSegment', 'removeSegments'].forEach(function(name) {
-	paper.Path.prototype[name.replace('Segments', 'Nodes')] =
-		paper.Path.prototype[name];
+['add', 'insert', 'remove'].forEach(function(name) {
+	proto[name + 'Nodes'] =
+		proto[name + 'Segments'];
 });
 
 // alias .segments to .nodes
-Object.defineProperty(paper.Path.prototype, 'nodes', {
-	get: function() {
-		return this.segments;
+Object.defineProperties(proto, {
+	nodes: {
+		get: function() {
+			return this.segments;
+		}
+	},
+	firstNode: {
+		get: function() {
+			return this.firstSegment;
+		}
+	},
+	lastNode: {
+		get: function() {
+			return this.lastSegment;
+		}
 	}
 });
 
-paper.Path.prototype.prepareOT = function( path ) {
+proto.prepareOT = function( path ) {
 	path.commands.push({
 		type: 'M',
-		x: Math.round( this.firstSegment.point.x ) || 0,
-		y: Math.round( this.firstSegment.point.y ) || 0
+		x: Math.round( this._segments[0].point.x ) || 0,
+		y: Math.round( this._segments[0].point.y ) || 0
 	});
 
 	this.curves.forEach(function( curve ) {
@@ -17365,33 +17770,38 @@ paper.Path.prototype.prepareOT = function( path ) {
 };
 
 module.exports = paper.Path;
-},{"../node_modules/paper/dist/paper-core.js":3}],8:[function(_dereq_,module,exports){
+},{"../node_modules/paper/dist/paper-core.js":3}],9:[function(_dereq_,module,exports){
 var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	paper = _dereq_('../node_modules/paper/dist/paper-core.js'),
 	Font = _dereq_('./Font.js'),
 	Glyph = _dereq_('./Glyph.js'),
 	Path = _dereq_('./Path.js'),
-	Node = _dereq_('./Node.js');
+	Node = _dereq_('./Node.js'),
+	Collection = _dereq_('./Collection.js');
 
-function plumin() {}
+paper.PaperScope.prototype.Font = Font;
+paper.PaperScope.prototype.Glyph = Glyph;
+paper.PaperScope.prototype.Path = Path;
+paper.PaperScope.prototype.Node = Node;
+paper.PaperScope.prototype.Collection = Collection;
 
-plumin.Font = Font;
-plumin.Glyph = Glyph;
-plumin.Node = Node;
-plumin.Path = Path;
+function plumin( arg ) {
+	if ( arguments.length === 1 && arg instanceof Collection ) {
+		return arg;
+	}
 
-plumin.Point = paper.Point;
-plumin.Size = paper.Size;
-plumin.Rectangle = paper.Rectangle;
-plumin.Matrix = paper.Matrix;
+	var c = Object.create( Collection.prototype );
+	Collection.apply( c, arguments );
+	return c;
+}
 
-plumin.setup = paper.setup.bind(paper);
 plumin.opentype = opentype;
-plumin.paper = paper;
 
+plumin.proxy = Collection.proxy.bind(plumin);
+plumin.proxy(paper);
 
 module.exports = plumin;
-},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3,"./Font.js":4,"./Glyph.js":5,"./Node.js":6,"./Path.js":7}]},{},[8])(8)
+},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3,"./Collection.js":4,"./Font.js":5,"./Glyph.js":6,"./Node.js":7,"./Path.js":8}]},{},[9])(9)
 });
 
 

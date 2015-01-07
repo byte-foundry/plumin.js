@@ -6,26 +6,29 @@ p.setup({
 	height: 1024
 });
 
-var demo = new p.Font({ familyName: 'Demo' }),
-	glyph_p = demo.addGlyph(new p.Glyph({
+var demo = p.Font({ familyName: 'Demo' }),
+	glyph_p = p.Glyph({
 		name: 'p',
 		advanceWidth: 450
-	}));
+	});
 
-glyph_p.addContour(new p.Path.Rectangle({
-	point: [0, -255],
-	size: [100, 800]
-}));
-glyph_p.addContour(new p.Path.Ellipse({
-	point: [50, 0],
-	size: [400, 550]
-}));
-glyph_p.addContour((new p.Path.Ellipse({
-	point: [100, 100],
-	size: [250, 350]
-})).reverse());
+glyph_p.addContours([
+	p.Path.Rectangle({
+		point: [0, -255],
+		size: [100, 800]
+	}),
+	p.Path.Ellipse({
+		point: [50, 0],
+		size: [400, 550]
+	}),
+	p.Path.Ellipse({
+		point: [100, 100],
+		size: [250, 350]
+	}).reverse()
+]);
 
-demo.prepareOT();
+demo.addGlyph(glyph_p)
+	.prepareOT();
 
 // mkdir if not exist
 fs.mkdir('.tmp', function(err) {
@@ -39,7 +42,7 @@ fs.mkdir('.tmp', function(err) {
 		}
 
 		// ArrayBuffer to nodejs buffer
-		var buffer = new Buffer( new Uint8Array( demo.ot.toBuffer() ) );
+		var buffer = new Buffer( new Uint8Array( demo[0].ot.toBuffer() ) );
 		fs.write(fd, buffer, 0, buffer.length, null, function(err) {
 			if (err) {
 				return console.log(err);

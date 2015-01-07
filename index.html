@@ -82,80 +82,77 @@
 		<div class="row">
 			<div class="col w50 plm">
 				<textarea id="editor" class="editor">
-window.font = new plumin.Font({
+(function(p) {
+
+var font = p.Font({
 		familyName: 'Demo'
 	}),
 
 	// glyphs
-	A = new plumin.Glyph({
+	A = p.Glyph({
 		name: 'A',
 		advanceWidth: 512
 	}),
-	B = new plumin.Glyph({
+	B = p.Glyph({
 		name: 'B',
 		advanceWidth: 512
 	}),
-	C = new plumin.Glyph({
+	C = p.Glyph({
 		name: 'C',
 		advanceWidth: 512
 	}),
 
 	// contours
-	ctA = new plumin.Path({ closed: true }),
-	ctB = new plumin.Path({ closed: true }),
-	ctC = new plumin.Path({ closed: true });
+	ctA = p.Path({ closed: true }),
+	ctB = p.Path({ closed: true }),
+	ctC = p.Path({ closed: true });
 
-ctA.addNodes([
-	new plumin.Node({ point: [50, 0] }),
-	new plumin.Node({ point: [256, 800] }),
-	new plumin.Node({ point: [462, 0] })
-]);
+ctA.addNodes(p.Node([
+	{ point: [50, 0] },
+	{ point: [256, 800] },
+	{ point: [462, 0] }
+]));
 
-ctB.addNodes([
-	new plumin.Node({ point: [50, 0] }),
-	new plumin.Node({ point: [50, 800] }),
-	new plumin.Node({ point: [462, 800] }),
-	new plumin.Node({ point: [462, 0] })
-]);
+ctB.addNodes(p.Node([
+	{ point: [50, 0] },
+	{ point: [50, 800] },
+	{ point: [462, 800] },
+	{ point: [462, 0] }
+]));
 
-ctC.addNodes([
-	new plumin.Node({
+ctC.addNodes(p.Node([{
 		point: [50, 400],
 		handleIn: [0, -200],
 		handleOut: [0, 200]
-	}),
-	new plumin.Node({
+	},{
 		point: [256, 800],
 		handleIn: [-200, 0],
 		handleOut: [200, 0]
-	}),
-	new plumin.Node({
+	},{
 		point: [462, 400],
 		handleIn: [0, 200],
 		handleOut: [0, -200]
-	}),
-	new plumin.Node({
+	},{
 		point: [256, 0],
 		handleIn: [200, 0],
 		handleOut: [-200, 0]
-	})
-]);
+	}]));
 
 A.addContour(ctA);
 B.addContour(ctB);
 C.addContour(ctC);
 
-font.addGlyphs([
+window.font = font.addGlyphs([
 		A,
 		B,
 		C
-	]);
-font.prepareOT()
+	])
+	.prepareOT()
 	.addToFonts();
 
 /*
 // animation are only fluid in Chrome
-var center = new plumin.Point(256, 400);
+var center = p(p.Point, [256, 400]);
 window.onFrame = function() {
 	ctA.rotate(3, center);
 	ctB.rotate(-3, center);
@@ -165,6 +162,8 @@ window.onFrame = function() {
 		.addToFonts();
 };
 */
+
+})(plumin);
 				</textarea>
 
 				<div class="mtm txtcenter">
@@ -191,7 +190,7 @@ window.onFrame = function() {
 		<script src="dist/plumin.js"></script>
 
 		<script>
-			plumin.setup('hidden-canvas');
+			plumin.paper.setup('hidden-canvas');
 
 			var cm = CodeMirror.fromTextArea( document.getElementById('editor'), {
 				autoCloseBrackets: true
@@ -234,7 +233,11 @@ window.onFrame = function() {
 
 			function _runNoWorker() {
 				/*jslint evil: true */
-				( new Function( cm.getValue() ) )();
+				try {
+					( new Function( cm.getValue() ) )();
+				} catch(e) {
+					console.error(e);
+				}
 
 				if ( window.onFrame ) {
 					(function _onFrame() {
@@ -251,6 +254,8 @@ window.onFrame = function() {
 						[
 							'var window = self;\n' +
 
+							// importScripts doesn't work with inline worker.
+							// You wouldn't use inline workers and this trick in prod, though.
 							pluminSource + '\n' +
 
 							'plumin.setup({\n' +
@@ -260,7 +265,7 @@ window.onFrame = function() {
 
 							'var acceptMessage = true;\n' +
 
-							'plumin.Font.prototype.addToFonts = function() {\n' +
+							'plumin.paper.Font.prototype.addToFonts = function() {\n' +
 							'	var buffer = this.ot.toBuffer();\n' +
 							'	postMessage( buffer, [buffer] );\n' +
 							'	acceptMessage = true;\n' +
