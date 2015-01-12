@@ -300,7 +300,12 @@ Collection.proxy = function( paper ) {
 			'addContour',
 			'addContours',
 			'addComponent',
-			'addComponents'
+			'addComponents',
+
+			'addUnicode',
+			'prepareOt',
+			'addToFonts',
+			'download'
 		],
 		plural = [
 			'addChildren',

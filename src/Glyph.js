@@ -4,19 +4,15 @@ var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 function Glyph( args ) {
 	paper.CompoundPath.prototype.constructor.apply( this );
 
-	if ( args.unicode === undefined ) {
+	if ( args.unicode === undefined && args.name ) {
 		args.unicode = args.name.charCodeAt(0);
 	}
 
-	if ( typeof args.unicode === 'string' ) {
-		args.unicode = args.unicode.charCodeAt(0);
-	}
+	this.ot = new opentype.Glyph( args );
+	this.ot.path = new opentype.Path();
 
 	this.name = args.name;
 	this.unicode = args.unicode;
-
-	this.ot = new opentype.Glyph( args );
-	this.ot.path = new opentype.Path();
 
 	this.contours = ( args && args.contours ) || [];
 	this.anchors = ( args && args.anchors ) || [];
@@ -26,6 +22,17 @@ function Glyph( args ) {
 
 Glyph.prototype = Object.create(paper.CompoundPath.prototype);
 Glyph.prototype.constructor = Glyph;
+
+Object.defineProperty(Glyph, 'unicode', {
+	set: function( code ) {
+		this.ot.unicode = typeof code === 'string' ?
+			code.charCodeAt(0):
+			code;
+	},
+	get: function() {
+		return this.ot.unicode;
+	}
+});
 
 Glyph.prototype.addContour = function( item ) {
 	// prevent CompoundPath from arbitrarily changing the direction of paths
@@ -70,6 +77,12 @@ Glyph.prototype.addAnchors = function( anchors ) {
 Glyph.prototype.addParentAnchor = function( item ) {
 	this.parentAnchors.push( item );
 	return item;
+};
+
+Glyph.prototype.addUnicode = function( code ) {
+	this.ot.addUnicode( code );
+
+	return this;
 };
 
 Glyph.prototype.prepareOT = function( path ) {
