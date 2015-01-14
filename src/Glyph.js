@@ -18,6 +18,11 @@ function Glyph( args ) {
 	this.anchors = ( args && args.anchors ) || [];
 	this.components = ( args && args.components ) || [];
 	this.parentAnchors = ( args && args.parentAnchors ) || [];
+
+	// default fill color needed to display the glyph in a canvas
+	this.fillColor = new paper.Color(0,0,0);
+	// but each individual glyph must be explicitely made visible
+	this.visible = false;
 }
 
 Glyph.prototype = Object.create(paper.CompoundPath.prototype);
