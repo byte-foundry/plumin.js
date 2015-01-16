@@ -4,14 +4,6 @@
 var paper = require('../node_modules/paper/dist/paper-core.js'),
 	proto = paper.PaperScope.prototype.Path.prototype;
 
-// Overwrite the constructor to handle object creator with nodes property
-// not sure this is required, the setters might be enough
-// proto.constructor = function(obj) {
-// 	if ( obj && 'nodes' in obj ) {
-// 		obj.segments = obj.nodes
-// 	}
-// };
-
 // alias *Segments methods to *Nodes equivalents
 ['add', 'insert', 'remove'].forEach(function(name) {
 	proto[name + 'Nodes'] =

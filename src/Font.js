@@ -30,6 +30,17 @@ function Font( args ) {
 	if ( args && args.glyphs ) {
 		this.addGlyphs( args.glyphs );
 	}
+
+	this.addedFonts = [];
+	// work around https://bugzilla.mozilla.org/show_bug.cgi?id=1100005
+	// by using fonts.delete in batch, every 1 second
+	if ( typeof window === 'object' && window.document ) {
+		setInterval(function() {
+			while ( this.addedFonts.length > 1 ) {
+				document.fonts.delete( this.addedFonts.shift() );
+			}
+		}.bind(this), 1000);
+	}
 }
 
 Font.prototype.addGlyph = function( glyph ) {
@@ -133,12 +144,7 @@ if ( typeof window === 'object' && window.document ) {
 			);
 
 			document.fonts.add( fontface );
-
-			if ( this.lastFontFace ) {
-				document.fonts.delete( this.lastFontFace );
-			}
-
-			this.lastFontFace = fontface;
+			this.addedFonts.push( fontface );
 
 			return this;
 		}:

@@ -17390,6 +17390,15 @@ function Font( args ) {
 	if ( args && args.glyphs ) {
 		this.addGlyphs( args.glyphs );
 	}
+
+	this.addedFonts = [];
+	if ( typeof window === 'object' && window.document ) {
+		setInterval(function() {
+			while ( this.addedFonts.length > 1 ) {
+				document.fonts.delete( this.addedFonts.shift() );
+			}
+		}.bind(this), 1000);
+	}
 }
 
 Font.prototype.addGlyph = function( glyph ) {
@@ -17493,12 +17502,7 @@ if ( typeof window === 'object' && window.document ) {
 			);
 
 			document.fonts.add( fontface );
-
-			if ( this.lastFontFace ) {
-				document.fonts.delete( this.lastFontFace );
-			}
-
-			this.lastFontFace = fontface;
+			this.addedFonts.push( fontface );
 
 			return this;
 		}:
@@ -17675,14 +17679,6 @@ module.exports = paper.Segment;
  */
 var paper = _dereq_('../node_modules/paper/dist/paper-core.js'),
 	proto = paper.PaperScope.prototype.Path.prototype;
-
-// Overwrite the constructor to handle object creator with nodes property
-// not sure this is required, the setters might be enough
-// proto.constructor = function(obj) {
-// 	if ( obj && 'nodes' in obj ) {
-// 		obj.segments = obj.nodes
-// 	}
-// };
 
 // alias *Segments methods to *Nodes equivalents
 ['add', 'insert', 'remove'].forEach(function(name) {
