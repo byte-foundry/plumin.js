@@ -17392,6 +17392,8 @@ function Font( args ) {
 	}
 
 	this.addedFonts = [];
+	// work around https://bugzilla.mozilla.org/show_bug.cgi?id=1100005
+	// by using fonts.delete in batch, every 1 second
 	if ( typeof window === 'object' && window.document ) {
 		setInterval(function() {
 			while ( this.addedFonts.length > 1 ) {
