@@ -1,13 +1,13 @@
 {
   "name": "plumin.js",
-  "version": "0.5.0",
+  "version": "0.5.3",
   "description": "Create and manipulate fonts using javascript",
   "main": "dist/plumin.js",
   "scripts": {
     "prepublish": "npm run build && npm test",
     "build": "npm run browserify && npm run uglify",
-    "browserify": "browserify src/plumin.js --debug --standalone plumin | derequire | exorcist dist/plumin.js.map > dist/plumin.js",
-    "watchify": "watchify src/plumin.js --debug --standalone plumin -o dist/plumin.js -v",
+    "browserify": "browserify src/plumin.js --dg false --debug --standalone plumin | derequire | exorcist dist/plumin.js.map > dist/plumin.js",
+    "watchify": "watchify src/plumin.js --dg false --debug --standalone plumin -o dist/plumin.js -v",
     "uglify": "uglifyjs dist/plumin.js > dist/plumin.min.js",
     "test": "mocha test/*.js"
   },
@@ -28,14 +28,14 @@
   "homepage": "https://github.com/byte-foundry/plumin.js",
   "dependencies": {},
   "devDependencies": {
+    "browserify": "^7.0.0",
+    "chai": "^1.10.0",
+    "derequire": "~1.2.0",
+    "exorcist": "^0.1.6",
+    "mocha": "^2.0.1",
     "opentype.js": "~0.4.4",
     "paper": "^0.9.21",
-    "browserify": "^7.0.0",
-    "watchify": "^2.1.1",
-    "exorcist": "^0.1.6",
     "uglify-js": "^2.4.14",
-    "mocha": "^2.0.1",
-    "chai": "^1.10.0",
-    "derequire": "~1.2.0"
+    "watchify": "^2.1.1"
   }
 }
