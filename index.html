@@ -265,19 +265,25 @@ window.onFrame = function() {
 
 							'var acceptMessage = true;\n' +
 
+							// Overwrite addToFonts to send the buffer over to the UI
 							'plumin.paper.Font.prototype.addToFonts = function() {\n' +
 							'	var buffer = this.ot.toBuffer();\n' +
 							'	postMessage( buffer, [buffer] );\n' +
+							// the font has been generated and posted to the UI,
+							// we're ready to generate a new font
 							'	acceptMessage = true;\n' +
 							'};\n' +
 
 							'onmessage = function() {\n' +
 							'	if ( acceptMessage && self.onFrame ) {\n' +
-							// don't accept new messages until we have finished generating this font
+							// Don't accept new messages until we have finished generating this font.
+							// Without this condition, the worker starts drawning, resulting in lower framerate.
 							'		acceptMessage = false;\n' +
 							'		self.onFrame();\n' +
 							'	}\n' +
 							'};\n' +
+
+							// append the content of the textarea
 							cm.getValue()
 						],
 						{type: "text/javascript"}
