@@ -12,6 +12,8 @@ function Glyph( args ) {
 	this.ot.path = new opentype.Path();
 
 	this.name = args.name;
+	// workaround opentype 'unicode === 0' bug
+	this.ot.unicode = args.unicode;
 
 	this.contours = ( args && args.contours ) || [];
 	this.anchors = ( args && args.anchors ) || [];
