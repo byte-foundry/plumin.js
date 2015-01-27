@@ -136,14 +136,17 @@
 				window.addGlyphs = function( font ) {
 					var A = p.Glyph({
 							name: 'A',
+							unicode: 'A',
 							advanceWidth: 512
 						}),
 						B = p.Glyph({
 							name: 'B',
+							unicode: 'B',
 							advanceWidth: 512
 						}),
 						C = p.Glyph({
 							name: 'C',
+							unicode: 'C',
 							advanceWidth: 512
 						}),
 
@@ -218,14 +221,15 @@
 					font1[0].glyphMap.B.contours[0].rotate(-3, center);
 					font1[0].glyphMap.C.contours[0].rotate(3, center);
 
-					font1.prepareOT();
+
+					font1.updateOTCommands();
 					addToFontsNoDelete( font1[0] );
 
 					font2[0].glyphMap.A.contours[0].rotate(3, center);
 					font2[0].glyphMap.B.contours[0].rotate(-3, center);
 					font2[0].glyphMap.C.contours[0].rotate(3, center);
 
-					font2.prepareOT();
+					font2.updateOTCommands();
 					addToFontsDelete( font2[0] );
 
 					requestAnimationFrame(_onFrame);

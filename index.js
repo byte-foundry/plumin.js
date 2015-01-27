@@ -9,6 +9,7 @@ p.setup({
 var demo = p.Font({ familyName: 'Demo' }),
 	glyph_p = p.Glyph({
 		name: 'p',
+		unicode: 'p',
 		advanceWidth: 450
 	});
 
@@ -28,7 +29,7 @@ glyph_p.addContours([
 ]);
 
 demo.addGlyph(glyph_p)
-	.prepareOT();
+	.updateOTCommands();
 
 // mkdir if not exist
 fs.mkdir('.tmp', function(err) {

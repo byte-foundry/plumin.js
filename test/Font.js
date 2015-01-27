@@ -19,9 +19,9 @@ describe('Font', function() {
 					'C'.charCodeAt(0) + ''
 				];
 
-			font.addGlyph({name: 'A', unicode: 'A'.charCodeAt(0)});
-			font.addGlyph({name: 'B', unicode: 'B'.charCodeAt(0)});
-			font.addGlyph({name: 'C', unicode: 'C'.charCodeAt(0)});
+			font.addGlyph({name: 'A', ot: { unicode: 'A'.charCodeAt(0)} } );
+			font.addGlyph({name: 'B', ot: { unicode: 'B'.charCodeAt(0)} } );
+			font.addGlyph({name: 'C', ot: { unicode: 'C'.charCodeAt(0)} } );
 
 			expect(Object.keys( font.glyphMap )).to.deep.equal(['.notdef', 'A', 'B', 'C']);
 			expect(Object.keys( font.charMap )).to.deep.equal( expected );
@@ -30,9 +30,9 @@ describe('Font', function() {
 
 		it('should handle two glyphs sharing the same unicode', function() {
 			var font = new plumin.Font(),
-				a = {name: 'A', unicode: 'A'.charCodeAt(0)},
-				aBis = {name: 'A bis', unicode: 'A'.charCodeAt(0)},
-				aTer = {name: 'A ter', unicode: 'A'.charCodeAt(0)};
+				a = {name: 'A', ot: { unicode: 'A'.charCodeAt(0) } },
+				aBis = {name: 'A bis', ot: { unicode: 'A'.charCodeAt(0) } },
+				aTer = {name: 'A ter', ot: { unicode: 'A'.charCodeAt(0) } };
 
 			font.addGlyph(aTer);
 			font.addGlyph(aBis);
