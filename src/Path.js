@@ -17,7 +17,7 @@ Object.defineProperties(proto, {
 	lastNode: Object.getOwnPropertyDescriptor( proto, 'lastSegment' )
 });
 
-proto.prepareOT = function( path ) {
+proto.updateOTCommands = function( path ) {
 	path.commands.push({
 		type: 'M',
 		x: Math.round( this._segments[0].point.x ) || 0,

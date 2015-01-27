@@ -47,19 +47,23 @@ Font.prototype.addGlyph = function( glyph ) {
 	this.glyphs.push( glyph );
 	this.glyphMap[glyph.name] = glyph;
 
+	if ( glyph.ot.unicode === undefined ) {
+		return glyph;
+	}
+
 	// build the default cmap
 	// if multiple glyphs share the same unicode, use the glyph where unicode and name are equal
-	if ( !this.charMap[glyph.unicode] ||
-			( glyph.name.length === 1 && glyph.name.charCodeAt(0) === glyph.unicode ) ) {
+	if ( !this.charMap[glyph.ot.unicode] ||
+			( glyph.name.length === 1 && glyph.name.charCodeAt(0) === glyph.ot.unicode ) ) {
 
-		this.charMap[glyph.unicode] = glyph;
+		this.charMap[glyph.ot.unicode] = glyph;
 	}
 
 	// build the alternates map
-	if ( !this.altMap[glyph.unicode] ) {
-		this.altMap[glyph.unicode] = [];
+	if ( !this.altMap[glyph.ot.unicode] ) {
+		this.altMap[glyph.ot.unicode] = [];
 	}
-	this.altMap[glyph.unicode].push( glyph );
+	this.altMap[glyph.ot.unicode].push( glyph );
 
 	return glyph;
 };
@@ -106,11 +110,14 @@ Font.prototype.getGlyphSubset = function( set ) {
 	this._lastSubset = [
 		( this._subset || [] ).join(),
 		this.glyphs.filter(function( glyph ) {
-			if ( this._subset === false && ( glyph.unicode !== false || glyph.unicodes.length ) ) {
+			if ( this._subset === false &&
+					( glyph.ot.unicode !== undefined ||
+					( glyph.ot.unicodes && glyph.ot.unicodes.length ) ) ) {
+
 				return true;
 			}
 
-			if ( this._subset.indexOf( glyph.unicode ) !== -1 ) {
+			if ( this._subset && this._subset.indexOf( glyph.ot.unicode ) !== -1 ) {
 				return true;
 			}
 
@@ -123,10 +130,49 @@ Font.prototype.getGlyphSubset = function( set ) {
 	return this._lastSubset[1];
 };
 
-Font.prototype.prepareOT = function( set ) {
-	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
-		return glyph.prepareOT();
+Font.prototype.interpolate = function( font0, font1, coef, set ) {
+	this.getGlyphSubset( set ).map(function( glyph ) {
+		glyph.interpolate(
+			font0.glyphMap[glyph.name],
+			font1.glyphMap[glyph.name],
+			coef
+		);
 	});
+
+	// TODO: evaluate if taking subsetting into account makes kerning
+	// interpolation faster or slower.
+	if ( this.ot.kerningPairs ) {
+		for ( var i in this.ot.kerningPairs ) {
+			this.ot.kerningPairs[i] =
+				font0.ot.kerningPairs[i] +
+				( font1.ot.kerningPairs[i] - font0.ot.kerningPairs[i] ) * coef;
+		}
+	}
+
+	return this;
+};
+
+Font.prototype.updateOTCommands = function( set ) {
+	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
+		return glyph.updateOTCommands();
+	});
+
+	return this;
+};
+
+Font.prototype.importOT = function( otFont ) {
+	this.ot = otFont;
+
+	otFont.glyphs.forEach(function( otGlyph ) {
+		var glyph = new Glyph({
+				name: otGlyph.name,
+				unicode: otGlyph.unicode
+			});
+
+		this.addGlyph( glyph );
+		glyph.importOT( otGlyph );
+
+	}, this);
 
 	return this;
 };

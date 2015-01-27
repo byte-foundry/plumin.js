@@ -4289,7 +4289,7 @@ exports.sizeOf = sizeOf;
  *
  * All rights reserved.
  *
- * Date: Tue Jan 13 18:02:35 2015 +0100
+ * Date: Mon Jan 26 16:22:06 2015 +0100
  *
  ***
  *
@@ -4996,7 +4996,7 @@ var PaperScope = Base.extend({
 		if (!this.browser) {
 			var browser = proto.browser = {};
 			navigator.userAgent.toLowerCase().replace(
-				/(opera|chrome|safari|webkit|firefox|msie|trident)\/?\s*([.\d]+)(?:.*version\/([.\d]+))?(?:.*rv\:([.\d]+))?/g,
+				/(opera|chrome|safari|webkit|firefox|msie|trident|atom)\/?\s*([.\d]+)(?:.*version\/([.\d]+))?(?:.*rv\:([.\d]+))?/g,
 				function(all, n, v1, v2, rv) {
 					if (!browser.chrome) {
 						var v = n === 'opera' ? v2 : v1;
@@ -5013,6 +5013,8 @@ var PaperScope = Base.extend({
 			);
 			if (browser.chrome)
 				delete browser.webkit;
+			if (browser.atom)
+				delete browser.chrome;
 		}
 	},
 
@@ -9594,6 +9596,24 @@ var Segment = Base.extend({
 		this._changed();
 	},
 
+	interpolate: function(segment0, segment1, coef) {
+		var dxPoint = segment1._point._x - segment0._point._x,
+			dyPoint = segment1._point._y - segment0._point._y,
+			dxHandleIn = segment1._handleIn._x - segment0._handleIn._x,
+			dyHandleIn = segment1._handleIn._y - segment0._handleIn._y,
+			dxHandleOut = segment1._handleOut._x - segment0._handleOut._x,
+			dyHandleOut = segment1._handleOut._y - segment0._handleOut._y;
+
+		this._point._x = segment0._point._x + dxPoint * coef;
+		this._point._y = segment0._point._y + dyPoint * coef;
+		this._handleIn._x = segment0._handleIn._x + dxHandleIn * coef;
+		this._handleIn._y = segment0._handleIn._y + dyHandleIn * coef;
+		this._handleOut._x = segment0._handleOut._x + dxHandleOut * coef;
+		this._handleOut._y = segment0._handleOut._y + dyHandleOut * coef;
+
+		this._changed();
+	},
+
 	_transformCoordinates: function(matrix, coords, change) {
 		var point = this._point,
 			handleIn = !change || !this._handleIn.isZero()
@@ -11445,6 +11465,22 @@ var Path = PathItem.extend({
 		return this;
 	},
 
+	interpolate: function(path0, path1, coef) {
+		for (var i = 0, l = this._segments.length; i < l; i++) {
+			if ( !path0._segments[i] || !path1._segments[i] ) {
+				break;
+			}
+
+			this._segments[i].interpolate(
+				path0._segments[i],
+				path1._segments[i],
+				coef
+			);
+		}
+
+		this._changed(9);
+	},
+
 	toShape: function(insert) {
 		if (!this._closed)
 			return null;
@@ -12584,6 +12620,20 @@ var CompoundPath = PathItem.extend({
 			return path;
 		} else {
 			return reduce.base.call(this);
+		}
+	},
+
+	interpolate: function(compoundpath0, compoundpath1, coef) {
+		for (var i = 0, l = this._children.length; i < l; i++) {
+			if ( !compoundpath0._children[i] || !compoundpath1._children[i] ) {
+				break;
+			}
+
+			this._children[i].interpolate(
+				compoundpath0._children[i],
+				compoundpath1._children[i],
+				coef
+			);
 		}
 	},
 
@@ -17407,19 +17457,23 @@ Font.prototype.addGlyph = function( glyph ) {
 	this.glyphs.push( glyph );
 	this.glyphMap[glyph.name] = glyph;
 
+	if ( glyph.ot.unicode === undefined ) {
+		return glyph;
+	}
+
 	// build the default cmap
 	// if multiple glyphs share the same unicode, use the glyph where unicode and name are equal
-	if ( !this.charMap[glyph.unicode] ||
-			( glyph.name.length === 1 && glyph.name.charCodeAt(0) === glyph.unicode ) ) {
+	if ( !this.charMap[glyph.ot.unicode] ||
+			( glyph.name.length === 1 && glyph.name.charCodeAt(0) === glyph.ot.unicode ) ) {
 
-		this.charMap[glyph.unicode] = glyph;
+		this.charMap[glyph.ot.unicode] = glyph;
 	}
 
 	// build the alternates map
-	if ( !this.altMap[glyph.unicode] ) {
-		this.altMap[glyph.unicode] = [];
+	if ( !this.altMap[glyph.ot.unicode] ) {
+		this.altMap[glyph.ot.unicode] = [];
 	}
-	this.altMap[glyph.unicode].push( glyph );
+	this.altMap[glyph.ot.unicode].push( glyph );
 
 	return glyph;
 };
@@ -17466,11 +17520,14 @@ Font.prototype.getGlyphSubset = function( set ) {
 	this._lastSubset = [
 		( this._subset || [] ).join(),
 		this.glyphs.filter(function( glyph ) {
-			if ( this._subset === false && ( glyph.unicode !== false || glyph.unicodes.length ) ) {
+			if ( this._subset === false &&
+					( glyph.ot.unicode !== undefined ||
+					( glyph.ot.unicodes && glyph.ot.unicodes.length ) ) ) {
+
 				return true;
 			}
 
-			if ( this._subset.indexOf( glyph.unicode ) !== -1 ) {
+			if ( this._subset && this._subset.indexOf( glyph.ot.unicode ) !== -1 ) {
 				return true;
 			}
 
@@ -17483,10 +17540,49 @@ Font.prototype.getGlyphSubset = function( set ) {
 	return this._lastSubset[1];
 };
 
-Font.prototype.prepareOT = function( set ) {
-	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
-		return glyph.prepareOT();
+Font.prototype.interpolate = function( font0, font1, coef, set ) {
+	this.getGlyphSubset( set ).map(function( glyph ) {
+		glyph.interpolate(
+			font0.glyphMap[glyph.name],
+			font1.glyphMap[glyph.name],
+			coef
+		);
 	});
+
+	// TODO: evaluate if taking subsetting into account makes kerning
+	// interpolation faster or slower.
+	if ( this.ot.kerningPairs ) {
+		for ( var i in this.ot.kerningPairs ) {
+			this.ot.kerningPairs[i] =
+				font0.ot.kerningPairs[i] +
+				( font1.ot.kerningPairs[i] - font0.ot.kerningPairs[i] ) * coef;
+		}
+	}
+
+	return this;
+};
+
+Font.prototype.updateOTCommands = function( set ) {
+	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
+		return glyph.updateOTCommands();
+	});
+
+	return this;
+};
+
+Font.prototype.importOT = function( otFont ) {
+	this.ot = otFont;
+
+	otFont.glyphs.forEach(function( otGlyph ) {
+		var glyph = new Glyph({
+				name: otGlyph.name,
+				unicode: otGlyph.unicode
+			});
+
+		this.addGlyph( glyph );
+		glyph.importOT( otGlyph );
+
+	}, this);
 
 	return this;
 };
@@ -17553,15 +17649,14 @@ var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 function Glyph( args ) {
 	paper.CompoundPath.prototype.constructor.apply( this );
 
-	if ( args.unicode === undefined && args.name ) {
-		args.unicode = args.name.charCodeAt(0);
+	if ( args && typeof args.unicode === 'string' ) {
+		args.unicode = args.unicode.charCodeAt(0);
 	}
 
 	this.ot = new opentype.Glyph( args );
 	this.ot.path = new opentype.Path();
 
 	this.name = args.name;
-	this.unicode = args.unicode;
 
 	this.contours = ( args && args.contours ) || [];
 	this.anchors = ( args && args.anchors ) || [];
@@ -17577,6 +17672,7 @@ function Glyph( args ) {
 Glyph.prototype = Object.create(paper.CompoundPath.prototype);
 Glyph.prototype.constructor = Glyph;
 
+// Todo: handle unicode updates
 Object.defineProperty(Glyph, 'unicode', {
 	set: function( code ) {
 		this.ot.unicode = typeof code === 'string' ?
@@ -17639,17 +17735,97 @@ Glyph.prototype.addUnicode = function( code ) {
 	return this;
 };
 
-Glyph.prototype.prepareOT = function( path ) {
+Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
+	for (var i = 0, l = this.contours.length; i < l; i++) {
+		// The number of children should be the same everywhere,
+		// but we're going to try our best anyway
+		if ( !glyph0.contours[i] || !glyph1.contours[i] ) {
+			break;
+		}
+
+		this.contours[i].interpolate(
+			glyph0.contours[i],
+			glyph1.contours[i],
+			coef
+		);
+
+		this.ot.advanceWidth =
+			glyph0.ot.advanceWidth +
+			( glyph1.ot.advanceWidth - glyph0.ot.advanceWidth ) * coef;
+		this.ot.leftSideBearing =
+			glyph0.ot.leftSideBearing +
+			( glyph1.ot.leftSideBearing - glyph0.ot.leftSideBearing ) * coef;
+		this.ot.xMax =
+			glyph0.ot.xMax + ( glyph1.ot.xMax - glyph0.ot.xMax ) * coef;
+		this.ot.xMin =
+			glyph0.ot.xMin + ( glyph1.ot.xMin - glyph0.ot.xMin ) * coef;
+		this.ot.yMax =
+			glyph0.ot.yMax + ( glyph1.ot.yMax - glyph0.ot.yMax ) * coef;
+		this.ot.yMin =
+			glyph0.ot.yMin + ( glyph1.ot.yMin - glyph0.ot.yMin ) * coef;
+	}
+
+	return this;
+};
+
+Glyph.prototype.updateOTCommands = function( path ) {
 	if ( !path ) {
 		this.ot.path.commands = [];
 		path = this.ot.path;
 	}
 
 	this.contours.forEach(function( contour ) {
-		contour.prepareOT( this.ot.path );
+		contour.updateOTCommands( this.ot.path );
 	}, this);
 
 	return this.ot;
+};
+
+Glyph.prototype.importOT = function( otGlyph ) {
+	var current;
+	this.ot = otGlyph;
+
+	if ( !otGlyph.path || !otGlyph.path.commands ) {
+		return;
+	}
+
+	this.ot.path.commands.forEach(function(command) {
+		switch ( command.type ) {
+			case 'M':
+				current = new paper.Path();
+				this.addContour( current );
+
+				current.moveTo( command );
+				break;
+			case 'L':
+				current.lineTo( command );
+				break;
+			case 'C':
+				current.cubicCurveTo(
+					[command.x1, command.y1],
+					[command.x2, command.y2],
+					command
+				);
+				break;
+			case 'Q':
+				current.quadraticCurveTo(
+					[command.x1, command.y1],
+					command
+				);
+				break;
+			case 'Z':
+				// When the glyph has no contour,
+				// they contain a single Z command in
+				// opentype.js.
+				// TODO: see how we should handle that
+				if ( current ) {
+					current.closePath();
+				}
+				break;
+		}
+	}, this);
+
+	return this;
 };
 
 module.exports = Glyph;
@@ -17695,7 +17871,7 @@ Object.defineProperties(proto, {
 	lastNode: Object.getOwnPropertyDescriptor( proto, 'lastSegment' )
 });
 
-proto.prepareOT = function( path ) {
+proto.updateOTCommands = function( path ) {
 	path.commands.push({
 		type: 'M',
 		x: Math.round( this._segments[0].point.x ) || 0,

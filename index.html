@@ -91,14 +91,17 @@ var font = p.Font({
 	// glyphs
 	A = p.Glyph({
 		name: 'A',
+		unicode: 'A',
 		advanceWidth: 512
 	}),
 	B = p.Glyph({
 		name: 'B',
+		unicode: 'B',
 		advanceWidth: 512
 	}),
 	C = p.Glyph({
 		name: 'C',
+		unicode: 'C',
 		advanceWidth: 512
 	}),
 
@@ -147,7 +150,7 @@ window.font = font.addGlyphs([
 		B,
 		C
 	])
-	.prepareOT()
+	.updateOTCommands()
 	.addToFonts();
 
 /*
@@ -158,7 +161,7 @@ window.onFrame = function() {
 	ctB.rotate(-3, center);
 	ctC.rotate(3, center);
 
-	font.prepareOT()
+	font.updateOTCommands()
 		.addToFonts();
 };
 */
@@ -249,43 +252,14 @@ window.onFrame = function() {
 			}
 
 			function _runWorker() {
+				// Create a worker using the inline script tag below
+				// (only to avoid adding one more file to the project)
 				worker = new Worker(
 					_URL.createObjectURL( new Blob(
-						[
-							'var window = self;\n' +
-
-							// importScripts doesn't work with inline worker.
-							// You wouldn't use inline workers and this trick in prod, though.
-							pluminSource + '\n' +
-
-							'plumin.setup({\n' +
-							'	width: 1024,\n' +
-							'	height: 1024\n' +
-							'});\n' +
-
-							'var acceptMessage = true;\n' +
-
-							// Overwrite addToFonts to send the buffer over to the UI
-							'plumin.paper.Font.prototype.addToFonts = function() {\n' +
-							'	var buffer = this.ot.toBuffer();\n' +
-							'	postMessage( buffer, [buffer] );\n' +
-							// the font has been generated and posted to the UI,
-							// we're ready to generate a new font
-							'	acceptMessage = true;\n' +
-							'};\n' +
-
-							'onmessage = function() {\n' +
-							'	if ( acceptMessage && self.onFrame ) {\n' +
-							// Don't accept new messages until we have finished generating this font.
-							// Without this condition, the worker starts drawning, resulting in lower framerate.
-							'		acceptMessage = false;\n' +
-							'		self.onFrame();\n' +
-							'	}\n' +
-							'};\n' +
-
-							// append the content of the textarea
-							cm.getValue()
-						],
+						[document.getElementById('workerscript')
+							.textContent
+							.replace('PLUMINSOURCE', pluminSource)
+							.replace('TEXTAREASOURCE', cm.getValue())],
 						{type: "text/javascript"}
 					))
 				);
@@ -305,9 +279,45 @@ window.onFrame = function() {
 				return lastBuffer ?
 					_font.download( lastBuffer ):
 					window.font
-						.prepareOT()
+						.updateOTCommands()
 						.download();
 			}
+		</script>
+
+		<script id="workerscript" type="text/workerscript">
+			var window = self;
+
+			// importScripts doesn't work with inline worker.
+			// The following placeholder will be replaced with plumin source.
+			// You wouldn't use inline workers and this trick in prod, though.
+			PLUMINSOURCE
+
+			plumin.setup({
+				width: 1024,
+				height: 1024
+			});
+
+			var acceptMessage = true;
+
+			// Overwrite addToFonts to send the buffer over to the UI
+			plumin.paper.Font.prototype.addToFonts = function() {
+				var buffer = this.ot.toBuffer();
+				postMessage( buffer, [buffer] );
+				// the font has been generated and posted to the UI,
+				// we're ready to generate a new font
+				acceptMessage = true;
+			};
+
+			onmessage = function() {
+				if ( acceptMessage && self.onFrame ) {
+					// Don't accept new messages until we have finished generating this font.
+					// Without this condition, the worker starts drawning, resulting in lower framerate.
+					acceptMessage = false;
+					self.onFrame();
+				}
+			};
+
+			TEXTAREASOURCE
 		</script>
 
 		<script>
