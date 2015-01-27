@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="">
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+		<meta name="viewport" content="width=device-width, initial-scale=1, minimal-ui">
+		<title>Plumin.js | Create and manipulate fonts using javascript | Live font interpolation</title>
+		<meta name="description" content="An experiment with plumin.js and font interpolation. It Vorx!">
+		<!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+
+		<link rel="stylesheet" href="bower_components/knacss/css/knacss.css" />
+		<style>
+			textarea.result {
+				height: 350px;
+				width: 800px;
+				padding: 20px;
+
+				border: 0;
+				border-radius: 0;
+
+				font-family: 'Demo', sans-serif;
+				font-size: 50px;
+
+				resize: none;
+			}
+
+			.btn {
+				border: 1px solid #CCC;
+				border-radius: 3px;
+
+				margin-top: 10px;
+				padding: 5px 10px;
+
+				font-size: 25px;
+				text-decoration: none;
+			}
+
+			.fb-like {
+				height: 20px;
+				font-size: 0;
+			}
+
+			.gh-star {
+				width: 106px;
+			}
+		</style>
+
+	</head>
+	<body>
+		<!--[if lt IE 10]>
+			<p class="chromeframe">You are using an outdated browser. <a href="http://browsehappy.com/">Upgrade your browser today</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to better experience this site.</p>
+		<![endif]-->
+
+		<div id="fb-root"></div>
+		<script>(function(d, s, id) {
+			var js, fjs = d.getElementsByTagName(s)[0];
+			if (d.getElementById(id)) return;
+			js = d.createElement(s); js.id = id;
+			js.src = "//connect.facebook.net/en_GB/sdk.js#xfbml=1&appId=1398681457099665&version=v2.0";
+			fjs.parentNode.insertBefore(js, fjs);
+		}(document, 'script', 'facebook-jssdk'));</script>
+
+		<a href="https://github.com/byte-foundry/plumin.js"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a>
+
+		<h1 class="man ptm plm">
+			<img src="plumin.png" alt="Plumin.js" style="height: 50px;">
+			<span class="h2" style="vertical-align: -12px">
+			&nbsp;– Interpolate like no one's watching.
+			</span>
+		</h1>
+
+		<div class="pbm plm">
+			<iframe class="gh-star" src="https://ghbtns.com/github-btn.html?user=byte-foundry&repo=plumin.js&type=star&count=true" frameborder="0" scrolling="0" width="170px" height="20px"></iframe>
+			<a href="https://twitter.com/share" class="twitter-share-button" data-via="prototypoApp">Tweet</a> <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
+			<div class="fb-like" data-layout="button_count" data-action="like" data-show-faces="false" data-share="false"></div>
+		</div>
+
+		<div class="row">
+			<div class="col w50 plm">
+				Light <input type="range" step="0.1" min="0" max="1" value="0" oninput="_interpolate(this.value);" /> Heavy<br/>
+				<textarea id="result" class="result pal" oninput="_subset(this.value);">
+Amazingly few discotheques provide jukeboxes
+(I'm a textarea!)</textarea>
+
+				<div class="mtm">
+					<a href="#" class="btn" onclick="_download();" download="demo.otf">▽ Download</a>
+				</div>
+			</div>
+		</div>
+
+		<canvas id="hidden-canvas" width="1024" height="1024" hidden />
+
+		<script src="dist/plumin.js"></script>
+
+		<script>
+			plumin.paper.setup('hidden-canvas');
+
+			var _URL = window.URL || window.webkitURL,
+				lastBuffer,
+				lastSubset,
+				pluminSource,
+				lightBuffer,
+				heavyBuffer,
+				worker,
+				// this font will be used for its addToFonts method
+				font = new plumin.Font({
+					familyName: 'Demo'
+				});
+
+			_get('dist/plumin.js', 'text', function(response) {
+				pluminSource = response;
+				if ( pluminSource && lightBuffer && heavyBuffer ) {
+					_initWorker();
+				}
+			});
+
+			_get('fonts/CoelacLight.otf', 'arraybuffer', function(response) {
+				lightBuffer = response;
+				if ( pluminSource && lightBuffer && heavyBuffer ) {
+					_initWorker();
+				}
+			});
+
+			_get('fonts/CoelacHeavy.otf', 'arraybuffer', function(response) {
+				heavyBuffer = response;
+				if ( pluminSource && lightBuffer && heavyBuffer ) {
+					_initWorker();
+				}
+			});
+
+			function _get(url, type, cb) {
+				var xhr = new XMLHttpRequest();
+				xhr.open('get', url, true);
+				xhr.responseType = type;
+				xhr.onload = function () {
+					if ( this.status === 200 ) {
+						cb( this.response );
+					}
+				};
+				xhr.send();
+			}
+
+			function _initWorker() {
+				// Create a worker using the inline script tag below
+				// (only to avoid adding one more file to the project)
+				worker = new Worker(
+					_URL.createObjectURL( new Blob(
+						[document.getElementById('workerscript')
+							.textContent
+							.replace('PLUMINSOURCE', pluminSource)],
+						{type: "text/javascript"}
+					))
+				);
+
+				worker.postMessage(
+					// message
+					[lightBuffer, heavyBuffer],
+					// transfer list
+					[lightBuffer, heavyBuffer]
+				);
+
+				// send initial subset
+				worker.postMessage(
+					lastSubset = _subsetFromText(
+						document.getElementById('result').value
+					)
+				);
+
+				worker.onmessage = function(e) {
+					font.addToFonts( lastBuffer = e.data );
+				};
+			}
+
+			function _subsetFromText( text ) {
+				return text.split('')
+					.filter(function(e, i, arr) {
+						return arr.lastIndexOf(e) === i;
+					})
+					.sort()
+					.join('');
+			}
+
+			// TODO: throttle calls
+			function _interpolate( value ) {
+				if ( !worker ) {
+					return;
+				}
+
+				worker.postMessage( +value );
+			}
+
+			// TODO: throttle calls
+			function _subset( value ) {
+				var tmp = _subsetFromText( value );
+
+				if ( tmp !== lastSubset ) {
+					worker.postMessage( lastSubset = tmp );
+				}
+			}
+
+			function _download() {
+				return lastBuffer ?
+					font.download( lastBuffer ):
+					window.font
+						.updateOTCommands()
+						.download();
+			}
+		</script>
+
+		<script id="workerscript" type="text/workerscript">
+			var window = self,
+				otFont0,
+				otFont1,
+				font,
+				font0,
+				font1,
+				coef = 0;
+
+			// importScripts doesn't work with inline worker.
+			// The following placeholder will be replaced with plumin source.
+			// You wouldn't use inline workers and this trick in prod, though.
+			PLUMINSOURCE
+
+			plumin.paper.setup({
+				width: 1024,
+				height: 1024
+			});
+
+			// Overwrite addToFonts to send the buffer over to the UI
+			plumin.paper.Font.prototype.addToFonts = function() {
+				var buffer = this.ot.toBuffer();
+				postMessage( buffer, [buffer] );
+			};
+
+			onmessage = function( message ) {
+				var data = message.data;
+
+				switch ( typeof data ) {
+				// parse incoming .otf ArrayBuffers
+				case 'object':
+					if ( !data[0] || data[0].constructor !== ArrayBuffer ) {
+						return;
+					}
+
+					otFont0 = plumin.opentype.parse( data[0] );
+					otFont1 = plumin.opentype.parse( data[1] );
+
+					font = new plumin.paper.Font();
+					// save default encoding
+					var encoding = font.ot.encoding;
+					font.importOT( otFont0 );
+					font.ot.familyName = 'Demo';
+					font.ot.encoding = encoding;
+
+					font0 = new plumin.paper.Font();
+					font0.importOT( otFont0 );
+					font0.ot.familyName = 'font0';
+
+					font1 = new plumin.paper.Font();
+					font1.importOT( otFont1 );
+					font1.ot.familyName = 'font1';
+					break;
+
+				// parse incoming subset
+				case 'string':
+					// TODO: optimize to only interpolate new glyphs added to the subset
+					font.subset = data.split('');
+					font.interpolate(font0, font1, coef)
+						.updateOTCommands()
+						.addToFonts();
+					break;
+
+				// parse incoming interpolation coef
+				case 'number':
+					coef = data;
+					font.interpolate(font0, font1, coef)
+						.updateOTCommands()
+						.addToFonts();
+					break;
+				}
+			};
+		</script>
+	</body>
+</html>
+

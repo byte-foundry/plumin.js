@@ -3,7 +3,7 @@
 What is this?
 =============
 
-It's a tool to ***create and manipulate fonts using javascript***.
+It's a tool to **create and manipulate fonts using javascript**.
 
 We hope that the interactive, connected, hackable nature of the web
 will bring more type-design enthusiasts to font-scripting,
@@ -20,7 +20,7 @@ Status
 ------
 
 Plumin.js is a work in progress and should be considered in alpha state
-(it still lacks OpenType import and UFO import/export).
+(it still lacks UFO support and proper documentation).
 It's a Free and Open-Source Software, MIT licensed and hosted on [Github](https://github.com/byte-foundry/plumin.js)
 (a cozy place where free-range code thrives, and [bugs are hunted down](https://github.com/byte-foundry/plumin.js/issues)).
 
@@ -33,3 +33,25 @@ Docs
 
 Getting started
 ---------------
+
+Try Plumin.js [in your browser](http://plnkr.co/edit/gist:6fcfaa9c968fd6392fb3?p=preview),
+then [https://github.com/byte-foundry/plumin.js/archive/master.zip](download it)
+or install it using [NPM](https://docs.npmjs.com/getting-started/what-is-npm).
+
+API Reference
+-------------
+
+**We need help getting Font and Glyph types merged into Paper.js and properly documented.**
+[Get in touch](mailto:contact@prototypo.io) if you want to give a hand!
+
+In the meantime, use the existing [Paper.js reference](http://paperjs.org/reference),
+read [Plumin.js sources](https://github.com/byte-foundry/plumin.js/tree/master/src)
+and the demos we've built
+(using [requestAnimationFrame and WebWorker](http://byte-foundry.github.io/plumin.js/index.html),
+using [Node.js](https://github.com/byte-foundry/plumin.js/blob/master/index.js)</a>,
+using [interpolation](http://byte-foundry.github.io/plumin.js/interpolate.html)).
+
+License
+=======
+
+MIT licensed, see LICENSE file.
