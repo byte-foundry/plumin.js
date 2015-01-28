@@ -1,7 +1,10 @@
 ![Plumin.js logo](http://byte-foundry.github.io/plumin.js/plumin.png)
 
-What is this?
-=============
+[![Dependency Status](https://david-dm.org/byte-foundry/plumin.js.svg?theme=shields.io)](https://david-dm.org/byte-foundry/plumin.js)
+[![devDependency Status](https://david-dm.org/byte-foundry/plumin.js/dev-status.svg?theme=shields.io)](https://david-dm.org/byte-foundry/plumin.js#info=devDependencies)
+[![Gitter](https://badges.gitter.im/Join Chat.svg)](https://gitter.im/byte-foundry/prototypo?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
+# What is this?
 
 It's a tool to **create and manipulate fonts using javascript**.
 
@@ -16,8 +19,7 @@ and [opentype.js](https://github.com/nodebox/opentype.js).
 It can run in the browser (in a [WebWorker](https://developer.mozilla.org/en-US/docs/Web/API/Worker) for optimal performances)
 or in [node.js](http://nodejs.org/).
 
-Status
-------
+## Status
 
 Plumin.js is a work in progress and should be considered in alpha state
 (it still lacks UFO support and proper documentation).
@@ -28,18 +30,15 @@ It's developped in parallel with [Prototypo](http://prototypo.io),
 an online app that uses parametric typefaces to design fonts faster.
 You can expect frequent updates and improvements in Plumin.js and upstream projects it uses.
 
-Docs
-====
+# Docs
 
-Getting started
----------------
+## Getting started
 
 Try Plumin.js [in your browser](http://plnkr.co/edit/gist:6fcfaa9c968fd6392fb3?p=preview),
-then [https://github.com/byte-foundry/plumin.js/archive/master.zip](download it)
+then [download it](https://github.com/byte-foundry/plumin.js/archive/master.zip)
 or install it using [NPM](https://docs.npmjs.com/getting-started/what-is-npm).
 
-API Reference
--------------
+## API Reference
 
 **We need help getting Font and Glyph types merged into Paper.js and properly documented.**
 [Get in touch](mailto:contact@prototypo.io) if you want to give a hand!
@@ -51,7 +50,6 @@ and the demos we've built
 using [Node.js](https://github.com/byte-foundry/plumin.js/blob/master/index.js)</a>,
 using [interpolation](http://byte-foundry.github.io/plumin.js/interpolate.html)).
 
-License
-=======
+# License
 
 MIT licensed, see LICENSE file.
