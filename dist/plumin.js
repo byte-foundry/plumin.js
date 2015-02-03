@@ -17170,7 +17170,7 @@ function wrapConstructor( constructor, prototype, useConstructed ) {
 	};
 }
 
-var rconstructor = /(^|\.)[A-Z][a-z]+$/;
+var rconstructor = /(^|\.)[A-Z][A-z]+$/;
 function constructorFilter( name ) {
 	return typeof this[name] === 'function' && rconstructor.test(name);
 }
