@@ -15,7 +15,7 @@ function Glyph( args ) {
 	// workaround opentype 'unicode === 0' bug
 	this.ot.unicode = args.unicode;
 
-	this.contours = ( args && args.contours ) || [];
+	//this.contours = ( args && args.contours ) || [];
 	this.anchors = ( args && args.anchors ) || [];
 	this.components = ( args && args.components ) || [];
 	this.parentAnchors = ( args && args.parentAnchors ) || [];
@@ -30,7 +30,7 @@ Glyph.prototype = Object.create(paper.CompoundPath.prototype);
 Glyph.prototype.constructor = Glyph;
 
 // Todo: handle unicode updates
-Object.defineProperty(Glyph, 'unicode', {
+Object.defineProperty(Glyph.prototype, 'unicode', {
 	set: function( code ) {
 		this.ot.unicode = typeof code === 'string' ?
 			code.charCodeAt(0):
@@ -41,22 +41,46 @@ Object.defineProperty(Glyph, 'unicode', {
 	}
 });
 
-Glyph.prototype.addContour = function( item ) {
-	// prevent CompoundPath from arbitrarily changing the direction of paths
-	if ( item._clockwise === undefined ) {
-		item._clockwise = null;
+// proxy *Child/*Children methods to *Contour/*Contours
+// This has the added benefit of preventing CompoundPath#insertChildren
+// from arbitrarily changing the direction of paths
+Object.getOwnPropertyNames( paper.Item.prototype )
+	.forEach(function(name, i) {
+		// exclude getters and non-methods
+		if ( Object.getOwnPropertyDescriptor(this, name).get ||
+				typeof this[name] !== 'function' ) {
+			return;
+		}
+
+		if ( name.indexOf('Children') !== -1 ) {
+			this[name.replace('Children', 'Contours')] = this[name];
+
+		} else if ( name.indexOf('Child') !== -1 ) {
+			this[name.replace('Child', 'Contour')] = this[name];
+		}
+
+	}, paper.Item.prototype);
+
+// Fix two problems with CompoundPath#insertChildren:
+// - it arbitrarily changes the direction of paths
+// - it seems that it doesn't handle CompoundPath arguments
+Glyph.prototype.insertChildren = function(index, items, _preserve) {
+	if ( Array.isArray( items ) ) {
+		// flatten items to handle CompoundPath children
+		items = [].concat.apply([], items.map(function(item) {
+			return item instanceof paper.Path ? item : item.children;
+		}));
 	}
 
-	this.addChild( item );
-	this.contours.push( item );
-	return item;
+	return paper.Item.prototype.insertChildren.call(this, index, items, _preserve, paper.Path);
 };
 
-Glyph.prototype.addContours = function( contours ) {
-	return contours.forEach(function(contour) {
-		this.addContour(contour);
-	}, this);
-};
+// proxy .children to .contours
+Object.defineProperty(
+	Glyph.prototype,
+	'contours',
+	Object.getOwnPropertyDescriptor( paper.Item.prototype, 'children' )
+);
 
 Glyph.prototype.addComponent = function( item ) {
 	this.addChild( item );

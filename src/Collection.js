@@ -99,7 +99,7 @@ function wrapConstructor( constructor, prototype, useConstructed ) {
 	};
 }
 
-var rconstructor = /(^|\.)[A-Z][a-z]+$/;
+var rconstructor = /(^|\.)[A-Z][A-z]+$/;
 function constructorFilter( name ) {
 	return typeof this[name] === 'function' && rconstructor.test(name);
 }
@@ -224,7 +224,7 @@ Collection.proxy = function( paper ) {
 	});
 
 		// addChild( item ) and other methods with similar signatures
-		// that we want to turn to addChild([constructor, ] item) and make chainable
+		// that we want to make chainable
 	var chain = [
 			'set',
 			'setX',
@@ -295,10 +295,12 @@ Collection.proxy = function( paper ) {
 			'addGlyph',
 			'addGlyphs',
 
+			'addContour',
+			'insertContour',
+			'addContours',
+			'insertContours',
 			'addAnchor',
 			'addAnchors',
-			'addContour',
-			'addContours',
 			'addComponent',
 			'addComponents',
 
@@ -317,6 +319,7 @@ Collection.proxy = function( paper ) {
 			'addGlyphs',
 			'addAnchors',
 			'addContours',
+			'insertContours',
 			'addComponents'
 		],
 		mathPoinFn = [

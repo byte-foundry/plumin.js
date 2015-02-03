@@ -1,5 +1,5 @@
 !function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.plumin=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
-!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.opentype=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof _dereq_=="function"&&_dereq_;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof _dereq_=="function"&&_dereq_;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
+!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.opentype=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof _dereq_=="function"&&_dereq_;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof _dereq_=="function"&&_dereq_;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
 // Run-time checking of preconditions.
 
 'use strict';
@@ -294,6 +294,8 @@ function Font(options) {
     this.copyright = options.copyright || ' ';
     this.trademark = options.trademark || ' ';
     this.unitsPerEm = options.unitsPerEm || 1000;
+    this.ascender = options.ascender;
+    this.descender = options.descender;
     this.supported = true;
     this.glyphs = options.glyphs || [];
     this.encoding = new encoding.DefaultEncoding(this);
@@ -961,7 +963,7 @@ exports.Path = path.Path;
 exports.parse = parseBuffer;
 exports.load = load;
 
-},{"./encoding":3,"./font":4,"./glyph":5,"./parse":7,"./path":8,"./tables/cff":10,"./tables/cmap":11,"./tables/glyf":12,"./tables/gpos":13,"./tables/head":14,"./tables/hhea":15,"./tables/hmtx":16,"./tables/kern":17,"./tables/loca":18,"./tables/maxp":19,"./tables/name":20,"./tables/os2":21,"./tables/post":22}],7:[function(_dereq_,module,exports){
+},{"./encoding":3,"./font":4,"./glyph":5,"./parse":7,"./path":8,"./tables/cff":10,"./tables/cmap":11,"./tables/glyf":12,"./tables/gpos":13,"./tables/head":14,"./tables/hhea":15,"./tables/hmtx":16,"./tables/kern":17,"./tables/loca":18,"./tables/maxp":19,"./tables/name":20,"./tables/os2":21,"./tables/post":22,"fs":undefined}],7:[function(_dereq_,module,exports){
 // Parsing utility functions
 
 'use strict';
@@ -2173,6 +2175,22 @@ function glyphToOps(glyph) {
     y = 0;
     for (i = 0; i < path.commands.length; i += 1) {
         cmd = path.commands[i];
+        if (cmd.type === 'Q') {
+            // CFF only supports bézier curves, so convert the quad to a bézier.
+            var _13 = 1 / 3;
+            var _23 = 2 / 3;
+            // We're going to create a new command so we don't change the original path.
+            cmd = {
+                type: 'C',
+                x: cmd.x,
+                y: cmd.y,
+                x1: _13 * x + _23 * cmd.x1,
+                y1: _13 * y + _23 * cmd.y1,
+                x2: _13 * cmd.x + _23 * cmd.x1,
+                y2: _13 * cmd.y + _23 * cmd.y1
+            }
+        }
+
         if (cmd.type === 'M') {
             dx = cmd.x - x;
             dy = cmd.y - y;
@@ -2189,9 +2207,6 @@ function glyphToOps(glyph) {
             ops.push({name: 'rlineto', type: 'OP', value: 5});
             x = cmd.x;
             y = cmd.y;
-        } else if (cmd.type === 'Q') {
-            // FIXME: Add support for quad curves
-            throw new Error('Writing quad curves is currently not supported.');
         } else if (cmd.type === 'C') {
             dx1 = cmd.x1 - x;
             dy1 = cmd.y1 - y;
@@ -2944,11 +2959,14 @@ function parsePairPosSubTable(data, start) {
 
         // Get the kerning value for a specific glyph pair.
         return function(leftGlyph, rightGlyph) {
-            if (!covered[leftGlyph]) return null;
+            if (!covered[leftGlyph]) return;
             var class1 = getClass1(leftGlyph),
                 class2 = getClass2(rightGlyph),
                 kerningRow = kerningMatrix[class1];
-            return kerningRow ? kerningRow[class2] : null;
+                
+            if (kerningRow) {
+                return kerningRow[class2];
+            }
         };
     }
 }
@@ -3805,8 +3823,8 @@ function fontToSfntTable(font) {
         maxLeftSideBearing: Math.max.apply(null, leftSideBearings),
         minRightSideBearing: Math.min.apply(null, rightSideBearings)
     };
-    globals.ascender = globals.yMax;
-    globals.descender = globals.yMin;
+    globals.ascender = font.ascender !== undefined ? font.ascender : globals.yMax;
+    globals.descender = font.descender !== undefined ? font.descender : globals.yMin;
 
     var headTable = head.make({
         unitsPerEm: font.unitsPerEm,
@@ -4274,9 +4292,9 @@ exports.decode = decode;
 exports.encode = encode;
 exports.sizeOf = sizeOf;
 
-},{"./check":1}]},{},[6])
-(6)
+},{"./check":1}]},{},[6])(6)
 });
+
 },{}],2:[function(_dereq_,module,exports){
 /*!
  * Paper.js v0.9.21 - The Swiss Army Knife of Vector Graphics Scripting.
@@ -17152,7 +17170,7 @@ function wrapConstructor( constructor, prototype, useConstructed ) {
 	};
 }
 
-var rconstructor = /(^|\.)[A-Z][a-z]+$/;
+var rconstructor = /(^|\.)[A-Z][A-z]+$/;
 function constructorFilter( name ) {
 	return typeof this[name] === 'function' && rconstructor.test(name);
 }
@@ -17277,7 +17295,7 @@ Collection.proxy = function( paper ) {
 	});
 
 		// addChild( item ) and other methods with similar signatures
-		// that we want to turn to addChild([constructor, ] item) and make chainable
+		// that we want to make chainable
 	var chain = [
 			'set',
 			'setX',
@@ -17348,10 +17366,12 @@ Collection.proxy = function( paper ) {
 			'addGlyph',
 			'addGlyphs',
 
+			'addContour',
+			'insertContour',
+			'addContours',
+			'insertContours',
 			'addAnchor',
 			'addAnchors',
-			'addContour',
-			'addContours',
 			'addComponent',
 			'addComponents',
 
@@ -17370,6 +17390,7 @@ Collection.proxy = function( paper ) {
 			'addGlyphs',
 			'addAnchors',
 			'addContours',
+			'insertContours',
 			'addComponents'
 		],
 		mathPoinFn = [
@@ -17559,6 +17580,11 @@ Font.prototype.interpolate = function( font0, font1, coef, set ) {
 		}
 	}
 
+	this.ot.ascender =
+		font0.ot.ascender + ( font1.ot.ascender - font0.ot.ascender ) * coef;
+	this.ot.descender =
+		font0.ot.descender + ( font1.ot.descender - font0.ot.descender ) * coef;
+
 	return this;
 };
 
@@ -17660,7 +17686,7 @@ function Glyph( args ) {
 	// workaround opentype 'unicode === 0' bug
 	this.ot.unicode = args.unicode;
 
-	this.contours = ( args && args.contours ) || [];
+	//this.contours = ( args && args.contours ) || [];
 	this.anchors = ( args && args.anchors ) || [];
 	this.components = ( args && args.components ) || [];
 	this.parentAnchors = ( args && args.parentAnchors ) || [];
@@ -17675,7 +17701,7 @@ Glyph.prototype = Object.create(paper.CompoundPath.prototype);
 Glyph.prototype.constructor = Glyph;
 
 // Todo: handle unicode updates
-Object.defineProperty(Glyph, 'unicode', {
+Object.defineProperty(Glyph.prototype, 'unicode', {
 	set: function( code ) {
 		this.ot.unicode = typeof code === 'string' ?
 			code.charCodeAt(0):
@@ -17686,22 +17712,46 @@ Object.defineProperty(Glyph, 'unicode', {
 	}
 });
 
-Glyph.prototype.addContour = function( item ) {
-	// prevent CompoundPath from arbitrarily changing the direction of paths
-	if ( item._clockwise === undefined ) {
-		item._clockwise = null;
+// proxy *Child/*Children methods to *Contour/*Contours
+// This has the added benefit of preventing CompoundPath#insertChildren
+// from arbitrarily changing the direction of paths
+Object.getOwnPropertyNames( paper.Item.prototype )
+	.forEach(function(name, i) {
+		// exclude getters and non-methods
+		if ( Object.getOwnPropertyDescriptor(this, name).get ||
+				typeof this[name] !== 'function' ) {
+			return;
+		}
+
+		if ( name.indexOf('Children') !== -1 ) {
+			this[name.replace('Children', 'Contours')] = this[name];
+
+		} else if ( name.indexOf('Child') !== -1 ) {
+			this[name.replace('Child', 'Contour')] = this[name];
+		}
+
+	}, paper.Item.prototype);
+
+// Fix two problems with CompoundPath#insertChildren:
+// - it arbitrarily changes the direction of paths
+// - it seems that it doesn't handle CompoundPath arguments
+Glyph.prototype.insertChildren = function(index, items, _preserve) {
+	if ( Array.isArray( items ) ) {
+		// flatten items to handle CompoundPath children
+		items = [].concat.apply([], items.map(function(item) {
+			return item instanceof paper.Path ? item : item.children;
+		}));
 	}
 
-	this.addChild( item );
-	this.contours.push( item );
-	return item;
+	return paper.Item.prototype.insertChildren.call(this, index, items, _preserve, paper.Path);
 };
 
-Glyph.prototype.addContours = function( contours ) {
-	return contours.forEach(function(contour) {
-		this.addContour(contour);
-	}, this);
-};
+// proxy .children to .contours
+Object.defineProperty(
+	Glyph.prototype,
+	'contours',
+	Object.getOwnPropertyDescriptor( paper.Item.prototype, 'children' )
+);
 
 Glyph.prototype.addComponent = function( item ) {
 	this.addChild( item );

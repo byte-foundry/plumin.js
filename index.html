@@ -43,7 +43,7 @@
 				border-radius: 0;
 
 				font-family: 'Demo', sans-serif;
-				font-size: 50px;
+				font-size: 100px;
 
 				resize: none;
 			}
@@ -75,29 +75,12 @@
 			<p class="chromeframe">You are using an outdated browser. <a href="http://browsehappy.com/">Upgrade your browser today</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to better experience this site.</p>
 		<![endif]-->
 
-		<div id="fb-root"></div>
-		<script>(function(d, s, id) {
-			var js, fjs = d.getElementsByTagName(s)[0];
-			if (d.getElementById(id)) return;
-			js = d.createElement(s); js.id = id;
-			js.src = "//connect.facebook.net/en_GB/sdk.js#xfbml=1&appId=1398681457099665&version=v2.0";
-			fjs.parentNode.insertBefore(js, fjs);
-		}(document, 'script', 'facebook-jssdk'));</script>
-
-		<a href="https://github.com/byte-foundry/plumin.js"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a>
-
-		<h1 class="man ptm plm">
+		<h1 class="man pam">
 			<img src="plumin.png" alt="Plumin.js" style="height: 50px;">
 			<span class="h2" style="vertical-align: -12px">
 			&nbsp;– Playground like no one's watching.
 			</span>
 		</h1>
-
-		<div class="pbm plm">
-			<iframe class="gh-star" src="https://ghbtns.com/github-btn.html?user=byte-foundry&repo=plumin.js&type=star&count=true" frameborder="0" scrolling="0" width="170px" height="20px"></iframe>
-			<a href="https://twitter.com/share" class="twitter-share-button" data-via="prototypoApp">Tweet</a> <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+'://platform.twitter.com/widgets.js';fjs.parentNode.insertBefore(js,fjs);}}(document, 'script', 'twitter-wjs');</script>
-			<div class="fb-like" data-layout="button_count" data-action="like" data-show-faces="false" data-share="false"></div>
-		</div>
 
 		<div class="row">
 			<div class="col w50 plm">
@@ -105,7 +88,9 @@
 (function(p) {
 
 var font = p.Font({
-		familyName: 'Demo'
+		familyName: 'Demo',
+		ascender: 800,
+		descender: -200
 	}),
 
 	// glyphs
@@ -124,46 +109,65 @@ var font = p.Font({
 		unicode: 'C',
 		advanceWidth: 512
 	}),
+	shape,
+	counter;
 
-	// contours
-	ctA = p.Path({ closed: true }),
-	ctB = p.Path({ closed: true }),
-	ctC = p.Path({ closed: true });
+shape = p.Path.RegularPolygon({
+	center: [256, 136],
+	sides: 3,
+	radius: 256
+});
+counter = p.Path.RegularPolygon({
+	center: [256, 61],
+	sides: 3,
+	radius: 256
+});
 
-ctA.addNodes(p.Node([
-	{ point: [50, 0] },
-	{ point: [256, 800] },
-	{ point: [462, 0] }
-]));
+// for some reason, the triangles are drawns upside-down
+// fix that
+shape.rotate(180, [256, 136]);
+counter.rotate(180, [256, 61]);
 
-ctB.addNodes(p.Node([
-	{ point: [50, 0] },
-	{ point: [50, 800] },
-	{ point: [462, 800] },
-	{ point: [462, 0] }
-]));
+A.addContour(shape.subtract(counter));
+A.scale(1,2, [256, 0]);
 
-ctC.addNodes(p.Node([{
-		point: [50, 400],
-		handleIn: [0, -200],
-		handleOut: [0, 200]
-	},{
-		point: [256, 800],
-		handleIn: [-200, 0],
-		handleOut: [200, 0]
-	},{
-		point: [462, 400],
-		handleIn: [0, 200],
-		handleOut: [0, -200]
-	},{
-		point: [256, 0],
-		handleIn: [200, 0],
-		handleOut: [-200, 0]
-	}]));
+shape = p.Path.Rectangle({
+	point: [0, 0],
+	size: [450, 450]
+});
+counter = p.Path.Rectangle({
+	point: [40, 40],
+	size: [370, 370]
+});
 
-A.addContour(ctA);
-B.addContour(ctB);
-C.addContour(ctC);
+B.addContour(shape.subtract(counter));
+
+shape = p.Path.Rectangle({
+	point: [0, 410],
+	size: [340, 340]
+});
+counter = p.Path.Rectangle({
+	point: [40, 450],
+	size: [260, 260]
+});
+
+B.addContour(shape.subtract(counter));
+
+shape = p.Path.Ellipse({
+	point: [0, 0],
+	size: [520, 800]
+});
+counter = p.Path.Ellipse({
+	point: [40, 40],
+	size: [440, 720]
+});
+shape = shape.subtract(counter);
+counter = new p.Path.Rectangle({
+	point: [445, 0],
+	size: [80, 800]
+});
+
+C.addContour(shape.subtract(counter));
 
 window.font = font.addGlyphs([
 		A,
@@ -175,11 +179,11 @@ window.font = font.addGlyphs([
 
 /*
 // animation are only fluid in Chrome
-var center = p.Point([256, 400]);
+var center = p.Point([256, 500]);
 window.onFrame = function() {
-	ctA.rotate(3, center);
-	ctB.rotate(-3, center);
-	ctC.rotate(3, center);
+	A.rotate(3, center);
+	B.rotate(-3, center);
+	C.rotate(3, center);
 
 	font.updateOTCommands()
 		.addToFonts();
@@ -196,7 +200,6 @@ window.onFrame = function() {
 			<div class="col w50">
 				<textarea id="result" class="result pal">
  A B C
- (I'm a textarea!)
  				</textarea>
 
 				<div class="mtm txtcenter">
@@ -338,15 +341,6 @@ window.onFrame = function() {
 			};
 
 			TEXTAREASOURCE
-		</script>
-
-		<script>
-			/* jshint ignore:start */
-			// google analytics
-			var _gaq=[['_setAccount','UA-41962243-3'],['_trackPageview']];
-			(function(d,t){var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
-			g.src=('https:'==location.protocol?'//ssl':'//www')+'.google-analytics.com/ga.js';
-			s.parentNode.insertBefore(g,s)}(document,'script'));
 		</script>
 	</body>
 </html>

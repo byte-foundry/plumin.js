@@ -28,14 +28,14 @@
   "homepage": "https://github.com/byte-foundry/plumin.js",
   "dependencies": {},
   "devDependencies": {
-    "browserify": "^7.0.0",
+    "browserify": "^8.1.1",
     "chai": "^1.10.0",
-    "derequire": "~1.2.0",
+    "derequire": "^1.2.0",
     "exorcist": "^0.1.6",
-    "mocha": "^2.0.1",
+    "mocha": "^2.1.0",
     "opentype.js": "~0.4.4",
     "paper": "^0.9.21",
-    "uglify-js": "^2.4.14",
-    "watchify": "^2.1.1"
+    "uglify-js": "^2.4.16",
+    "watchify": "^2.2.1"
   }
 }

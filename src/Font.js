@@ -149,6 +149,11 @@ Font.prototype.interpolate = function( font0, font1, coef, set ) {
 		}
 	}
 
+	this.ot.ascender =
+		font0.ot.ascender + ( font1.ot.ascender - font0.ot.ascender ) * coef;
+	this.ot.descender =
+		font0.ot.descender + ( font1.ot.descender - font0.ot.descender ) * coef;
+
 	return this;
 };
 
