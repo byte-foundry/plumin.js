@@ -31,15 +31,30 @@ function Font( args ) {
 		this.addGlyphs( args.glyphs );
 	}
 
-	this.addedFonts = [];
-	// work around https://bugzilla.mozilla.org/show_bug.cgi?id=1100005
-	// by using fonts.delete in batch, every 1 second
 	if ( typeof window === 'object' && window.document ) {
-		setInterval(function() {
-			while ( this.addedFonts.length > 1 ) {
-				document.fonts.delete( this.addedFonts.shift() );
-			}
-		}.bind(this), 1000);
+		// work around https://bugzilla.mozilla.org/show_bug.cgi?id=1100005
+		// by using fonts.delete in batch, every 1 second
+		if ( document.fonts ) {
+			this.addedFonts = [];
+
+			setInterval(function() {
+				while ( this.addedFonts.length > 1 ) {
+					document.fonts.delete( this.addedFonts.shift() );
+				}
+			}.bind(this), 1000);
+
+		} else {
+			document.head.appendChild(
+				this.styleElement = document.createElement('style')
+			);
+			// let's find the corresponding CSSStyleSheet
+			// (would be much easier with Array#find)
+			this.styleSheet = document.styleSheets[
+				[].map.call(document.styleSheets, function(ss) {
+					return ss.ownerNode;
+				}).indexOf(this.styleElement)
+			];
+		}
 	}
 }
 
@@ -184,8 +199,7 @@ Font.prototype.importOT = function( otFont ) {
 
 if ( typeof window === 'object' && window.document ) {
 
-	var _URL = window.URL || window.webkitURL,
-		ruleIndex;
+	var _URL = window.URL || window.webkitURL;
 	Font.prototype.addToFonts = document.fonts ?
 		// CSS font loading, lightning fast
 		function( buffer ) {
@@ -201,20 +215,22 @@ if ( typeof window === 'object' && window.document ) {
 		}:
 		function( buffer ) {
 			var url = _URL.createObjectURL(
-				new Blob(
-					[ new DataView( buffer || this.ot.toBuffer() ) ],
-					{type: 'font/opentype'}
-				)
-			);
+					new Blob(
+						[ new DataView( buffer || this.ot.toBuffer() ) ],
+						{type: 'font/opentype'}
+					)
+				);
 
-			if ( ruleIndex ) {
-				document.styleSheets[0].deleteRule( ruleIndex );
+			if ( this.fontObjectURL ) {
+				_URL.revokeObjectURL( this.fontObjectURL );
+				this.styleSheet.deleteRule(0);
 			}
 
-			ruleIndex = document.styleSheets[0].insertRule(
+			this.styleSheet.insertRule(
 				'@font-face { font-family: "' + this.ot.familyName + '"; src: url(' + url + '); }',
-				ruleIndex || document.styleSheets[0].cssRules.length
+				0
 			);
+			this.fontObjectURL = url;
 
 			return this;
 		};

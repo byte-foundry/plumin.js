@@ -112,6 +112,7 @@ var font = p.Font({
 	shape,
 	counter;
 
+// A contours
 shape = p.Path.RegularPolygon({
 	center: [256, 136],
 	sides: 3,
@@ -122,15 +123,12 @@ counter = p.Path.RegularPolygon({
 	sides: 3,
 	radius: 256
 });
-
-// for some reason, the triangles are drawns upside-down
-// fix that
 shape.rotate(180, [256, 136]);
 counter.rotate(180, [256, 61]);
-
 A.addContour(shape.subtract(counter));
 A.scale(1,2, [256, 0]);
 
+// B contours
 shape = p.Path.Rectangle({
 	point: [0, 0],
 	size: [450, 450]
@@ -139,9 +137,7 @@ counter = p.Path.Rectangle({
 	point: [40, 40],
 	size: [370, 370]
 });
-
 B.addContour(shape.subtract(counter));
-
 shape = p.Path.Rectangle({
 	point: [0, 410],
 	size: [340, 340]
@@ -150,9 +146,9 @@ counter = p.Path.Rectangle({
 	point: [40, 450],
 	size: [260, 260]
 });
-
 B.addContour(shape.subtract(counter));
 
+// C contours
 shape = p.Path.Ellipse({
 	point: [0, 0],
 	size: [520, 800]
@@ -163,17 +159,12 @@ counter = p.Path.Ellipse({
 });
 shape = shape.subtract(counter);
 counter = new p.Path.Rectangle({
-	point: [445, 0],
-	size: [80, 800]
+	point: [430, 180],
+	size: [100, 440]
 });
-
 C.addContour(shape.subtract(counter));
 
-window.font = font.addGlyphs([
-		A,
-		B,
-		C
-	])
+window.font = font.addGlyphs([ A, B, C ])
 	.updateOTCommands()
 	.addToFonts();
 
@@ -198,9 +189,7 @@ window.onFrame = function() {
 				</div>
 			</div>
 			<div class="col w50">
-				<textarea id="result" class="result pal">
- A B C
- 				</textarea>
+				<textarea id="result" class="result pal"> A B C</textarea>
 
 				<div class="mtm txtcenter">
 					<a href="#" class="btn" onclick="_download();" download="demo.otf">▽ Download</a>
