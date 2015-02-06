@@ -17465,7 +17465,7 @@ function Font( args ) {
 	if ( typeof window === 'object' && window.document ) {
 		// work around https://bugzilla.mozilla.org/show_bug.cgi?id=1100005
 		// by using fonts.delete in batch, every 1 second
-		if ( document.fonts && false ) {
+		if ( document.fonts ) {
 			this.addedFonts = [];
 
 			setInterval(function() {
@@ -17631,7 +17631,7 @@ Font.prototype.importOT = function( otFont ) {
 if ( typeof window === 'object' && window.document ) {
 
 	var _URL = window.URL || window.webkitURL;
-	Font.prototype.addToFonts = document.fonts && false ?
+	Font.prototype.addToFonts = document.fonts ?
 		// CSS font loading, lightning fast
 		function( buffer ) {
 			var fontface = new FontFace(
