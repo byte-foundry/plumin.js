@@ -45,7 +45,7 @@ Object.defineProperty(Glyph.prototype, 'unicode', {
 // This has the added benefit of preventing CompoundPath#insertChildren
 // from arbitrarily changing the direction of paths
 Object.getOwnPropertyNames( paper.Item.prototype )
-	.forEach(function(name, i) {
+	.forEach(function(name) {
 		// exclude getters and non-methods
 		if ( Object.getOwnPropertyDescriptor(this, name).get ||
 				typeof this[name] !== 'function' ) {
@@ -67,9 +67,9 @@ Object.getOwnPropertyNames( paper.Item.prototype )
 Glyph.prototype.insertChildren = function(index, items, _preserve) {
 	if ( Array.isArray( items ) ) {
 		// flatten items to handle CompoundPath children
-		items = [].concat.apply([], items.map(function(item) {
-			return item instanceof paper.Path ? item : item.children;
-		}));
+		items = [].concat.apply([], items.map(item =>
+			item instanceof paper.Path ? item : item.children
+		));
 	}
 
 	return paper.Item.prototype.insertChildren.call(this, index, items, _preserve, paper.Path);
@@ -83,7 +83,6 @@ Object.defineProperty(
 );
 
 Glyph.prototype.addComponent = function( item ) {
-	this.addChild( item );
 	this.components.push( item );
 	return item;
 };
@@ -130,6 +129,10 @@ Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
 			coef
 		);
 
+		this.components.forEach(function(component, i) {
+			component.interpolate( glyph0.components[i], glyph1.components[i], coef );
+		});
+
 		this.ot.advanceWidth =
 			glyph0.ot.advanceWidth +
 			( glyph1.ot.advanceWidth - glyph0.ot.advanceWidth ) * coef;
@@ -156,8 +159,12 @@ Glyph.prototype.updateOTCommands = function( path ) {
 	}
 
 	this.contours.forEach(function( contour ) {
-		contour.updateOTCommands( this.ot.path );
+		contour.updateOTCommands( path );
 	}, this);
+
+	this.components.forEach(function( component ) {
+		component.updateOTCommands( path );
+	});
 
 	return this.ot;
 };
