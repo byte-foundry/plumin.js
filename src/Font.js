@@ -172,6 +172,14 @@ Font.prototype.interpolate = function( font0, font1, coef, set ) {
 	return this;
 };
 
+Font.prototype.updateSVGData = function( set ) {
+	this.svgData = this.getGlyphSubset( set ).map(function( glyph ) {
+		return glyph.updateSVGData();
+	}).join(' ');
+
+	return this;
+};
+
 Font.prototype.updateOTCommands = function( set ) {
 	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
 		return glyph.updateOTCommands();

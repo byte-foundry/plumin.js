@@ -48,4 +48,35 @@ proto.updateOTCommands = function( path ) {
 	return path;
 };
 
+proto.updateSVGData = function( path ) {
+	path.push(
+		'M',
+		Math.round( this._segments[0].point.x ) || 0,
+		Math.round( this._segments[0].point.y ) || 0
+	);
+
+	this.curves.forEach(function( curve ) {
+		if ( curve.isLinear() ) {
+			path.push(
+				'L',
+				Math.round( curve.point2.x ) || 0,
+				Math.round( curve.point2.y ) || 0
+			);
+
+		} else {
+			path.push(
+				'C',
+				Math.round( curve.point1.x + curve.handle1.x ) || 0,
+				Math.round( curve.point1.y + curve.handle1.y ) || 0,
+				Math.round( curve.point2.x + curve.handle2.x ) || 0,
+				Math.round( curve.point2.y + curve.handle2.y ) || 0,
+				Math.round( curve.point2.x ) || 0,
+				Math.round( curve.point2.y ) || 0
+			);
+		}
+	});
+
+	return path;
+};
+
 module.exports = paper.Path;

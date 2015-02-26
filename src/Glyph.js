@@ -67,9 +67,9 @@ Object.getOwnPropertyNames( paper.Item.prototype )
 Glyph.prototype.insertChildren = function(index, items, _preserve) {
 	if ( Array.isArray( items ) ) {
 		// flatten items to handle CompoundPath children
-		items = [].concat.apply([], items.map(item =>
-			item instanceof paper.Path ? item : item.children
-		));
+		items = [].concat.apply([], items.map(function(item) {
+			return item instanceof paper.Path ? item : item.children;
+		}));
 	}
 
 	return paper.Item.prototype.insertChildren.call(this, index, items, _preserve, paper.Path);
@@ -150,6 +150,23 @@ Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
 	}
 
 	return this;
+};
+
+Glyph.prototype.updateSVGData = function( path ) {
+	if ( !path ) {
+		this.svgData = [];
+		path = this.svgData;
+	}
+
+	this.contours.forEach(function( contour ) {
+		contour.updateSVGData( path );
+	}, this);
+
+	this.components.forEach(function( component ) {
+		component.updateSVGData( path );
+	});
+
+	return this.svgData;
 };
 
 Glyph.prototype.updateOTCommands = function( path ) {

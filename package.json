@@ -6,8 +6,8 @@
   "scripts": {
     "prepublish": "npm run build && npm test",
     "build": "npm run browserify && npm run uglify",
-    "browserify": "browserify src/plumin.js -t [ babelify --compact false --sourceMapRelative . ] --dg false --debug --standalone plumin | derequire | exorcist dist/plumin.js.map > dist/plumin.js",
-    "watchify": "watchify src/plumin.js -t [ babelify --compact false --sourceMapRelative . ] --dg false --debug --standalone plumin -o dist/plumin.js -v",
+    "browserify": "browserify src/plumin.js --dg false --debug --standalone plumin | derequire | exorcist dist/plumin.js.map > dist/plumin.js",
+    "watchify": "watchify src/plumin.js --dg false --debug --standalone plumin -o dist/plumin.js -v",
     "uglify": "uglifyjs dist/plumin.js > dist/plumin.min.js",
     "test": "mocha test/*.js"
   },
