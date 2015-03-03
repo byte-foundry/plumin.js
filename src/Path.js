@@ -18,6 +18,10 @@ Object.defineProperties(proto, {
 });
 
 proto.updateOTCommands = function( path ) {
+	if ( this.visible === false ) {
+		return;
+	}
+
 	path.commands.push({
 		type: 'M',
 		x: Math.round( this._segments[0].point.x ) || 0,
@@ -49,6 +53,10 @@ proto.updateOTCommands = function( path ) {
 };
 
 proto.updateSVGData = function( path ) {
+	if ( this.visible === false ) {
+		return;
+	}
+
 	path.push(
 		'M',
 		Math.round( this._segments[0].point.x ) || 0,
