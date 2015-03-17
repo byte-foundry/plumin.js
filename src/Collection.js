@@ -1,5 +1,3 @@
-var paper = require('../node_modules/paper/dist/paper-core.js');
-
 function Collection( args ) {
 	// already a Collection? Job's done
 	if ( arguments.length === 1 && args instanceof Collection ) {
@@ -72,8 +70,7 @@ function wrapConstructor( constructor, prototype, useConstructed ) {
 			c = Object.create(prototype);
 			tmp = constructor.apply(c, arguments);
 			return useConstructed ?
-				tmp:
-				c;
+				tmp : c;
 
 		// without new, build a collection
 		} else {
@@ -109,12 +106,12 @@ function unwrapArg( arr, id, isPlural ) {
 	// unwrap a single collection
 	if ( arr && arr[id] instanceof Collection ) {
 		arr[id] = isPlural ?
-			[].slice.call( arr[id], 0 ):
+			[].slice.call( arr[id], 0 ) :
 			arr[id][0];
 
 	// unwrap an array of collection
 	} else if ( arr && arr[id].length && arr[id][0] instanceof Collection ) {
-		for ( i = -1; ++i < arr[id].length; ) {
+		for ( var i = -1; ++i < arr[id].length; ) {
 			arr[id][i] = arr[id][i][0];
 		}
 	}
@@ -123,7 +120,6 @@ function unwrapArg( arr, id, isPlural ) {
 function unwrapArgs() {
 	var isPlural = this.isPlural,
 		args = [].slice.call( arguments, 0 ),
-		arr,
 		id,
 		i;
 
@@ -147,7 +143,7 @@ function unwrapArgs() {
 		for ( i = -1; ++i < args.length; ) {
 			// if the method is plural (addChildren) and we're unwrapping
 			// the last argument, we want to keep it in an array
-			unwrapArg( args, i, i === args.length -1 && isPlural );
+			unwrapArg( args, i, i === args.length - 1 && isPlural );
 		}
 	}
 
@@ -162,7 +158,7 @@ Collection.proxy = function( paper ) {
 	var methodNames = {};
 	Object.getOwnPropertyNames( paper.PaperScope.prototype )
 		.filter( constructorFilter, paper.PaperScope.prototype )
-		.forEach(function(name, i) {
+		.forEach(function(name) {
 			plumin[name] = wrapConstructor( this[name], this[name].prototype );
 
 			// we don't want to proxy methods of Collection
@@ -170,29 +166,34 @@ Collection.proxy = function( paper ) {
 				return;
 			}
 
-			Object.getOwnPropertyNames( this[name].prototype ).forEach(function(name, i) {
-				// collect unique method names (first test avoids getters)
-				if ( !Object.getOwnPropertyDescriptor(this, name).get &&
-						typeof this[name] === 'function' ) {
+			Object.getOwnPropertyNames( this[name].prototype )
+				.forEach(function(_name) {
+					// collect unique method names (first test avoids getters)
+					if ( !Object.getOwnPropertyDescriptor(this, _name).get &&
+							typeof this[_name] === 'function' ) {
 
-					methodNames[name] = true;
-				}
+						methodNames[_name] = true;
+					}
 
-			}, this[name].prototype);
+				}, this[name].prototype);
 
 		}, paper.PaperScope.prototype);
 
 	Object.keys( paper.PaperScope.prototype.Path )
 		.filter( constructorFilter, paper.PaperScope.prototype.Path )
 		.forEach(function(name) {
-			plumin.Path[name] = wrapConstructor( this[name], this.prototype, true );
+			plumin.Path[name] = wrapConstructor(
+				this[name], this.prototype, true
+			);
 
 		}, paper.PaperScope.prototype.Path );
 
 	Object.keys( paper.PaperScope.prototype.Shape )
 		.filter( constructorFilter, paper.PaperScope.prototype.Shape )
 		.forEach(function(name) {
-			plumin.Shape[name] = wrapConstructor( this[name], this.prototype, true );
+			plumin.Shape[name] = wrapConstructor(
+				this[name], this.prototype, true
+			);
 
 		}, paper.PaperScope.prototype.Shape );
 
@@ -321,7 +322,7 @@ Collection.proxy = function( paper ) {
 			'addContours',
 			'insertContours',
 			'addComponents'
-		],
+		]/*,
 		mathPoinFn = [
 			'round',
 			'ceil',
@@ -334,7 +335,7 @@ Collection.proxy = function( paper ) {
 			'subtract',
 			'exclude',
 			'divide'
-		];
+		]*/;
 
 	chain.forEach(function(name) {
 		Collection.prototype[name] = function() {

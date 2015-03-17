@@ -21,7 +21,7 @@ function Glyph( args ) {
 	this.parentAnchors = ( args && args.parentAnchors ) || [];
 
 	// default fill color needed to display the glyph in a canvas
-	this.fillColor = new paper.Color(0,0,0);
+	this.fillColor = new paper.Color(0, 0, 0);
 	// but each individual glyph must be explicitely made visible
 	this.visible = false;
 }
@@ -33,7 +33,7 @@ Glyph.prototype.constructor = Glyph;
 Object.defineProperty(Glyph.prototype, 'unicode', {
 	set: function( code ) {
 		this.ot.unicode = typeof code === 'string' ?
-			code.charCodeAt(0):
+			code.charCodeAt(0) :
 			code;
 	},
 	get: function() {
@@ -72,7 +72,9 @@ Glyph.prototype.insertChildren = function(index, items, _preserve) {
 		}));
 	}
 
-	return paper.Item.prototype.insertChildren.call(this, index, items, _preserve, paper.Path);
+	return paper.Item.prototype.insertChildren.call(
+		this, index, items, _preserve, paper.Path
+	);
 };
 
 // proxy .children to .contours
@@ -129,8 +131,10 @@ Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
 			coef
 		);
 
-		this.components.forEach(function(component, i) {
-			component.interpolate( glyph0.components[i], glyph1.components[i], coef );
+		this.components.forEach(function(component, j) {
+			component.interpolate(
+				glyph0.components[j], glyph1.components[j], coef
+			);
 		});
 
 		this.ot.advanceWidth =
@@ -191,7 +195,7 @@ Glyph.prototype.importOT = function( otGlyph ) {
 	this.ot = otGlyph;
 
 	if ( !otGlyph.path || !otGlyph.path.commands ) {
-		return;
+		return this;
 	}
 
 	this.ot.path.commands.forEach(function(command) {
@@ -207,14 +211,14 @@ Glyph.prototype.importOT = function( otGlyph ) {
 				break;
 			case 'C':
 				current.cubicCurveTo(
-					[command.x1, command.y1],
-					[command.x2, command.y2],
+					[ command.x1, command.y1 ],
+					[ command.x2, command.y2 ],
 					command
 				);
 				break;
 			case 'Q':
 				current.quadraticCurveTo(
-					[command.x1, command.y1],
+					[ command.x1, command.y1 ],
 					command
 				);
 				break;

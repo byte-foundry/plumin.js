@@ -1,11 +1,12 @@
 /* Extend the Path prototype to add OpenType conversion
  * and alias *segments methods and properties to *nodes
  */
-var paper = require('../node_modules/paper/dist/paper-core.js'),
-	proto = paper.PaperScope.prototype.Path.prototype;
+var paper = require('../node_modules/paper/dist/paper-core.js');
+
+var proto = paper.PaperScope.prototype.Path.prototype;
 
 // alias *Segments methods to *Nodes equivalents
-['add', 'insert', 'remove'].forEach(function(name) {
+[ 'add', 'insert', 'remove' ].forEach(function(name) {
 	proto[name + 'Nodes'] =
 		proto[name + 'Segments'];
 });
@@ -19,7 +20,7 @@ Object.defineProperties(proto, {
 
 proto.updateOTCommands = function( path ) {
 	if ( this.visible === false ) {
-		return;
+		return path;
 	}
 
 	path.commands.push({
@@ -54,7 +55,7 @@ proto.updateOTCommands = function( path ) {
 
 proto.updateSVGData = function( path ) {
 	if ( this.visible === false ) {
-		return;
+		return path;
 	}
 
 	path.push(

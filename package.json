@@ -3,13 +3,12 @@
   "version": "0.8.0",
   "description": "Create and manipulate fonts using javascript",
   "main": "dist/plumin.js",
+  "//scripts": "NPM 2+ REQUIRED to use gulp tasks without global gulp",
   "scripts": {
-    "prepublish": "npm run build && npm test",
-    "build": "npm run browserify && npm run uglify",
-    "browserify": "browserify src/plumin.js --dg false --debug --standalone plumin | derequire | exorcist dist/plumin.js.map > dist/plumin.js",
-    "watchify": "watchify src/plumin.js --dg false --debug --standalone plumin -o dist/plumin.js -v",
-    "uglify": "uglifyjs dist/plumin.js > dist/plumin.min.js",
-    "test": "mocha test/*.js"
+    "help": "gulp help",
+    "prepublish": "npm run gulp -- jscs && npm run gulp -- eslint && npm run gulp -- build && npm run gulp -- mocha",
+    "gulp": "gulp",
+    "test": "npm run gulp -- test"
   },
   "repository": {
     "type": "git",
@@ -28,15 +27,22 @@
   "homepage": "https://github.com/byte-foundry/plumin.js",
   "dependencies": {},
   "devDependencies": {
-    "babelify": "^5.0.3",
-    "browserify": "^8.1.1",
-    "chai": "^1.10.0",
-    "derequire": "^1.2.0",
+    "babelify": "^5.0.4",
+    "browserify": "^9.0.3",
+    "chai": "^2.1.2",
+    "codemirror": "^5.0.0",
+    "derequire": "^2.0.0",
+    "eslint": "^0.17.0",
     "exorcist": "^0.1.6",
-    "mocha": "^2.1.0",
-    "opentype.js": "~0.4.4",
-    "paper": "^0.9.21",
-    "uglify-js": "^2.4.16",
-    "watchify": "^2.2.1"
+    "gulp": "^3.8.11",
+    "gulp-help": "^1.3.4",
+    "gulp-shell": "^0.4.0",
+    "jscs": "^1.11.3",
+    "knacss": "^4.0.3",
+    "mocha": "^2.2.1",
+    "opentype.js": "~0.4.5",
+    "paper": "^0.9.22",
+    "uglify-js": "^2.4.17",
+    "watchify": "^2.4.0"
   }
 }
