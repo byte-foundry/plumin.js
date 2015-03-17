@@ -17069,8 +17069,6 @@ return paper;
 };
 
 },{}],3:[function(_dereq_,module,exports){
-var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
-
 function Collection( args ) {
 	// already a Collection? Job's done
 	if ( arguments.length === 1 && args instanceof Collection ) {
@@ -17143,8 +17141,7 @@ function wrapConstructor( constructor, prototype, useConstructed ) {
 			c = Object.create(prototype);
 			tmp = constructor.apply(c, arguments);
 			return useConstructed ?
-				tmp:
-				c;
+				tmp : c;
 
 		// without new, build a collection
 		} else {
@@ -17180,12 +17177,12 @@ function unwrapArg( arr, id, isPlural ) {
 	// unwrap a single collection
 	if ( arr && arr[id] instanceof Collection ) {
 		arr[id] = isPlural ?
-			[].slice.call( arr[id], 0 ):
+			[].slice.call( arr[id], 0 ) :
 			arr[id][0];
 
 	// unwrap an array of collection
 	} else if ( arr && arr[id].length && arr[id][0] instanceof Collection ) {
-		for ( i = -1; ++i < arr[id].length; ) {
+		for ( var i = -1; ++i < arr[id].length; ) {
 			arr[id][i] = arr[id][i][0];
 		}
 	}
@@ -17194,7 +17191,6 @@ function unwrapArg( arr, id, isPlural ) {
 function unwrapArgs() {
 	var isPlural = this.isPlural,
 		args = [].slice.call( arguments, 0 ),
-		arr,
 		id,
 		i;
 
@@ -17218,7 +17214,7 @@ function unwrapArgs() {
 		for ( i = -1; ++i < args.length; ) {
 			// if the method is plural (addChildren) and we're unwrapping
 			// the last argument, we want to keep it in an array
-			unwrapArg( args, i, i === args.length -1 && isPlural );
+			unwrapArg( args, i, i === args.length - 1 && isPlural );
 		}
 	}
 
@@ -17233,7 +17229,7 @@ Collection.proxy = function( paper ) {
 	var methodNames = {};
 	Object.getOwnPropertyNames( paper.PaperScope.prototype )
 		.filter( constructorFilter, paper.PaperScope.prototype )
-		.forEach(function(name, i) {
+		.forEach(function(name) {
 			plumin[name] = wrapConstructor( this[name], this[name].prototype );
 
 			// we don't want to proxy methods of Collection
@@ -17241,29 +17237,34 @@ Collection.proxy = function( paper ) {
 				return;
 			}
 
-			Object.getOwnPropertyNames( this[name].prototype ).forEach(function(name, i) {
-				// collect unique method names (first test avoids getters)
-				if ( !Object.getOwnPropertyDescriptor(this, name).get &&
-						typeof this[name] === 'function' ) {
+			Object.getOwnPropertyNames( this[name].prototype )
+				.forEach(function(_name) {
+					// collect unique method names (first test avoids getters)
+					if ( !Object.getOwnPropertyDescriptor(this, _name).get &&
+							typeof this[_name] === 'function' ) {
 
-					methodNames[name] = true;
-				}
+						methodNames[_name] = true;
+					}
 
-			}, this[name].prototype);
+				}, this[name].prototype);
 
 		}, paper.PaperScope.prototype);
 
 	Object.keys( paper.PaperScope.prototype.Path )
 		.filter( constructorFilter, paper.PaperScope.prototype.Path )
 		.forEach(function(name) {
-			plumin.Path[name] = wrapConstructor( this[name], this.prototype, true );
+			plumin.Path[name] = wrapConstructor(
+				this[name], this.prototype, true
+			);
 
 		}, paper.PaperScope.prototype.Path );
 
 	Object.keys( paper.PaperScope.prototype.Shape )
 		.filter( constructorFilter, paper.PaperScope.prototype.Shape )
 		.forEach(function(name) {
-			plumin.Shape[name] = wrapConstructor( this[name], this.prototype, true );
+			plumin.Shape[name] = wrapConstructor(
+				this[name], this.prototype, true
+			);
 
 		}, paper.PaperScope.prototype.Shape );
 
@@ -17392,7 +17393,7 @@ Collection.proxy = function( paper ) {
 			'addContours',
 			'insertContours',
 			'addComponents'
-		],
+		]/*,
 		mathPoinFn = [
 			'round',
 			'ceil',
@@ -17405,7 +17406,7 @@ Collection.proxy = function( paper ) {
 			'subtract',
 			'exclude',
 			'divide'
-		];
+		]*/;
 
 	chain.forEach(function(name) {
 		Collection.prototype[name] = function() {
@@ -17428,7 +17429,8 @@ Collection.proxy = function( paper ) {
 };
 
 module.exports = Collection;
-},{"../node_modules/paper/dist/paper-core.js":2}],4:[function(_dereq_,module,exports){
+
+},{}],4:[function(_dereq_,module,exports){
 var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	Glyph = _dereq_('./Glyph.js');
 
@@ -17498,9 +17500,11 @@ Font.prototype.addGlyph = function( glyph ) {
 	}
 
 	// build the default cmap
-	// if multiple glyphs share the same unicode, use the glyph where unicode and name are equal
+	// if multiple glyphs share the same unicode, use the glyph where unicode
+	// and name are equal
 	if ( !this.charMap[glyph.ot.unicode] ||
-			( glyph.name.length === 1 && glyph.name.charCodeAt(0) === glyph.ot.unicode ) ) {
+			( glyph.name.length === 1 &&
+				glyph.name.charCodeAt(0) === glyph.ot.unicode ) ) {
 
 		this.charMap[glyph.ot.unicode] = glyph;
 	}
@@ -17530,11 +17534,10 @@ Object.defineProperty( Font.prototype, 'subset', {
 		return this._subset;
 	},
 	set: function( set ) {
-		if ( set === false ) {
-			return ( this._subset = false );
-		}
+		this._subset = set === false ?
+			false : Font.normalizeSubset( set );
 
-		return ( this._subset = Font.normalizeSubset( set ) );
+		return this._subset;
 	}
 });
 
@@ -17544,12 +17547,14 @@ Font.prototype.getGlyphSubset = function( set ) {
 	}
 
 	set = set !== undefined ?
-		Font.normalizeSubset( set ):
+		Font.normalizeSubset( set ) :
 		this._subset;
 
 	// reuse last subset if possible
 	// TODO: implement caching using immutable.js
-	if ( this._lastSubset && this._lastSubset[0] === ( this._subset || [] ).join() ) {
+	if ( this._lastSubset &&
+			this._lastSubset[0] === ( this._subset || [] ).join() ) {
+
 		return this._lastSubset[1];
 	}
 
@@ -17564,7 +17569,9 @@ Font.prototype.getGlyphSubset = function( set ) {
 				return true;
 			}
 
-			if ( this._subset && this._subset.indexOf( glyph.ot.unicode ) !== -1 ) {
+			if ( this._subset &&
+					this._subset.indexOf( glyph.ot.unicode ) !== -1 ) {
+
 				return true;
 			}
 
@@ -17643,7 +17650,7 @@ if ( typeof window === 'object' && window.document ) {
 	Font.prototype.addToFonts = document.fonts ?
 		// CSS font loading, lightning fast
 		function( buffer ) {
-			var fontface = new FontFace(
+			var fontface = new window.FontFace(
 				this.ot.familyName,
 				buffer || this.ot.toBuffer()
 			);
@@ -17652,12 +17659,12 @@ if ( typeof window === 'object' && window.document ) {
 			this.addedFonts.push( fontface );
 
 			return this;
-		}:
+		} :
 		function( buffer ) {
 			var url = _URL.createObjectURL(
 					new Blob(
-						[ new DataView( buffer || this.ot.toBuffer() ) ],
-						{type: 'font/opentype'}
+						[ new DataView( buffer || this.ot.toBuffer() ) ],
+						{ type: 'font/opentype' }
 					)
 				);
 
@@ -17667,7 +17674,8 @@ if ( typeof window === 'object' && window.document ) {
 			}
 
 			this.styleSheet.insertRule(
-				'@font-face { font-family: "' + this.ot.familyName + '"; src: url(' + url + '); }',
+				'@font-face { font-family: "' + this.ot.familyName + '";' +
+				'src: url(' + url + '); }',
 				0
 			);
 			this.fontObjectURL = url;
@@ -17684,7 +17692,7 @@ if ( typeof window === 'object' && window.document ) {
 
 		reader.readAsDataURL(new Blob(
 			[ new DataView( buffer || this.ot.toBuffer() ) ],
-			{type: 'font/opentype'}
+			{ type: 'font/opentype' }
 		));
 
 		return this;
@@ -17696,7 +17704,7 @@ Font.normalizeSubset = function( set ) {
 	return ( typeof set === 'string' ?
 			set.split('').map(function(e) {
 				return e.charCodeAt(0);
-			}):
+			}) :
 			set
 		)
 		.filter(function(e, i, arr) {
@@ -17706,6 +17714,7 @@ Font.normalizeSubset = function( set ) {
 };
 
 module.exports = Font;
+
 },{"../node_modules/opentype.js/dist/opentype.js":1,"./Glyph.js":5}],5:[function(_dereq_,module,exports){
 var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	paper = _dereq_('../node_modules/paper/dist/paper-core.js');
@@ -17730,7 +17739,7 @@ function Glyph( args ) {
 	this.parentAnchors = ( args && args.parentAnchors ) || [];
 
 	// default fill color needed to display the glyph in a canvas
-	this.fillColor = new paper.Color(0,0,0);
+	this.fillColor = new paper.Color(0, 0, 0);
 	// but each individual glyph must be explicitely made visible
 	this.visible = false;
 }
@@ -17742,7 +17751,7 @@ Glyph.prototype.constructor = Glyph;
 Object.defineProperty(Glyph.prototype, 'unicode', {
 	set: function( code ) {
 		this.ot.unicode = typeof code === 'string' ?
-			code.charCodeAt(0):
+			code.charCodeAt(0) :
 			code;
 	},
 	get: function() {
@@ -17781,7 +17790,9 @@ Glyph.prototype.insertChildren = function(index, items, _preserve) {
 		}));
 	}
 
-	return paper.Item.prototype.insertChildren.call(this, index, items, _preserve, paper.Path);
+	return paper.Item.prototype.insertChildren.call(
+		this, index, items, _preserve, paper.Path
+	);
 };
 
 // proxy .children to .contours
@@ -17838,8 +17849,10 @@ Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
 			coef
 		);
 
-		this.components.forEach(function(component, i) {
-			component.interpolate( glyph0.components[i], glyph1.components[i], coef );
+		this.components.forEach(function(component, j) {
+			component.interpolate(
+				glyph0.components[j], glyph1.components[j], coef
+			);
 		});
 
 		this.ot.advanceWidth =
@@ -17900,7 +17913,7 @@ Glyph.prototype.importOT = function( otGlyph ) {
 	this.ot = otGlyph;
 
 	if ( !otGlyph.path || !otGlyph.path.commands ) {
-		return;
+		return this;
 	}
 
 	this.ot.path.commands.forEach(function(command) {
@@ -17916,14 +17929,14 @@ Glyph.prototype.importOT = function( otGlyph ) {
 				break;
 			case 'C':
 				current.cubicCurveTo(
-					[command.x1, command.y1],
-					[command.x2, command.y2],
+					[ command.x1, command.y1 ],
+					[ command.x2, command.y2 ],
 					command
 				);
 				break;
 			case 'Q':
 				current.quadraticCurveTo(
-					[command.x1, command.y1],
+					[ command.x1, command.y1 ],
 					command
 				);
 				break;
@@ -17943,6 +17956,7 @@ Glyph.prototype.importOT = function( otGlyph ) {
 };
 
 module.exports = Glyph;
+
 },{"../node_modules/opentype.js/dist/opentype.js":1,"../node_modules/paper/dist/paper-core.js":2}],6:[function(_dereq_,module,exports){
 var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
 
@@ -17965,15 +17979,17 @@ Object.defineProperty( paper.Segment.prototype, 'y', {
 });
 
 module.exports = paper.Segment;
+
 },{"../node_modules/paper/dist/paper-core.js":2}],7:[function(_dereq_,module,exports){
 /* Extend the Path prototype to add OpenType conversion
  * and alias *segments methods and properties to *nodes
  */
-var paper = _dereq_('../node_modules/paper/dist/paper-core.js'),
-	proto = paper.PaperScope.prototype.Path.prototype;
+var paper = _dereq_('../node_modules/paper/dist/paper-core.js');
+
+var proto = paper.PaperScope.prototype.Path.prototype;
 
 // alias *Segments methods to *Nodes equivalents
-['add', 'insert', 'remove'].forEach(function(name) {
+[ 'add', 'insert', 'remove' ].forEach(function(name) {
 	proto[name + 'Nodes'] =
 		proto[name + 'Segments'];
 });
@@ -17987,7 +18003,7 @@ Object.defineProperties(proto, {
 
 proto.updateOTCommands = function( path ) {
 	if ( this.visible === false ) {
-		return;
+		return path;
 	}
 
 	path.commands.push({
@@ -18022,7 +18038,7 @@ proto.updateOTCommands = function( path ) {
 
 proto.updateSVGData = function( path ) {
 	if ( this.visible === false ) {
-		return;
+		return path;
 	}
 
 	path.push(
@@ -18056,6 +18072,7 @@ proto.updateSVGData = function( path ) {
 };
 
 module.exports = paper.Path;
+
 },{"../node_modules/paper/dist/paper-core.js":2}],8:[function(_dereq_,module,exports){
 var opentype = _dereq_('../node_modules/opentype.js/dist/opentype.js'),
 	paper = _dereq_('../node_modules/paper/dist/paper-core.js'),
@@ -18087,6 +18104,7 @@ plumin.proxy = Collection.proxy.bind(plumin);
 plumin.proxy(paper);
 
 module.exports = plumin;
+
 },{"../node_modules/opentype.js/dist/opentype.js":1,"../node_modules/paper/dist/paper-core.js":2,"./Collection.js":3,"./Font.js":4,"./Glyph.js":5,"./Node.js":6,"./Path.js":7}]},{},[8])(8)
 });
 

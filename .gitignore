@@ -1,6 +1,5 @@
 .tmp
 *.log
-node_modules
 node_modules/*
 
 # include just the files we use in gh-pages
