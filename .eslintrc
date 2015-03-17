@@ -1,0 +1,28 @@
+{
+	"env": {
+		"browser": true,
+		"node": true,
+		"amd": true,
+		"mocha": true
+	},
+	"ecmaFeatures": {
+		"jsx": true,
+		"arrowFunctions": true,
+		"blockBindings": true,
+		"classes": true,
+		"defaultParams": true,
+		"destructuring": true,
+		"forOf": true,
+		"generators": true,
+		"modules": true,
+		"templateStrings": true,
+		"objectLiteralComputedProperties": true,
+		"objectLiteralShorthandMethods": true,
+		"objectLiteralShorthandProperties": true
+	},
+	"rules": {
+		"quotes": "single",
+		"no-underscore-dangle": false,
+		"no-loop-func": false
+	}
+}

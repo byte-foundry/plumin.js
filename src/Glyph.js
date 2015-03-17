@@ -21,7 +21,7 @@ function Glyph( args ) {
 	this.parentAnchors = ( args && args.parentAnchors ) || [];
 
 	// default fill color needed to display the glyph in a canvas
-	this.fillColor = new paper.Color(0,0,0);
+	this.fillColor = new paper.Color(0, 0, 0);
 	// but each individual glyph must be explicitely made visible
 	this.visible = false;
 }
@@ -33,7 +33,7 @@ Glyph.prototype.constructor = Glyph;
 Object.defineProperty(Glyph.prototype, 'unicode', {
 	set: function( code ) {
 		this.ot.unicode = typeof code === 'string' ?
-			code.charCodeAt(0):
+			code.charCodeAt(0) :
 			code;
 	},
 	get: function() {
@@ -45,7 +45,7 @@ Object.defineProperty(Glyph.prototype, 'unicode', {
 // This has the added benefit of preventing CompoundPath#insertChildren
 // from arbitrarily changing the direction of paths
 Object.getOwnPropertyNames( paper.Item.prototype )
-	.forEach(function(name, i) {
+	.forEach(function(name) {
 		// exclude getters and non-methods
 		if ( Object.getOwnPropertyDescriptor(this, name).get ||
 				typeof this[name] !== 'function' ) {
@@ -72,7 +72,9 @@ Glyph.prototype.insertChildren = function(index, items, _preserve) {
 		}));
 	}
 
-	return paper.Item.prototype.insertChildren.call(this, index, items, _preserve, paper.Path);
+	return paper.Item.prototype.insertChildren.call(
+		this, index, items, _preserve, paper.Path
+	);
 };
 
 // proxy .children to .contours
@@ -83,7 +85,6 @@ Object.defineProperty(
 );
 
 Glyph.prototype.addComponent = function( item ) {
-	this.addChild( item );
 	this.components.push( item );
 	return item;
 };
@@ -130,6 +131,12 @@ Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
 			coef
 		);
 
+		this.components.forEach(function(component, j) {
+			component.interpolate(
+				glyph0.components[j], glyph1.components[j], coef
+			);
+		});
+
 		this.ot.advanceWidth =
 			glyph0.ot.advanceWidth +
 			( glyph1.ot.advanceWidth - glyph0.ot.advanceWidth ) * coef;
@@ -149,6 +156,23 @@ Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
 	return this;
 };
 
+Glyph.prototype.updateSVGData = function( path ) {
+	if ( !path ) {
+		this.svgData = [];
+		path = this.svgData;
+	}
+
+	this.contours.forEach(function( contour ) {
+		contour.updateSVGData( path );
+	}, this);
+
+	this.components.forEach(function( component ) {
+		component.updateSVGData( path );
+	});
+
+	return this.svgData;
+};
+
 Glyph.prototype.updateOTCommands = function( path ) {
 	if ( !path ) {
 		this.ot.path.commands = [];
@@ -156,8 +180,12 @@ Glyph.prototype.updateOTCommands = function( path ) {
 	}
 
 	this.contours.forEach(function( contour ) {
-		contour.updateOTCommands( this.ot.path );
+		contour.updateOTCommands( path );
 	}, this);
+
+	this.components.forEach(function( component ) {
+		component.updateOTCommands( path );
+	});
 
 	return this.ot;
 };
@@ -167,7 +195,7 @@ Glyph.prototype.importOT = function( otGlyph ) {
 	this.ot = otGlyph;
 
 	if ( !otGlyph.path || !otGlyph.path.commands ) {
-		return;
+		return this;
 	}
 
 	this.ot.path.commands.forEach(function(command) {
@@ -183,14 +211,14 @@ Glyph.prototype.importOT = function( otGlyph ) {
 				break;
 			case 'C':
 				current.cubicCurveTo(
-					[command.x1, command.y1],
-					[command.x2, command.y2],
+					[ command.x1, command.y1 ],
+					[ command.x2, command.y2 ],
 					command
 				);
 				break;
 			case 'Q':
 				current.quadraticCurveTo(
-					[command.x1, command.y1],
+					[ command.x1, command.y1 ],
 					command
 				);
 				break;
