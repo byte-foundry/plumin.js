@@ -1,6 +1,5 @@
 var path = require('path'),
 	gulp = require('gulp'),
-	gutil = require('gulp-util'),
 	shell = require('gulp-shell'),
 	browserify = require('browserify'),
 	watchify = require('watchify'),
@@ -10,6 +9,10 @@ var path = require('path'),
 function d( description, fn ) {
 	fn.description = description;
 	return fn;
+}
+
+function noop(done) {
+	return done();
 }
 
 function _browserify() {
@@ -51,7 +54,7 @@ gulp.task('eslint', d('Lint code using eslint', shell.task([
 	'eslint src/**.js'
 ])));
 
-gulp.task('browserify', d('Build standalone plumin.js in dist/plumin.js',
+gulp.task('browserify', d('Build standalone plumin.js in dist/',
 	function() {
 		return _bundle( _browserify() );
 	}
@@ -65,7 +68,7 @@ gulp.task('watchify', d('Update dist/plumin.js on source change',
 	function() {
 		var b = _browserify();
 		watchify(b).on('update', function() {
-			gutil.log('watchify:update');
+			console.log('[watchify] update');
 			_bundle( b );
 		});
 
@@ -73,18 +76,22 @@ gulp.task('watchify', d('Update dist/plumin.js on source change',
 	}
 ));
 
+gulp.task('browsersync', d('Live-reload using browsersync', shell.task([
+	'browser-sync start --server --files "dist/*.js, index.html"'
+])));
+
 // high level tasks
 gulp.task('build', [ 'browserify', 'uglify' ],
-	d('Build standalone plumin.js and plumins.min.js in dist', function(done) {
-		return done();
-	}
-));
+	d('Build standalone plumin.js and plumins.min.js in dist', noop)
+);
 
 gulp.task('test', [ 'jscs', 'eslint', 'mocha' ],
-	d('Lint + Unit tests', function(done) {
-		return done();
-	}
-));
+	d('Lint + Unit tests', noop)
+);
+
+gulp.task('serve', [ 'watchify', 'browsersync' ],
+	d('Opens index.html and live-reload on changes', noop)
+);
 
 gulp.task('debug',
 	d(
