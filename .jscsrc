@@ -43,8 +43,8 @@
         "try",
         "catch"
     ],
-    "requireSpacesInsideObjectBrackets": "all",
-    "requireSpacesInsideArrayBrackets": "all",
+    "requireSpacesInsideObjectBrackets": "allButNested",
+    "requireSpacesInsideArrayBrackets": "allButNested",
     "requireSpacesInConditionalExpression": true,
     "requireSpaceAfterBinaryOperators": true,
     "requireLineFeedAtFileEnd": true,

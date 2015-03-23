@@ -5,10 +5,10 @@
   "main": "dist/plumin.js",
   "//scripts": "NPM 2+ REQUIRED to use gulp tasks without global gulp",
   "scripts": {
-    "help": "gulp help",
-    "prepublish": "npm run gulp -- jscs && npm run gulp -- eslint && npm run gulp -- build && npm run gulp -- mocha",
     "gulp": "gulp",
-    "test": "npm run gulp -- test"
+    "help": "gulp --tasks",
+    "test": "gulp test",
+    "prepublish": "gulp jscs && gulp eslint && gulp build && gulp mocha"
   },
   "repository": {
     "type": "git",
@@ -27,22 +27,21 @@
   "homepage": "https://github.com/byte-foundry/plumin.js",
   "dependencies": {},
   "devDependencies": {
-    "babelify": "^5.0.4",
     "browserify": "^9.0.3",
     "chai": "^2.1.2",
     "codemirror": "^5.0.0",
-    "derequire": "^2.0.0",
     "eslint": "^0.17.0",
     "exorcist": "^0.1.6",
     "gulp": "^3.8.11",
-    "gulp-help": "^1.3.4",
     "gulp-shell": "^0.4.0",
+    "gulp-util": "^3.0.4",
     "jscs": "^1.11.3",
     "knacss": "^4.0.3",
     "mocha": "^2.2.1",
-    "opentype.js": "~0.4.5",
-    "paper": "^0.9.22",
+    "opentype.js": "git@github.com:byte-foundry/opentype.js.git#user_defined_ascender",
+    "paper": "git@github.com:byte-foundry/paper.js.git#plumin_fork",
     "uglify-js": "^2.4.17",
+    "vinyl-source-stream": "^1.1.0",
     "watchify": "^2.4.0"
   }
 }
