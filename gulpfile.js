@@ -88,7 +88,7 @@ gulp.task('test', [ 'jscs', 'eslint', 'mocha' ],
 
 gulp.task('debug',
 	d(
-		'Debug prototypo.js using node-inspector (required as global module)',
+		'Debug plumin.js using node-inspector (required as global module)',
 		shell.task([
 			'node-inspector --no-preload --web-port=8081 ' +
 			'& mocha --debug-brk -w test/*.js'
