@@ -2,6 +2,6 @@ language: node_js
 node_js:
 - 'iojs'
 before_script:
-- npm install --no-optional
+- npm install
 after_script:
 - npm test
