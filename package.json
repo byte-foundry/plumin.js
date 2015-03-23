@@ -38,8 +38,8 @@
     "jscs": "^1.11.3",
     "knacss": "^4.0.3",
     "mocha": "^2.2.1",
-    "opentype.js": "git@github.com:byte-foundry/opentype.js.git#user_defined_ascender",
-    "paper": "git@github.com:byte-foundry/paper.js.git#plumin_fork",
+    "opentype.js": "byte-foundry/opentype.js.git#user_defined_ascender",
+    "paper": "byte-foundry/paper.js.git#plumin_fork",
     "uglify-js": "^2.4.17",
     "vinyl-source-stream": "^1.1.0",
     "watchify": "^2.4.0"
