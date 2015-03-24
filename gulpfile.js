@@ -11,16 +11,15 @@ function d( description, fn ) {
 	return fn;
 }
 
-function noop(done) {
-	return done();
-}
-
 function _browserify() {
 	return browserify({
 		entries: require.resolve('./src/plumin.js'),
-		detectGlobals: false,
-		debug: true,
 		standalone: 'plumin',
+		// we dont need to detect globals -> faster build
+		detectGlobals: false,
+		// we want a source-map
+		debug: true,
+		// don't parse big deps -> faster build, no need to derequire them
 		noParse: [
 			path.join(
 				__dirname, 'node_modules/opentype.js/dist/opentype.js'
@@ -29,6 +28,7 @@ function _browserify() {
 				__dirname, 'node_modules/paper/dist/paper-core.js'
 			)
 		],
+		// required by watchify
 		cache: {},
 		packageCache: {}
 	});
@@ -61,44 +61,43 @@ gulp.task('browserify', d('Build standalone plumin.js in dist/',
 ));
 
 gulp.task('uglify', d('Minimize dist file using Uglify', shell.task([
-	'uglifyjs dist/plumin.js > dist/plumin.min.js'
+	'uglifyjs dist/plumin.js ' +
+		'-o dist/plumin.min.js ' +
+		'--in-source-map dist/plumin.js.map ' +
+		'--source-map dist/plumin.min.js.map '
 ])));
 
-gulp.task('watchify', d('Update dist/plumin.js on source change',
-	function() {
-		var b = _browserify();
-		watchify(b).on('update', function() {
-			console.log('[watchify] update');
-			_bundle( b );
-		});
+gulp.task('dist', d('Generate all dist files', shell.task([
+	'gulp browserify && gulp uglify'
+])));
 
+gulp.task('watchify', d('Update dist/plumin.js on source change', function() {
+	var b = _browserify();
+	watchify(b).on('update', function() {
+		console.log('[watchify] update');
 		_bundle( b );
-	}
-));
+	});
+
+	_bundle( b );
+}));
 
 gulp.task('browsersync', d('Live-reload using browsersync', shell.task([
 	'browser-sync start --server --files "dist/*.js, index.html"'
 ])));
 
 // high level tasks
-gulp.task('build', [ 'browserify', 'uglify' ],
-	d('Build standalone plumin.js and plumins.min.js in dist', noop)
-);
+gulp.task('build', d('Lint code, generate dist files and test them',
+	shell.task([ 'gulp jscs && gulp eslint && gulp dist && gulp mocha' ])
+));
 
-gulp.task('test', [ 'jscs', 'eslint', 'mocha' ],
-	d('Lint + Unit tests', noop)
-);
-
-gulp.task('serve', [ 'watchify', 'browsersync' ],
-	d('Opens index.html and live-reload on changes', noop)
-);
+gulp.task('serve', d('Opens index.html and live-reload on changes', shell.task([
+	'gulp watchify & gulp browsersync'
+])));
 
 gulp.task('debug',
-	d(
-		'Debug plumin.js using node-inspector (required as global module)',
+	d('Debug plumin.js using node-inspector (required as global module)',
 		shell.task([
 			'node-inspector --no-preload --web-port=8081 ' +
 			'& mocha --debug-brk -w test/*.js'
-		])
-	)
+		]))
 );

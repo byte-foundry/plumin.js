@@ -7,8 +7,8 @@
   "scripts": {
     "gulp": "gulp",
     "help": "gulp --tasks",
-    "test": "gulp test",
-    "prepublish": "gulp jscs && gulp eslint && gulp build && gulp mocha"
+    "test": "gulp build",
+    "prepublish": "gulp build"
   },
   "repository": {
     "type": "git",
@@ -33,6 +33,7 @@
     "codemirror": "^5.0.0",
     "eslint": "^0.17.0",
     "exorcist": "^0.1.6",
+    "ghooks": "^0.3.0",
     "gulp": "^3.8.11",
     "gulp-shell": "^0.4.0",
     "jscs": "^1.11.3",
@@ -43,5 +44,10 @@
     "uglify-js": "^2.4.17",
     "vinyl-source-stream": "^1.1.0",
     "watchify": "^2.4.0"
+  },
+  "config": {
+    "pre-commit": "npm run gulp -- build",
+    "post-merge": "npm install",
+    "post-rebase": "npm install"
   }
 }
