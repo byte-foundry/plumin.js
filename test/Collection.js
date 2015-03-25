@@ -1,24 +1,25 @@
+/* eslint-disable new-cap */
 var expect = require('../node_modules/chai').expect,
 	plumin = require('../src/plumin');
 
 function createOnePath() {
 	return plumin.Path({
-		segments: [[20, 20], [80, 80], [140, 20]],
+		segments: [[ 20, 20 ], [ 80, 80 ], [ 140, 20 ]],
 		fillColor: 'black',
 		closed: true
 	});
 }
 
 function createTwoPaths() {
-	return plumin.Path([{
-		segments: [[20, 20], [80, 80], [140, 20]],
+	return plumin.Path([ {
+		segments: [[ 20, 20 ], [ 80, 80 ], [ 140, 20 ]],
 		fillColor: 'black',
 		closed: true
 	}, {
-		segments: [[140, 20], [80, 80], [20, 20]],
+		segments: [[ 140, 20 ], [ 80, 80 ], [ 20, 20 ]],
 		fillColor: 'pink',
 		closed: true
-	}]);
+	} ]);
 }
 
 describe('Collection', function() {
@@ -30,14 +31,15 @@ describe('Collection', function() {
 	});
 
 	describe('constructor', function() {
-		it('should be possible to create a collection containing a single Path', function() {
-			var $path = createOnePath();
+		it('can create a collection containing a single Path',
+			function() {
+				var $path = createOnePath();
 
-			expect($path.length).to.equal(1);
-			expect($path[0].constructor).to.equal(plumin.paper.Path);
-		});
+				expect($path.length).to.equal(1);
+				expect($path[0].constructor).to.equal(plumin.paper.Path);
+			});
 
-		it('should be possible to create a collection containing multiple Paths', function() {
+		it('can create a collection containing multiple Paths', function() {
 			var $paths = createTwoPaths();
 
 			expect($paths.length).to.equal(2);
@@ -45,25 +47,29 @@ describe('Collection', function() {
 			expect($paths[1].constructor).to.equal(plumin.paper.Path);
 		});
 
-		it('should be possible to create a collection containing multiple collections', function() {
-			var $paths = plumin( createOnePath(), createTwoPaths() );
+		it('can create a collection containing multiple collections',
+			function() {
+				var $paths = plumin( createOnePath(), createTwoPaths() );
 
-			expect($paths.length).to.equal(3);
-			expect($paths[0].constructor).to.equal(plumin.paper.Path);
-			expect($paths[1].constructor).to.equal(plumin.paper.Path);
-			expect($paths[2].constructor).to.equal(plumin.paper.Path);
-		});
+				expect($paths.length).to.equal(3);
+				expect($paths[0].constructor).to.equal(plumin.paper.Path);
+				expect($paths[1].constructor).to.equal(plumin.paper.Path);
+				expect($paths[2].constructor).to.equal(plumin.paper.Path);
+			}
+		);
 
 		it('should be possible to create a Shape or a Path shape', function() {
 			var $rect = plumin.Path.Rectangle({
-					point: [100, 100],
-					size: [250, 350]
+					point: [ 100, 100 ],
+					size: [ 250, 350 ]
 				});
 
 			expect($rect[0].segments.length).to.equal(4);
 			// woops, for some reason this test fails without throwing any error
 			// ignore it until we figure out why it fails
-			//expect($rect[0].constructor).to.equal(plumin.paper.PaperScope.prototype.Path.Rectangle);
+			//expect($rect[0].constructor).to.equal(
+			// 	plumin.paper.PaperScope.prototype.Path.Rectangle
+			// );
 		});
 	});
 
@@ -109,36 +115,42 @@ describe('Collection', function() {
 			expect($path.isEmpty()).to.equal(false);
 		});
 
-		it('should proxy chainable methods and make them chainable /via @captainObvious', function() {
-			var $path = createOnePath().reverse();
+		it('should proxy chainable methods and make them chainable',
+			function() {
+				var $path = createOnePath().reverse();
 
-			expect($path[0].constructor).to.equal(plumin.paper.Path);
-		});
+				expect($path[0].constructor).to.equal(plumin.paper.Path);
+			}
+		);
 
-		it('should proxy chainable methods and create items on the fly', function() {
-			var $path = createOnePath()
-					.addSegments( plumin.Segment( [[60, 60]] ) );
+		it('should proxy chainable methods and create items on the fly',
+			function() {
+				var $path = createOnePath()
+						.addSegments( plumin.Segment([[ 60, 60 ]]) );
 
-			expect($path[0].constructor).to.equal(plumin.paper.Path);
-			expect($path[0].segments.length).to.equal(4);
-		});
+				expect($path[0].constructor).to.equal(plumin.paper.Path);
+				expect($path[0].segments.length).to.equal(4);
+			}
+		);
 
 		it('should unwrap collection in arguments - plural method', function() {
 			var $path = createOnePath()
-					.addNodes(plumin.Node({point: [100, 50]}));
+					.addNodes( plumin.Node({ point: [ 100, 50 ] }) );
 
 			expect($path[0].nodes.length).to.equal(4);
 			expect($path[0].nodes[3].x).to.equal(100);
 			expect($path[0].nodes[3].y).to.equal(50);
 		});
 
-		it('should unwrap collection in arguments - singular method', function() {
-			var $path = createOnePath()
-					.add(plumin.Node({point: [100, 50]}));
+		it('should unwrap collection in arguments - singular method',
+			function() {
+				var $path = createOnePath()
+						.add( plumin.Node({ point: [ 100, 50 ] }) );
 
-			expect($path[0].nodes.length).to.equal(4);
-			expect($path[0].nodes[3].x).to.equal(100);
-			expect($path[0].nodes[3].y).to.equal(50);
-		});
+				expect($path[0].nodes.length).to.equal(4);
+				expect($path[0].nodes[3].x).to.equal(100);
+				expect($path[0].nodes[3].y).to.equal(50);
+			}
+		);
 	});
 });

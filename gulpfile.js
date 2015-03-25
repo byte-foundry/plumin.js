@@ -43,15 +43,15 @@ function _bundle(b) {
 
 // low level tasks
 gulp.task('mocha', d('Run unit tests using Mocha', shell.task([
-	'mocha test/*.js --colors'
+	'mocha test/*.js test/**.js --colors'
 ])));
 
 gulp.task('jscs', d('Enforce coding style using jscs', shell.task([
-	'jscs src/**.js'
+	'jscs src/**.js test/**.js'
 ])));
 
 gulp.task('eslint', d('Lint code using eslint', shell.task([
-	'eslint src/**.js'
+	'eslint src/**.js test/**.js'
 ])));
 
 gulp.task('browserify', d('Build standalone plumin.js in dist/',

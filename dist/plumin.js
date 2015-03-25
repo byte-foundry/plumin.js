@@ -18096,74 +18096,104 @@ Object.defineProperties(proto, {
 	lastNode: Object.getOwnPropertyDescriptor( proto, 'lastSegment' )
 });
 
-proto.updateOTCommands = function( path ) {
+proto._updateData = function( data, reverse, pushSimple, pushBezier ) {
 	if ( this.visible === false ) {
-		return path;
+		return data;
 	}
 
-	path.commands.push({
-		type: 'M',
-		x: Math.round( this._segments[0].point.x ) || 0,
-		y: Math.round( this._segments[0].point.y ) || 0
-	});
+	var length = this.curves.length,
+		closed = this.closed;
 
-	this.curves.forEach(function( curve ) {
-		if ( curve.isLinear() ) {
-			path.commands.push({
-				type: 'L',
-				x: Math.round( curve.point2.x ) || 0,
-				y: Math.round( curve.point2.y ) || 0
-			});
-
-		} else {
-			path.commands.push({
-				type: 'C',
-				x1: Math.round( curve.point1.x + curve.handle1.x ) || 0,
-				y1: Math.round( curve.point1.y + curve.handle1.y ) || 0,
-				x2: Math.round( curve.point2.x + curve.handle2.x ) || 0,
-				y2: Math.round( curve.point2.y + curve.handle2.y ) || 0,
-				x: Math.round( curve.point2.x ) || 0,
-				y: Math.round( curve.point2.y ) || 0
-			});
-		}
-	});
-
-	return path;
-};
-
-proto.updateSVGData = function( path ) {
-	if ( this.visible === false ) {
-		return path;
-	}
-
-	path.push(
+	pushSimple(
 		'M',
-		Math.round( this._segments[0].point.x ) || 0,
-		Math.round( this._segments[0].point.y ) || 0
+		Math.round( this.curves[ reverse ? length - ( closed ? 2 : 1 ) : 0 ][
+			'point' + ( reverse ? 2 : 1 )
+		].x ) || 0,
+		Math.round( this.curves[ reverse ? length - ( closed ? 2 : 1 ) : 0 ][
+			'point' + ( reverse ? 2 : 1 )
+		].y ) || 0
 	);
 
-	this.curves.forEach(function( curve ) {
+	( reverse ?
+		this.curves.slice(0, closed ? -1 : length).reverse() :
+		this.curves.slice(0, closed ? -1 : length)
+
+	).forEach(function( curve ) {
 		if ( curve.isLinear() ) {
-			path.push(
+			pushSimple(
 				'L',
-				Math.round( curve.point2.x ) || 0,
-				Math.round( curve.point2.y ) || 0
+				Math.round( curve[ 'point' + ( reverse ? 1 : 2 ) ].x ) || 0,
+				Math.round( curve[ 'point' + ( reverse ? 1 : 2 ) ].y ) || 0
 			);
 
 		} else {
-			path.push(
+			pushBezier(
 				'C',
-				Math.round( curve.point1.x + curve.handle1.x ) || 0,
-				Math.round( curve.point1.y + curve.handle1.y ) || 0,
-				Math.round( curve.point2.x + curve.handle2.x ) || 0,
-				Math.round( curve.point2.y + curve.handle2.y ) || 0,
-				Math.round( curve.point2.x ) || 0,
-				Math.round( curve.point2.y ) || 0
+				Math.round(
+					curve[ 'point' + ( reverse ? 1 : 2 ) ].x +
+					curve[ 'handle' + ( reverse ? 1 : 2 ) ].x
+				) || 0,
+				Math.round(
+					curve[ 'point' + ( reverse ? 1 : 2 ) ].y +
+					curve[ 'handle' + ( reverse ? 1 : 2 ) ].y
+				) || 0,
+				Math.round(
+					curve[ 'point' + ( reverse ? 2 : 1 ) ].x +
+					curve[ 'handle' + ( reverse ? 2 : 1 ) ].x
+				) || 0,
+				Math.round(
+					curve[ 'point' + ( reverse ? 2 : 1 ) ].y +
+					curve[ 'handle' + ( reverse ? 2 : 1 ) ].y
+				) || 0,
+				Math.round( curve[ 'point' + ( reverse ? 1 : 2 ) ].x ) || 0,
+				Math.round( curve[ 'point' + ( reverse ? 1 : 2 ) ].y ) || 0
 			);
 		}
 	});
 
-	return path;
+	if ( closed ) {
+		pushSimple('Z');
+	}
+
+	return data;
+};
+
+proto.updateOTCommands = function( data, reverse ) {
+	return this._updateData(
+		data,
+		reverse,
+		function pushSimple() {
+			data.commands.push({
+				type: arguments[0],
+				x: arguments[1],
+				y: arguments[2]
+			});
+		},
+		function pushBezier() {
+			data.commands.push({
+				type: arguments[0],
+				x1: arguments[1],
+				y1: arguments[2],
+				x2: arguments[3],
+				y2: arguments[4],
+				x: arguments[5],
+				y: arguments[6]
+			});
+		}
+	);
+};
+
+proto.updateSVGData = function( data, reverse ) {
+	return this._updateData(
+		data,
+		reverse,
+		function pushSimple() {
+			data.push.apply( data, arguments );
+		},
+		function pushBezier() {
+			data.push.apply( data, arguments );
+		}
+	);
 };
 
 module.exports = paper.Path;
