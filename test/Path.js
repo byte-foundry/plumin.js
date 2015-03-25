@@ -43,7 +43,7 @@ describe('Font', function() {
 		it('should return an array with pseudo-svg commands - closed path',
 			function() {
 				var data = [],
-					result = closedPath._updateData(data, false,
+					result = closedPath._updateData(data,
 						function() {
 							data.push.apply(data, arguments);
 						}, function() {
@@ -62,30 +62,10 @@ describe('Font', function() {
 			}
 		);
 
-		it('can return an reversed array - closed path', function() {
-			var data = [],
-				result = closedPath._updateData(data, true,
-					function() {
-						data.push.apply(data, arguments);
-					}, function() {
-						data.push.apply(data, arguments);
-					}
-				);
-
-			expect(result).to.deep.equal([
-				'M', 100, 0,
-				'L', 100, 100,
-				'L', 0, 100,
-				'L', 0, 0,
-				'Z'
-			]);
-
-		});
-
 		it('should return an array with pseudo-svg commands - open path',
 			function() {
 				var data = [],
-					result = openPath._updateData(data, false,
+					result = openPath._updateData(data,
 						function() {
 							data.push.apply(data, arguments);
 						}, function() {
@@ -102,25 +82,6 @@ describe('Font', function() {
 
 			}
 		);
-
-		it('can return an reversed array - open path', function() {
-			var data = [],
-				result = openPath._updateData(data, true,
-					function() {
-						data.push.apply(data, arguments);
-					}, function() {
-						data.push.apply(data, arguments);
-					}
-				);
-
-			expect(result).to.deep.equal([
-				'M', 100, 0,
-				'L', 100, 100,
-				'L', 0, 100,
-				'L', 0, 0
-			]);
-
-		});
 	});
 
 });

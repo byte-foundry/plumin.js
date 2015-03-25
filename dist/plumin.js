@@ -18096,7 +18096,7 @@ Object.defineProperties(proto, {
 	lastNode: Object.getOwnPropertyDescriptor( proto, 'lastSegment' )
 });
 
-proto._updateData = function( data, reverse, pushSimple, pushBezier ) {
+proto._updateData = function( data, pushSimple, pushBezier ) {
 	if ( this.visible === false ) {
 		return data;
 	}
@@ -18106,47 +18106,27 @@ proto._updateData = function( data, reverse, pushSimple, pushBezier ) {
 
 	pushSimple(
 		'M',
-		Math.round( this.curves[ reverse ? length - ( closed ? 2 : 1 ) : 0 ][
-			'point' + ( reverse ? 2 : 1 )
-		].x ) || 0,
-		Math.round( this.curves[ reverse ? length - ( closed ? 2 : 1 ) : 0 ][
-			'point' + ( reverse ? 2 : 1 )
-		].y ) || 0
+		Math.round( this.curves[0].point1.x ) || 0,
+		Math.round( this.curves[0].point1.y ) || 0
 	);
 
-	( reverse ?
-		this.curves.slice(0, closed ? -1 : length).reverse() :
-		this.curves.slice(0, closed ? -1 : length)
-
-	).forEach(function( curve ) {
+	this.curves.slice(0, closed ? -1 : length).forEach(function( curve ) {
 		if ( curve.isLinear() ) {
 			pushSimple(
 				'L',
-				Math.round( curve[ 'point' + ( reverse ? 1 : 2 ) ].x ) || 0,
-				Math.round( curve[ 'point' + ( reverse ? 1 : 2 ) ].y ) || 0
+				Math.round( curve.point2.x ) || 0,
+				Math.round( curve.point2.y ) || 0
 			);
 
 		} else {
 			pushBezier(
 				'C',
-				Math.round(
-					curve[ 'point' + ( reverse ? 1 : 2 ) ].x +
-					curve[ 'handle' + ( reverse ? 1 : 2 ) ].x
-				) || 0,
-				Math.round(
-					curve[ 'point' + ( reverse ? 1 : 2 ) ].y +
-					curve[ 'handle' + ( reverse ? 1 : 2 ) ].y
-				) || 0,
-				Math.round(
-					curve[ 'point' + ( reverse ? 2 : 1 ) ].x +
-					curve[ 'handle' + ( reverse ? 2 : 1 ) ].x
-				) || 0,
-				Math.round(
-					curve[ 'point' + ( reverse ? 2 : 1 ) ].y +
-					curve[ 'handle' + ( reverse ? 2 : 1 ) ].y
-				) || 0,
-				Math.round( curve[ 'point' + ( reverse ? 1 : 2 ) ].x ) || 0,
-				Math.round( curve[ 'point' + ( reverse ? 1 : 2 ) ].y ) || 0
+				Math.round( curve.point1.x + curve.handle1.x ) || 0,
+				Math.round( curve.point1.y + curve.handle1.y ) || 0,
+				Math.round( curve.point2.x + curve.handle2.x ) || 0,
+				Math.round( curve.point2.y + curve.handle2.y ) || 0,
+				Math.round( curve.point2.x ) || 0,
+				Math.round( curve.point2.y ) || 0
 			);
 		}
 	});
@@ -18158,10 +18138,9 @@ proto._updateData = function( data, reverse, pushSimple, pushBezier ) {
 	return data;
 };
 
-proto.updateOTCommands = function( data, reverse ) {
+proto.updateOTCommands = function( data ) {
 	return this._updateData(
 		data,
-		reverse,
 		function pushSimple() {
 			data.commands.push({
 				type: arguments[0],
@@ -18183,10 +18162,9 @@ proto.updateOTCommands = function( data, reverse ) {
 	);
 };
 
-proto.updateSVGData = function( data, reverse ) {
+proto.updateSVGData = function( data ) {
 	return this._updateData(
 		data,
-		reverse,
 		function pushSimple() {
 			data.push.apply( data, arguments );
 		},
