@@ -1,103 +1,90 @@
 var path = require('path'),
 	gulp = require('gulp'),
-	shell = require('gulp-shell'),
-	browserify = require('browserify'),
-	watchify = require('watchify'),
-	exorcist = require('exorcist'),
-	source = require('vinyl-source-stream');
+	shelter = require('gulp-shelter');
 
-function d( description, fn ) {
-	fn.description = description;
-	return fn;
-}
+shelter = shelter( gulp );
 
-function _browserify() {
-	return browserify({
-		entries: require.resolve('./src/plumin.js'),
-		standalone: 'plumin',
-		// we dont need to detect globals -> faster build
-		detectGlobals: false,
-		// we want a source-map
-		debug: true,
-		// don't parse big deps -> faster build, no need to derequire them
-		noParse: [
-			path.join(
-				__dirname, 'node_modules/opentype.js/dist/opentype.js'
+shelter({
+	/* Fragments */
+	project: 'plumin',
+	browserifyArgs: [
+		'--standalone ${project}',
+		// don't parse big js -> faster build, no need to derequire
+		'--noparse',
+			path.resolve(
+				'node_modules/opentype.js/dist/opentype.js'
 			),
-			path.join(
-				__dirname, 'node_modules/paper/dist/paper-core.js'
-			)
-		],
-		// required by watchify
-		cache: {},
-		packageCache: {}
-	});
-}
+			path.resolve(
+				'node_modules/paper/dist/paper-core.js'
+			),
+		// no need to detect globals -> faster build
+		'--dg false'
+	],
+	_browserify: [
+		'browserify src/${project}.js',
+			'${browserifyArgs}',
+			// we want a source map
+			'--debug'
+	],
 
-function _bundle(b) {
-	return b.bundle()
-		.pipe(exorcist(path.join(__dirname, 'dist/plumin.js.map')))
-		.pipe(source('plumin.js'))
-		.pipe(gulp.dest('./dist'));
-}
-
-// low level tasks
-gulp.task('mocha', d('Run unit tests using Mocha', shell.task([
-	'mocha test/*.js test/**.js --colors'
-])));
-
-gulp.task('jscs', d('Enforce coding style using jscs', shell.task([
-	'jscs src/**.js test/**.js'
-])));
-
-gulp.task('eslint', d('Lint code using eslint', shell.task([
-	'eslint src/**.js test/**.js'
-])));
-
-gulp.task('browserify', d('Build standalone plumin.js in dist/',
-	function() {
-		return _bundle( _browserify() );
+	/* Tasks */
+	browserify: {
+		dsc: 'Build standalone ${project}.js in dist/',
+		cmd: '${_browserify} > dist/${project}.js'
+	},
+	watchify: {
+		dsc: 'Update dist/plumin.js on source change',
+		cmd: [ 'watchify src/${project}.js',
+				'${browserifyArgs}',
+				'-o dist/${project}.js',
+				'--verbose'
+		]
+	},
+	exorcist: {
+		dsc: 'Creates the initial source-map',
+		cmd: 'exorcist dist/${project}.js.map > dist/${project}.js'
+	},
+	mocha: {
+		dsc: 'Run unit tests using Mocha',
+		cmd: 'mocha test/*.js test/**.js --colors'
+	},
+	jscs: {
+		dsc: 'Enforce coding style using jscs',
+		cmd: 'jscs src/**.js test/**.js'
+	},
+	eslint: {
+		dsc: 'Lint code using eslint',
+		cmd: 'eslint src/**.js test/**.js'
+	},
+	uglify: {
+		dsc: 'Minimize dist file using Uglify',
+		cmd: [ 'uglifyjs dist/${project}.js',
+				'-o dist/${project}.min.js',
+				'--in-source-map dist/${project}.js.map',
+				'--source-map dist/${project}.min.js.map'
+		]
+	},
+	dist: {
+		dsc: 'Generate all dist files',
+		cmd: '${_browserify} | ${exorcist} && ${uglify}'
+	},
+	build: {
+		dsc: 'Lint code, generate dist files and test them',
+		cmd: '( ${jscs} & ${eslint} ) && ${dist} && ${mocha}'
+	},
+	browsersync: {
+		dsc: 'Live-reload using browsersync',
+		cmd: 'browser-sync start --server --files "dist/*.js, index.html"'
+	},
+	serve: {
+		dsc: 'Opens index.html and live-reload on changes',
+		cmd: '${watchify} & ${browsersync}'
+	},
+	debug: {
+		dsc: 'Debug ${project}.js using node-inspector ' +
+				'(required as global module)',
+		cmd: [ 'node-inspector --no-preload --web-port=8081',
+				'& mocha --debug-brk -w test/*.js'
+		]
 	}
-));
-
-gulp.task('uglify', d('Minimize dist file using Uglify', shell.task([
-	'uglifyjs dist/plumin.js ' +
-		'-o dist/plumin.min.js ' +
-		'--in-source-map dist/plumin.js.map ' +
-		'--source-map dist/plumin.min.js.map '
-])));
-
-gulp.task('dist', d('Generate all dist files', shell.task([
-	'gulp browserify && gulp uglify'
-])));
-
-gulp.task('watchify', d('Update dist/plumin.js on source change', function() {
-	var b = _browserify();
-	watchify(b).on('update', function() {
-		console.log('[watchify] update');
-		_bundle( b );
-	});
-
-	_bundle( b );
-}));
-
-gulp.task('browsersync', d('Live-reload using browsersync', shell.task([
-	'browser-sync start --server --files "dist/*.js, index.html"'
-])));
-
-// high level tasks
-gulp.task('build', d('Lint code, generate dist files and test them',
-	shell.task([ 'gulp jscs && gulp eslint && gulp dist && gulp mocha' ])
-));
-
-gulp.task('serve', d('Opens index.html and live-reload on changes', shell.task([
-	'gulp watchify & gulp browsersync'
-])));
-
-gulp.task('debug',
-	d('Debug plumin.js using node-inspector (required as global module)',
-		shell.task([
-			'node-inspector --no-preload --web-port=8081 ' +
-			'& mocha --debug-brk -w test/*.js'
-		]))
-);
+});
