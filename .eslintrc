@@ -22,7 +22,6 @@
 	},
 	"rules": {
 		"quotes": "single",
-		"no-underscore-dangle": false,
-		"no-loop-func": false
+		"no-underscore-dangle": false
 	}
 }

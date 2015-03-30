@@ -131,11 +131,13 @@ Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
 			coef
 		);
 
+		/* eslint-disable no-loop-func */
 		this.components.forEach(function(component, j) {
 			component.interpolate(
 				glyph0.components[j], glyph1.components[j], coef
 			);
 		});
+		/* eslint-enable no-loop-func */
 
 		this.ot.advanceWidth =
 			glyph0.ot.advanceWidth +
