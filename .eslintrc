@@ -20,8 +20,12 @@
 		"objectLiteralShorthandMethods": true,
 		"objectLiteralShorthandProperties": true
 	},
+	"plugins": [
+		"mocha"
+	],
 	"rules": {
 		"quotes": "single",
-		"no-underscore-dangle": false
+		"no-underscore-dangle": false,
+		"mocha/no-exclusive-tests": 2
 	}
 }

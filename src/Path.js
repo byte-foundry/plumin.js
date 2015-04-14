@@ -23,16 +23,13 @@ proto._updateData = function( data, pushSimple, pushBezier ) {
 		return data;
 	}
 
-	var length = this.curves.length,
-		closed = this.closed;
-
 	pushSimple(
 		'M',
 		Math.round( this.curves[0].point1.x ) || 0,
 		Math.round( this.curves[0].point1.y ) || 0
 	);
 
-	this.curves.slice(0, closed ? -1 : length).forEach(function( curve ) {
+	this.curves.forEach(function( curve ) {
 		if ( curve.isLinear() ) {
 			pushSimple(
 				'L',
@@ -53,7 +50,7 @@ proto._updateData = function( data, pushSimple, pushBezier ) {
 		}
 	});
 
-	if ( closed ) {
+	if ( this.closed ) {
 		pushSimple('Z');
 	}
 

@@ -26,7 +26,8 @@ describe('Font', function() {
 
 	describe('#_updateData method', function() {
 		var closedPath,
-			openPath;
+			openPath,
+			circle;
 
 		before(function() {
 			closedPath = new plumin.Path({
@@ -38,6 +39,11 @@ describe('Font', function() {
 				segments: [ [ 0, 0 ], [ 0, 100 ], [ 100, 100 ], [ 100, 0 ] ],
 				closed: false
 			});
+
+			circle = new plumin.Path(
+				'M 0 50 C 0 75 25 100 50 100 C 75 100 100 75 100 50 ' +
+				'C 100 25 75 0 50 0 C 25 0 0 25 0 50 Z'
+			);
 		});
 
 		it('should return an array with pseudo-svg commands - closed path',
@@ -56,6 +62,7 @@ describe('Font', function() {
 					'L', 0, 100,
 					'L', 100, 100,
 					'L', 100, 0,
+					'L', 0, 0,
 					'Z'
 				]);
 
@@ -78,6 +85,29 @@ describe('Font', function() {
 					'L', 0, 100,
 					'L', 100, 100,
 					'L', 100, 0
+				]);
+
+			}
+		);
+
+		it('should return an array with pseudo-svg commands - circle',
+			function() {
+				var data = [],
+					result = circle._updateData(data,
+						function() {
+							data.push.apply(data, arguments);
+						}, function() {
+							data.push.apply(data, arguments);
+						}
+					);
+
+				expect(result).to.deep.equal([
+					'M', 0, 50,
+					'C', 0, 75, 25, 100, 50, 100,
+					'C', 75, 100, 100, 75, 100, 50,
+					'C', 100, 25, 75, 0, 50, 0,
+					'C', 25, 0, 0, 25, 0, 50,
+					'Z'
 				]);
 
 			}

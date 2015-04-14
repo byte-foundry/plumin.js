@@ -5,7 +5,7 @@ var path = require('path'),
 shelter = shelter( gulp );
 
 shelter({
-	/* Fragments */
+	/* Variables */
 	project: 'plumin',
 	browserifyArgs: [
 		'--standalone ${project}',
@@ -20,18 +20,29 @@ shelter({
 		// no need to detect globals -> faster build
 		'--dg false'
 	],
+
+	/* Fragments */
 	_browserify: [
 		'browserify src/${project}.js',
 			'${browserifyArgs}',
 			// we want a source map
 			'--debug'
 	],
+	_uglify: [
+		'uglifyjs dist/${project}.js',
+			'-o dist/${project}.min.js',
+			'--in-source-map dist/${project}.js.map',
+			'--source-map dist/${project}.min.js.map'
+	],
+	// extract the source-map in its own file
+	_exorcist: 'exorcist dist/${project}.js.map > dist/${project}.js',
+	_dist: '${_browserify} | ${_exorcist} && ${_uglify}',
+	_mocha: 'mocha test/*.js test/**.js --colors',
+	_jscs: 'jscs src/**.js test/**.js',
+	_eslint: 'eslint src/**.js test/**.js',
+	_browsersync: 'browser-sync start --server --files "dist/*.js, index.html"',
 
 	/* Tasks */
-	browserify: {
-		dsc: 'Build standalone ${project}.js in dist/',
-		cmd: '${_browserify} > dist/${project}.js'
-	},
 	watchify: {
 		dsc: 'Update dist/plumin.js on source change',
 		cmd: [ 'watchify src/${project}.js',
@@ -40,45 +51,17 @@ shelter({
 				'--verbose'
 		]
 	},
-	exorcist: {
-		dsc: 'Creates the initial source-map',
-		cmd: 'exorcist dist/${project}.js.map > dist/${project}.js'
-	},
-	mocha: {
-		dsc: 'Run unit tests using Mocha',
-		cmd: 'mocha test/*.js test/**.js --colors'
-	},
-	jscs: {
-		dsc: 'Enforce coding style using jscs',
-		cmd: 'jscs src/**.js test/**.js'
-	},
-	eslint: {
-		dsc: 'Lint code using eslint',
-		cmd: 'eslint src/**.js test/**.js'
-	},
-	uglify: {
-		dsc: 'Minimize dist file using Uglify',
-		cmd: [ 'uglifyjs dist/${project}.js',
-				'-o dist/${project}.min.js',
-				'--in-source-map dist/${project}.js.map',
-				'--source-map dist/${project}.min.js.map'
-		]
-	},
-	dist: {
-		dsc: 'Generate all dist files',
-		cmd: '${_browserify} | ${exorcist} && ${uglify}'
-	},
 	build: {
 		dsc: 'Lint code, generate dist files and test them',
-		cmd: '( ${jscs} & ${eslint} ) && ${dist} && ${mocha}'
-	},
-	browsersync: {
-		dsc: 'Live-reload using browsersync',
-		cmd: 'browser-sync start --server --files "dist/*.js, index.html"'
+		cmd: '( ${_jscs} & ${_eslint} ) && ${_dist} && ${_mocha}'
 	},
 	serve: {
 		dsc: 'Opens index.html and live-reload on changes',
-		cmd: '${watchify} & ${browsersync}'
+		cmd: '${watchify} & ${_browsersync}'
+	},
+	test: {
+		dsc: 'Build ${project}.js + map and test it',
+		cmd: '${_browserify} | ${_exorcist} && ${_mocha}'
 	},
 	debug: {
 		dsc: 'Debug ${project}.js using node-inspector ' +

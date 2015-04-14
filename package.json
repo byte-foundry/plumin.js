@@ -32,6 +32,7 @@
     "chai": "^2.1.2",
     "codemirror": "^5.1.0",
     "eslint": "^0.17.1",
+    "eslint-plugin-mocha": "^0.2.2",
     "exorcist": "^0.1.6",
     "ghooks": "^0.3.0",
     "gulp": "^3.8.11",
