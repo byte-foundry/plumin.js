@@ -1,12 +1,12 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.plumin = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-!function(e){if("object"==typeof exports&&"undefined"!=typeof module)module.exports=e();else if("function"==typeof define&&define.amd)define([],e);else{var f;"undefined"!=typeof window?f=window:"undefined"!=typeof global?f=global:"undefined"!=typeof self&&(f=self),f.opentype=e()}}(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.opentype = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 // Run-time checking of preconditions.
 
 'use strict';
 
 // Precondition function that checks if the given predicate is true.
 // If not, it will throw an error.
-exports.argument = function (predicate, message) {
+exports.argument = function(predicate, message) {
     if (!predicate) {
         throw new Error(message);
     }
@@ -162,14 +162,13 @@ function DefaultEncoding(font) {
     this.font = font;
 }
 
-DefaultEncoding.prototype.charToGlyphIndex = function (c) {
-    var code, glyphs, i, glyph, j;
-    code = c.charCodeAt(0);
-    glyphs = this.font.glyphs;
+DefaultEncoding.prototype.charToGlyphIndex = function(c) {
+    var code = c.charCodeAt(0);
+    var glyphs = this.font.glyphs;
     if (glyphs) {
-        for (i = 0; i < glyphs.length; i += 1) {
-            glyph = glyphs[i];
-            for (j = 0; j < glyph.unicodes.length; j += 1) {
+        for (var i = 0; i < glyphs.length; i += 1) {
+            var glyph = glyphs[i];
+            for (var j = 0; j < glyph.unicodes.length; j += 1) {
                 if (glyph.unicodes[j] === code) {
                     return i;
                 }
@@ -184,7 +183,7 @@ function CmapEncoding(cmap) {
     this.cmap = cmap;
 }
 
-CmapEncoding.prototype.charToGlyphIndex = function (c) {
+CmapEncoding.prototype.charToGlyphIndex = function(c) {
     return this.cmap.glyphIndexMap[c.charCodeAt(0)] || 0;
 };
 
@@ -193,10 +192,9 @@ function CffEncoding(encoding, charset) {
     this.charset = charset;
 }
 
-CffEncoding.prototype.charToGlyphIndex = function (s) {
-    var code, charName;
-    code = s.charCodeAt(0);
-    charName = this.encoding[code];
+CffEncoding.prototype.charToGlyphIndex = function(s) {
+    var code = s.charCodeAt(0);
+    var charName = this.encoding[code];
     return this.charset.indexOf(charName);
 };
 
@@ -215,12 +213,14 @@ function GlyphNames(post) {
                 this.names[i] = post.names[post.glyphNameIndex[i] - exports.standardNames.length];
             }
         }
+
         break;
     case 2.5:
         this.names = new Array(post.numberOfGlyphs);
         for (i = 0; i < post.numberOfGlyphs; i++) {
             this.names[i] = exports.standardNames[i + post.glyphNameIndex[i]];
         }
+
         break;
     case 3:
         this.names = [];
@@ -228,24 +228,25 @@ function GlyphNames(post) {
     }
 }
 
-GlyphNames.prototype.nameToGlyphIndex = function (name) {
+GlyphNames.prototype.nameToGlyphIndex = function(name) {
     return this.names.indexOf(name);
 };
 
-GlyphNames.prototype.glyphIndexToName = function (gid) {
+GlyphNames.prototype.glyphIndexToName = function(gid) {
     return this.names[gid];
 };
 
 function addGlyphNames(font) {
-    var glyphIndexMap, charCodes, i, c, glyphIndex, glyph;
-    glyphIndexMap = font.tables.cmap.glyphIndexMap;
-    charCodes = Object.keys(glyphIndexMap);
-    for (i = 0; i < charCodes.length; i += 1) {
-        c = charCodes[i];
-        glyphIndex = glyphIndexMap[c];
+    var glyph;
+    var glyphIndexMap = font.tables.cmap.glyphIndexMap;
+    var charCodes = Object.keys(glyphIndexMap);
+    for (var i = 0; i < charCodes.length; i += 1) {
+        var c = charCodes[i];
+        var glyphIndex = glyphIndexMap[c];
         glyph = font.glyphs[glyphIndex];
         glyph.addUnicode(parseInt(c));
     }
+
     for (i = 0; i < font.glyphs.length; i += 1) {
         glyph = font.glyphs[i];
         if (font.cffEncoding) {
@@ -280,6 +281,7 @@ var encoding = require('./encoding');
 // or to get a path representing the text.
 function Font(options) {
     options = options || {};
+
     // OS X will complain if the names are empty, so we put a single space everywhere by default.
     this.familyName = options.familyName || ' ';
     this.styleName = options.styleName || ' ';
@@ -303,27 +305,28 @@ function Font(options) {
 }
 
 // Check if the font has a glyph for the given character.
-Font.prototype.hasChar = function (c) {
+Font.prototype.hasChar = function(c) {
     return this.encoding.charToGlyphIndex(c) !== null;
 };
 
 // Convert the given character to a single glyph index.
 // Note that this function assumes that there is a one-to-one mapping between
 // the given character and a glyph; for complex scripts this might not be the case.
-Font.prototype.charToGlyphIndex = function (s) {
+Font.prototype.charToGlyphIndex = function(s) {
     return this.encoding.charToGlyphIndex(s);
 };
 
 // Convert the given character to a single Glyph object.
 // Note that this function assumes that there is a one-to-one mapping between
 // the given character and a glyph; for complex scripts this might not be the case.
-Font.prototype.charToGlyph = function (c) {
-    var glyphIndex, glyph;
-    glyphIndex = this.charToGlyphIndex(c);
-    glyph = this.glyphs[glyphIndex];
+Font.prototype.charToGlyph = function(c) {
+    var glyphIndex = this.charToGlyphIndex(c);
+    var glyph = this.glyphs[glyphIndex];
     if (!glyph) {
-        glyph = this.glyphs[0]; // .notdef
+        // .notdef
+        glyph = this.glyphs[0];
     }
+
     return glyph;
 };
 
@@ -331,34 +334,36 @@ Font.prototype.charToGlyph = function (c) {
 // Note that there is no strict one-to-one mapping between characters and
 // glyphs, so the list of returned glyphs can be larger or smaller than the
 // length of the given string.
-Font.prototype.stringToGlyphs = function (s) {
-    var i, c, glyphs;
-    glyphs = [];
-    for (i = 0; i < s.length; i += 1) {
-        c = s[i];
+Font.prototype.stringToGlyphs = function(s) {
+    var glyphs = [];
+    for (var i = 0; i < s.length; i += 1) {
+        var c = s[i];
         glyphs.push(this.charToGlyph(c));
     }
+
     return glyphs;
 };
 
-Font.prototype.nameToGlyphIndex = function (name) {
+Font.prototype.nameToGlyphIndex = function(name) {
     return this.glyphNames.nameToGlyphIndex(name);
 };
 
-Font.prototype.nameToGlyph = function (name) {
-    var glyphIndex, glyph;
-    glyphIndex = this.nametoGlyphIndex(name);
-    glyph = this.glyphs[glyphIndex];
+Font.prototype.nameToGlyph = function(name) {
+    var glyphIndex = this.nametoGlyphIndex(name);
+    var glyph = this.glyphs[glyphIndex];
     if (!glyph) {
-        glyph = this.glyphs[0]; // .notdef
+        // .notdef
+        glyph = this.glyphs[0];
     }
+
     return glyph;
 };
 
-Font.prototype.glyphIndexToName = function (gid) {
+Font.prototype.glyphIndexToName = function(gid) {
     if (!this.glyphNames.glyphIndexToName) {
         return '';
     }
+
     return this.glyphNames.glyphIndexToName(gid);
 };
 
@@ -366,7 +371,7 @@ Font.prototype.glyphIndexToName = function (gid) {
 // and the right glyph (or its index). If no kerning pair is found, return 0.
 // The kerning value gets added to the advance width when calculating the spacing
 // between glyphs.
-Font.prototype.getKerningValue = function (leftGlyph, rightGlyph) {
+Font.prototype.getKerningValue = function(leftGlyph, rightGlyph) {
     leftGlyph = leftGlyph.index || leftGlyph;
     rightGlyph = rightGlyph.index || rightGlyph;
     var gposKerning = this.getGposKerningValue;
@@ -376,26 +381,27 @@ Font.prototype.getKerningValue = function (leftGlyph, rightGlyph) {
 
 // Helper function that invokes the given callback for each glyph in the given text.
 // The callback gets `(glyph, x, y, fontSize, options)`.
-Font.prototype.forEachGlyph = function (text, x, y, fontSize, options, callback) {
-    var kerning, fontScale, glyphs, i, glyph, kerningValue;
+Font.prototype.forEachGlyph = function(text, x, y, fontSize, options, callback) {
     if (!this.supported) {
         return;
     }
+
     x = x !== undefined ? x : 0;
     y = y !== undefined ? y : 0;
     fontSize = fontSize !== undefined ? fontSize : 72;
     options = options || {};
-    kerning = options.kerning === undefined ? true : options.kerning;
-    fontScale = 1 / this.unitsPerEm * fontSize;
-    glyphs = this.stringToGlyphs(text);
-    for (i = 0; i < glyphs.length; i += 1) {
-        glyph = glyphs[i];
+    var kerning = options.kerning === undefined ? true : options.kerning;
+    var fontScale = 1 / this.unitsPerEm * fontSize;
+    var glyphs = this.stringToGlyphs(text);
+    for (var i = 0; i < glyphs.length; i += 1) {
+        var glyph = glyphs[i];
         callback(glyph, x, y, fontSize, options);
         if (glyph.advanceWidth) {
             x += glyph.advanceWidth * fontScale;
         }
+
         if (kerning && i < glyphs.length - 1) {
-            kerningValue = this.getKerningValue(glyph, glyphs[i + 1]);
+            var kerningValue = this.getKerningValue(glyph, glyphs[i + 1]);
             x += kerningValue * fontScale;
         }
     }
@@ -411,12 +417,13 @@ Font.prototype.forEachGlyph = function (text, x, y, fontSize, options, callback)
 // - kerning - Whether to take kerning information into account. (default: true)
 //
 // Returns a Path object.
-Font.prototype.getPath = function (text, x, y, fontSize, options) {
+Font.prototype.getPath = function(text, x, y, fontSize, options) {
     var fullPath = new path.Path();
-    this.forEachGlyph(text, x, y, fontSize, options, function (glyph, gX, gY, gFontSize) {
+    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
         var glyphPath = glyph.getPath(gX, gY, gFontSize);
         fullPath.extend(glyphPath);
     });
+
     return fullPath;
 };
 
@@ -429,7 +436,7 @@ Font.prototype.getPath = function (text, x, y, fontSize, options) {
 // fontSize - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`. (default: 72)
 // Options is an optional object that contains:
 // - kerning - Whether to take kerning information into account. (default: true)
-Font.prototype.draw = function (ctx, text, x, y, fontSize, options) {
+Font.prototype.draw = function(ctx, text, x, y, fontSize, options) {
     this.getPath(text, x, y, fontSize, options).draw(ctx);
 };
 
@@ -443,8 +450,8 @@ Font.prototype.draw = function (ctx, text, x, y, fontSize, options) {
 // fontSize - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`. (default: 72)
 // Options is an optional object that contains:
 // - kerning - Whether to take kerning information into account. (default: true)
-Font.prototype.drawPoints = function (ctx, text, x, y, fontSize, options) {
-    this.forEachGlyph(text, x, y, fontSize, options, function (glyph, gX, gY, gFontSize) {
+Font.prototype.drawPoints = function(ctx, text, x, y, fontSize, options) {
+    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
         glyph.drawPoints(ctx, gX, gY, gFontSize);
     });
 };
@@ -461,16 +468,16 @@ Font.prototype.drawPoints = function (ctx, text, x, y, fontSize, options) {
 // fontSize - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`. (default: 72)
 // Options is an optional object that contains:
 // - kerning - Whether to take kerning information into account. (default: true)
-Font.prototype.drawMetrics = function (ctx, text, x, y, fontSize, options) {
-    this.forEachGlyph(text, x, y, fontSize, options, function (glyph, gX, gY, gFontSize) {
+Font.prototype.drawMetrics = function(ctx, text, x, y, fontSize, options) {
+    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
         glyph.drawMetrics(ctx, gX, gY, gFontSize);
     });
 };
 
 // Validate
-Font.prototype.validate = function () {
+Font.prototype.validate = function() {
     var warnings = [];
-    var font = this;
+    var _this = this;
 
     function assert(predicate, message) {
         if (!predicate) {
@@ -479,7 +486,7 @@ Font.prototype.validate = function () {
     }
 
     function assertStringAttribute(attrName) {
-        assert(font[attrName] && font[attrName].trim().length > 0, 'No ' + attrName + ' specified.');
+        assert(_this[attrName] && _this[attrName].trim().length > 0, 'No ' + attrName + ' specified.');
     }
 
     // Identification information
@@ -495,11 +502,11 @@ Font.prototype.validate = function () {
 
 // Convert the font object to a SFNT data structure.
 // This structure contains all the necessary tables and metadata to create a binary OTF file.
-Font.prototype.toTables = function () {
+Font.prototype.toTables = function() {
     return sfnt.fontToTable(this);
 };
 
-Font.prototype.toBuffer = function () {
+Font.prototype.toBuffer = function() {
     var sfntTable = this.toTables();
     var bytes = sfntTable.encode();
     var buffer = new ArrayBuffer(bytes.length);
@@ -507,29 +514,32 @@ Font.prototype.toBuffer = function () {
     for (var i = 0; i < bytes.length; i++) {
         intArray[i] = bytes[i];
     }
+
     return buffer;
 };
 
 // Initiate a download of the OpenType font.
-Font.prototype.download = function () {
+Font.prototype.download = function() {
     var fileName = this.familyName.replace(/\s/g, '') + '-' + this.styleName + '.otf';
     var buffer = this.toBuffer();
 
     window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
-    window.requestFileSystem(window.TEMPORARY, buffer.byteLength, function (fs) {
-        fs.root.getFile(fileName, {create: true}, function (fileEntry) {
-            fileEntry.createWriter(function (writer) {
+    window.requestFileSystem(window.TEMPORARY, buffer.byteLength, function(fs) {
+        fs.root.getFile(fileName, {create: true}, function(fileEntry) {
+            fileEntry.createWriter(function(writer) {
                 var dataView = new DataView(buffer);
                 var blob = new Blob([dataView], {type: 'font/opentype'});
                 writer.write(blob);
 
-                 writer.addEventListener('writeend', function () {
+                writer.addEventListener('writeend', function() {
                     // Navigating to the file will download it.
                     location.href = fileEntry.toURL();
-                 }, false);
+                }, false);
             });
         });
-    }, function (err) {
+    },
+
+    function(err) {
         throw err;
     });
 };
@@ -564,10 +574,11 @@ function Glyph(options) {
     this.path = options.path || null;
 }
 
-Glyph.prototype.addUnicode = function (unicode) {
+Glyph.prototype.addUnicode = function(unicode) {
     if (this.unicodes.length === 0) {
         this.unicode = unicode;
     }
+
     this.unicodes.push(unicode);
 };
 
@@ -576,16 +587,15 @@ Glyph.prototype.addUnicode = function (unicode) {
 // x - Horizontal position of the glyph. (default: 0)
 // y - Vertical position of the *baseline* of the glyph. (default: 0)
 // fontSize - Font size, in pixels (default: 72).
-Glyph.prototype.getPath = function (x, y, fontSize) {
-    var scale, p, commands, cmd;
+Glyph.prototype.getPath = function(x, y, fontSize) {
     x = x !== undefined ? x : 0;
     y = y !== undefined ? y : 0;
     fontSize = fontSize !== undefined ? fontSize : 72;
-    scale = 1 / this.font.unitsPerEm * fontSize;
-    p = new path.Path();
-    commands = this.path.commands;
+    var scale = 1 / this.font.unitsPerEm * fontSize;
+    var p = new path.Path();
+    var commands = this.path.commands;
     for (var i = 0; i < commands.length; i += 1) {
-        cmd = commands[i];
+        var cmd = commands[i];
         if (cmd.type === 'M') {
             p.moveTo(x + (cmd.x * scale), y + (-cmd.y * scale));
         } else if (cmd.type === 'L') {
@@ -601,33 +611,35 @@ Glyph.prototype.getPath = function (x, y, fontSize) {
             p.closePath();
         }
     }
+
     return p;
 };
 
 // Split the glyph into contours.
 // This function is here for backwards compatibility, and to
 // provide raw access to the TrueType glyph outlines.
-Glyph.prototype.getContours = function () {
-    var contours, currentContour, i, pt;
+Glyph.prototype.getContours = function() {
     if (this.points === undefined) {
         return [];
     }
-    contours = [];
-    currentContour = [];
-    for (i = 0; i < this.points.length; i += 1) {
-        pt = this.points[i];
+
+    var contours = [];
+    var currentContour = [];
+    for (var i = 0; i < this.points.length; i += 1) {
+        var pt = this.points[i];
         currentContour.push(pt);
         if (pt.lastPointOfContour) {
             contours.push(currentContour);
             currentContour = [];
         }
     }
+
     check.argument(currentContour.length === 0, 'There are still points left in the current contour.');
     return contours;
 };
 
 // Calculate the xMin/yMin/xMax/yMax/lsb/rsb for a Glyph.
-Glyph.prototype.getMetrics = function () {
+Glyph.prototype.getMetrics = function() {
     var commands = this.path.commands;
     var xCoords = [];
     var yCoords = [];
@@ -637,15 +649,18 @@ Glyph.prototype.getMetrics = function () {
             xCoords.push(cmd.x);
             yCoords.push(cmd.y);
         }
+
         if (cmd.type === 'Q' || cmd.type === 'C') {
             xCoords.push(cmd.x1);
             yCoords.push(cmd.y1);
         }
+
         if (cmd.type === 'C') {
             xCoords.push(cmd.x2);
             yCoords.push(cmd.y2);
         }
     }
+
     var metrics = {
         xMin: Math.min.apply(null, xCoords),
         yMin: Math.min.apply(null, yCoords),
@@ -663,7 +678,7 @@ Glyph.prototype.getMetrics = function () {
 // x - Horizontal position of the glyph. (default: 0)
 // y - Vertical position of the *baseline* of the glyph. (default: 0)
 // fontSize - Font size, in pixels (default: 72).
-Glyph.prototype.draw = function (ctx, x, y, fontSize) {
+Glyph.prototype.draw = function(ctx, x, y, fontSize) {
     this.getPath(x, y, fontSize).draw(ctx);
 };
 
@@ -674,36 +689,38 @@ Glyph.prototype.draw = function (ctx, x, y, fontSize) {
 // x - Horizontal position of the glyph. (default: 0)
 // y - Vertical position of the *baseline* of the glyph. (default: 0)
 // fontSize - Font size, in pixels (default: 72).
-Glyph.prototype.drawPoints = function (ctx, x, y, fontSize) {
+Glyph.prototype.drawPoints = function(ctx, x, y, fontSize) {
 
     function drawCircles(l, x, y, scale) {
-        var j, PI_SQ = Math.PI * 2;
+        var PI_SQ = Math.PI * 2;
         ctx.beginPath();
-        for (j = 0; j < l.length; j += 1) {
+        for (var j = 0; j < l.length; j += 1) {
             ctx.moveTo(x + (l[j].x * scale), y + (l[j].y * scale));
             ctx.arc(x + (l[j].x * scale), y + (l[j].y * scale), 2, 0, PI_SQ, false);
         }
+
         ctx.closePath();
         ctx.fill();
     }
 
-    var scale, i, blueCircles, redCircles, path, cmd;
     x = x !== undefined ? x : 0;
     y = y !== undefined ? y : 0;
     fontSize = fontSize !== undefined ? fontSize : 24;
-    scale = 1 / this.font.unitsPerEm * fontSize;
+    var scale = 1 / this.font.unitsPerEm * fontSize;
 
-    blueCircles = [];
-    redCircles = [];
-    path = this.path;
-    for (i = 0; i < path.commands.length; i += 1) {
-        cmd = path.commands[i];
+    var blueCircles = [];
+    var redCircles = [];
+    var path = this.path;
+    for (var i = 0; i < path.commands.length; i += 1) {
+        var cmd = path.commands[i];
         if (cmd.x !== undefined) {
             blueCircles.push({x: cmd.x, y: -cmd.y});
         }
+
         if (cmd.x1 !== undefined) {
             redCircles.push({x: cmd.x1, y: -cmd.y1});
         }
+
         if (cmd.x2 !== undefined) {
             redCircles.push({x: cmd.x2, y: -cmd.y2});
         }
@@ -724,23 +741,26 @@ Glyph.prototype.drawPoints = function (ctx, x, y, fontSize) {
 // x - Horizontal position of the glyph. (default: 0)
 // y - Vertical position of the *baseline* of the glyph. (default: 0)
 // fontSize - Font size, in pixels (default: 72).
-Glyph.prototype.drawMetrics = function (ctx, x, y, fontSize) {
+Glyph.prototype.drawMetrics = function(ctx, x, y, fontSize) {
     var scale;
     x = x !== undefined ? x : 0;
     y = y !== undefined ? y : 0;
     fontSize = fontSize !== undefined ? fontSize : 24;
     scale = 1 / this.font.unitsPerEm * fontSize;
     ctx.lineWidth = 1;
+
     // Draw the origin
     ctx.strokeStyle = 'black';
     draw.line(ctx, x, -10000, x, 10000);
     draw.line(ctx, -10000, y, 10000, y);
+
     // Draw the glyph box
     ctx.strokeStyle = 'blue';
     draw.line(ctx, x + (this.xMin * scale), -10000, x + (this.xMin * scale), 10000);
     draw.line(ctx, x + (this.xMax * scale), -10000, x + (this.xMax * scale), 10000);
     draw.line(ctx, -10000, y + (-this.yMin * scale), 10000, y + (-this.yMin * scale));
     draw.line(ctx, -10000, y + (-this.yMax * scale), 10000, y + (-this.yMax * scale));
+
     // Draw the advance width
     ctx.strokeStyle = 'green';
     draw.line(ctx, x + (this.advanceWidth * scale), -10000, x + (this.advanceWidth * scale), 10000);
@@ -782,11 +802,9 @@ var post = require('./tables/post');
 
 // Convert a Node.js Buffer to an ArrayBuffer
 function toArrayBuffer(buffer) {
-    var i,
-        arrayBuffer = new ArrayBuffer(buffer.length),
-        data = new Uint8Array(arrayBuffer);
-
-    for (i = 0; i < buffer.length; i += 1) {
+    var arrayBuffer = new ArrayBuffer(buffer.length);
+    var data = new Uint8Array(arrayBuffer);
+    for (var i = 0; i < buffer.length; i += 1) {
         data[i] = buffer[i];
     }
 
@@ -795,7 +813,7 @@ function toArrayBuffer(buffer) {
 
 function loadFromFile(path, callback) {
     var fs = require('fs');
-    fs.readFile(path, function (err, buffer) {
+    fs.readFile(path, function(err, buffer) {
         if (err) {
             return callback(err.message);
         }
@@ -808,12 +826,14 @@ function loadFromUrl(url, callback) {
     var request = new XMLHttpRequest();
     request.open('get', url, true);
     request.responseType = 'arraybuffer';
-    request.onload = function () {
+    request.onload = function() {
         if (request.status !== 200) {
             return callback('Font could not be loaded: ' + request.statusText);
         }
+
         return callback(null, request.response);
     };
+
     request.send();
 }
 
@@ -823,17 +843,22 @@ function loadFromUrl(url, callback) {
 // If the file could not be parsed (most likely because it contains Postscript outlines)
 // we return an empty Font object with the `supported` flag set to `false`.
 function parseBuffer(buffer) {
-    var font, data, version, numTables, i, p, tag, offset, hmtxOffset, glyfOffset, locaOffset,
-        cffOffset, kernOffset, gposOffset, indexToLocFormat, numGlyphs, locaTable,
-        shortVersion;
+    var indexToLocFormat;
+    var hmtxOffset;
+    var glyfOffset;
+    var locaOffset;
+    var cffOffset;
+    var kernOffset;
+    var gposOffset;
+
     // OpenType fonts use big endian byte ordering.
     // We can't rely on typed array view types, because they operate with the endianness of the host computer.
     // Instead we use DataViews where we can specify endianness.
 
-    font = new _font.Font();
-    data = new DataView(buffer, 0);
+    var font = new _font.Font();
+    var data = new DataView(buffer, 0);
 
-    version = parse.getFixed(data, 0);
+    var version = parse.getFixed(data, 0);
     if (version === 1.0) {
         font.outlinesFormat = 'truetype';
     } else {
@@ -845,13 +870,13 @@ function parseBuffer(buffer) {
         }
     }
 
-    numTables = parse.getUShort(data, 4);
+    var numTables = parse.getUShort(data, 4);
 
     // Offset into the table records.
-    p = 12;
-    for (i = 0; i < numTables; i += 1) {
-        tag = parse.getTag(data, p);
-        offset = parse.getULong(data, p + 8);
+    var p = 12;
+    for (var i = 0; i < numTables; i += 1) {
+        var tag = parse.getTag(data, p);
+        var offset = parse.getULong(data, p + 8);
         switch (tag) {
         case 'cmap':
             font.tables.cmap = cmap.parse(data, offset);
@@ -859,6 +884,7 @@ function parseBuffer(buffer) {
             if (!font.encoding) {
                 font.supported = false;
             }
+
             break;
         case 'head':
             font.tables.head = head.parse(data, offset);
@@ -876,7 +902,7 @@ function parseBuffer(buffer) {
             break;
         case 'maxp':
             font.tables.maxp = maxp.parse(data, offset);
-            font.numGlyphs = numGlyphs = font.tables.maxp.numGlyphs;
+            font.numGlyphs = font.tables.maxp.numGlyphs;
             break;
         case 'name':
             font.tables.name = _name.parse(data, offset);
@@ -910,8 +936,8 @@ function parseBuffer(buffer) {
     }
 
     if (glyfOffset && locaOffset) {
-        shortVersion = indexToLocFormat === 0;
-        locaTable = loca.parse(data, locaOffset, numGlyphs, shortVersion);
+        var shortVersion = indexToLocFormat === 0;
+        var locaTable = loca.parse(data, locaOffset, font.numGlyphs, shortVersion);
         font.glyphs = glyf.parse(data, glyfOffset, locaTable, font);
         hmtx.parse(data, hmtxOffset, font.numberOfHMetrics, font.numGlyphs, font.glyphs);
         encoding.addGlyphNames(font);
@@ -928,6 +954,7 @@ function parseBuffer(buffer) {
         } else {
             font.kerningPairs = {};
         }
+
         if (gposOffset) {
             gpos.parse(data, gposOffset, font);
         }
@@ -945,18 +972,21 @@ function parseBuffer(buffer) {
 function load(url, callback) {
     var isNode = typeof window === 'undefined';
     var loadFn = isNode ? loadFromFile : loadFromUrl;
-    loadFn(url, function (err, arrayBuffer) {
+    loadFn(url, function(err, arrayBuffer) {
         if (err) {
             return callback(err);
         }
+
         var font = parseBuffer(arrayBuffer);
         if (!font.supported) {
             return callback('Font is not supported (is this a Postscript font?)');
         }
+
         return callback(null, font);
     });
 }
 
+exports._parse = parse;
 exports.Font = _font.Font;
 exports.Glyph = glyph.Glyph;
 exports.Path = path.Path;
@@ -977,7 +1007,7 @@ exports.getCard8 = exports.getByte;
 
 // Retrieve an unsigned 16-bit short from the DataView.
 // The value is stored in big endian.
-exports.getUShort = function (dataView, offset) {
+exports.getUShort = function(dataView, offset) {
     return dataView.getUint16(offset, false);
 };
 
@@ -985,64 +1015,64 @@ exports.getCard16 = exports.getUShort;
 
 // Retrieve a signed 16-bit short from the DataView.
 // The value is stored in big endian.
-exports.getShort = function (dataView, offset) {
+exports.getShort = function(dataView, offset) {
     return dataView.getInt16(offset, false);
 };
 
 // Retrieve an unsigned 32-bit long from the DataView.
 // The value is stored in big endian.
-exports.getULong = function (dataView, offset) {
+exports.getULong = function(dataView, offset) {
     return dataView.getUint32(offset, false);
 };
 
 // Retrieve a 32-bit signed fixed-point number (16.16) from the DataView.
 // The value is stored in big endian.
-exports.getFixed = function (dataView, offset) {
-    var decimal, fraction;
-    decimal = dataView.getInt16(offset, false);
-    fraction = dataView.getUint16(offset + 2, false);
+exports.getFixed = function(dataView, offset) {
+    var decimal = dataView.getInt16(offset, false);
+    var fraction = dataView.getUint16(offset + 2, false);
     return decimal + fraction / 65535;
 };
 
 // Retrieve a 4-character tag from the DataView.
 // Tags are used to identify tables.
-exports.getTag = function (dataView, offset) {
-    var tag = '', i;
-    for (i = offset; i < offset + 4; i += 1) {
+exports.getTag = function(dataView, offset) {
+    var tag = '';
+    for (var i = offset; i < offset + 4; i += 1) {
         tag += String.fromCharCode(dataView.getInt8(i));
     }
+
     return tag;
 };
 
 // Retrieve an offset from the DataView.
 // Offsets are 1 to 4 bytes in length, depending on the offSize argument.
-exports.getOffset = function (dataView, offset, offSize) {
-    var i, v;
-    v = 0;
-    for (i = 0; i < offSize; i += 1) {
+exports.getOffset = function(dataView, offset, offSize) {
+    var v = 0;
+    for (var i = 0; i < offSize; i += 1) {
         v <<= 8;
         v += dataView.getUint8(offset + i);
     }
+
     return v;
 };
 
 // Retrieve a number of bytes from start offset to the end offset from the DataView.
-exports.getBytes = function (dataView, startOffset, endOffset) {
-    var bytes, i;
-    bytes = [];
-    for (i = startOffset; i < endOffset; i += 1) {
+exports.getBytes = function(dataView, startOffset, endOffset) {
+    var bytes = [];
+    for (var i = startOffset; i < endOffset; i += 1) {
         bytes.push(dataView.getUint8(i));
     }
+
     return bytes;
 };
 
 // Convert the list of bytes to a string.
-exports.bytesToString = function (bytes) {
-    var s, i;
-    s = '';
-    for (i = 0; i < bytes.length; i += 1) {
+exports.bytesToString = function(bytes) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i += 1) {
         s += String.fromCharCode(bytes[i]);
     }
+
     return s;
 };
 
@@ -1064,13 +1094,13 @@ function Parser(data, offset) {
     this.relativeOffset = 0;
 }
 
-Parser.prototype.parseByte = function () {
+Parser.prototype.parseByte = function() {
     var v = this.data.getUint8(this.offset + this.relativeOffset);
     this.relativeOffset += 1;
     return v;
 };
 
-Parser.prototype.parseChar = function () {
+Parser.prototype.parseChar = function() {
     var v = this.data.getInt8(this.offset + this.relativeOffset);
     this.relativeOffset += 1;
     return v;
@@ -1078,64 +1108,67 @@ Parser.prototype.parseChar = function () {
 
 Parser.prototype.parseCard8 = Parser.prototype.parseByte;
 
-Parser.prototype.parseUShort = function () {
+Parser.prototype.parseUShort = function() {
     var v = this.data.getUint16(this.offset + this.relativeOffset);
     this.relativeOffset += 2;
     return v;
 };
+
 Parser.prototype.parseCard16 = Parser.prototype.parseUShort;
 Parser.prototype.parseSID = Parser.prototype.parseUShort;
 Parser.prototype.parseOffset16 = Parser.prototype.parseUShort;
 
-Parser.prototype.parseShort = function () {
+Parser.prototype.parseShort = function() {
     var v = this.data.getInt16(this.offset + this.relativeOffset);
     this.relativeOffset += 2;
     return v;
 };
 
-Parser.prototype.parseF2Dot14 = function () {
+Parser.prototype.parseF2Dot14 = function() {
     var v = this.data.getInt16(this.offset + this.relativeOffset) / 16384;
     this.relativeOffset += 2;
     return v;
 };
 
-Parser.prototype.parseULong = function () {
+Parser.prototype.parseULong = function() {
     var v = exports.getULong(this.data, this.offset + this.relativeOffset);
     this.relativeOffset += 4;
     return v;
 };
 
-Parser.prototype.parseFixed = function () {
+Parser.prototype.parseFixed = function() {
     var v = exports.getFixed(this.data, this.offset + this.relativeOffset);
     this.relativeOffset += 4;
     return v;
 };
 
 Parser.prototype.parseOffset16List =
-Parser.prototype.parseUShortList = function (count) {
-    var offsets = new Array(count),
-        dataView = this.data,
-        offset = this.offset + this.relativeOffset;
+Parser.prototype.parseUShortList = function(count) {
+    var offsets = new Array(count);
+    var dataView = this.data;
+    var offset = this.offset + this.relativeOffset;
     for (var i = 0; i < count; i++) {
         offsets[i] = exports.getUShort(dataView, offset);
         offset += 2;
     }
+
     this.relativeOffset += count * 2;
     return offsets;
 };
 
-Parser.prototype.parseString = function (length) {
-    var dataView = this.data,
-        offset = this.offset + this.relativeOffset,
-        string = '';
+Parser.prototype.parseString = function(length) {
+    var dataView = this.data;
+    var offset = this.offset + this.relativeOffset;
+    var string = '';
     this.relativeOffset += length;
     for (var i = 0; i < length; i++) {
         string += String.fromCharCode(dataView.getUint8(offset + i));
     }
+
     return string;
 };
 
-Parser.prototype.parseTag = function () {
+Parser.prototype.parseTag = function() {
     return this.parseString(4);
 };
 
@@ -1156,6 +1189,7 @@ Parser.prototype.parseFixed = function() {
 
 Parser.prototype.parseVersion = function() {
     var major = exports.getUShort(this.data, this.offset + this.relativeOffset);
+
     // How to interpret the minor version is very vague in the spec. 0x5000 is 5, 0x1000 is 1
     // This returns the correct number if minor = 0xN000 where N is 0-9
     var minor = exports.getUShort(this.data, this.offset + this.relativeOffset + 2);
@@ -1163,10 +1197,11 @@ Parser.prototype.parseVersion = function() {
     return major + minor / 0x1000 / 10;
 };
 
-Parser.prototype.skip = function (type, amount) {
+Parser.prototype.skip = function(type, amount) {
     if (amount === undefined) {
         amount = 1;
     }
+
     this.relativeOffset += typeOffsets[type] * amount;
 };
 
@@ -1186,7 +1221,7 @@ function Path() {
     this.strokeWidth = 1;
 }
 
-Path.prototype.moveTo = function (x, y) {
+Path.prototype.moveTo = function(x, y) {
     this.commands.push({
         type: 'M',
         x: x,
@@ -1194,7 +1229,7 @@ Path.prototype.moveTo = function (x, y) {
     });
 };
 
-Path.prototype.lineTo = function (x, y) {
+Path.prototype.lineTo = function(x, y) {
     this.commands.push({
         type: 'L',
         x: x,
@@ -1202,7 +1237,7 @@ Path.prototype.lineTo = function (x, y) {
     });
 };
 
-Path.prototype.curveTo = Path.prototype.bezierCurveTo = function (x1, y1, x2, y2, x, y) {
+Path.prototype.curveTo = Path.prototype.bezierCurveTo = function(x1, y1, x2, y2, x, y) {
     this.commands.push({
         type: 'C',
         x1: x1,
@@ -1214,7 +1249,7 @@ Path.prototype.curveTo = Path.prototype.bezierCurveTo = function (x1, y1, x2, y2
     });
 };
 
-Path.prototype.quadTo = Path.prototype.quadraticCurveTo = function (x1, y1, x, y) {
+Path.prototype.quadTo = Path.prototype.quadraticCurveTo = function(x1, y1, x, y) {
     this.commands.push({
         type: 'Q',
         x1: x1,
@@ -1224,26 +1259,26 @@ Path.prototype.quadTo = Path.prototype.quadraticCurveTo = function (x1, y1, x, y
     });
 };
 
-Path.prototype.close = Path.prototype.closePath = function () {
+Path.prototype.close = Path.prototype.closePath = function() {
     this.commands.push({
         type: 'Z'
     });
 };
 
 // Add the given path or list of commands to the commands of this path.
-Path.prototype.extend = function (pathOrCommands) {
+Path.prototype.extend = function(pathOrCommands) {
     if (pathOrCommands.commands) {
         pathOrCommands = pathOrCommands.commands;
     }
+
     Array.prototype.push.apply(this.commands, pathOrCommands);
 };
 
 // Draw the path to a 2D context.
-Path.prototype.draw = function (ctx) {
-    var i, cmd;
+Path.prototype.draw = function(ctx) {
     ctx.beginPath();
-    for (i = 0; i < this.commands.length; i += 1) {
-        cmd = this.commands[i];
+    for (var i = 0; i < this.commands.length; i += 1) {
+        var cmd = this.commands[i];
         if (cmd.type === 'M') {
             ctx.moveTo(cmd.x, cmd.y);
         } else if (cmd.type === 'L') {
@@ -1256,10 +1291,12 @@ Path.prototype.draw = function (ctx) {
             ctx.closePath();
         }
     }
+
     if (this.fill) {
         ctx.fillStyle = this.fill;
         ctx.fill();
     }
+
     if (this.stroke) {
         ctx.strokeStyle = this.stroke;
         ctx.lineWidth = this.strokeWidth;
@@ -1271,7 +1308,7 @@ Path.prototype.draw = function (ctx) {
 // See http://www.w3.org/TR/SVG/paths.html#PathData
 // Parameters:
 // - decimalPlaces: The amount of decimal places for floating-point values (default: 2)
-Path.prototype.toPathData = function (decimalPlaces) {
+Path.prototype.toPathData = function(decimalPlaces) {
     decimalPlaces = decimalPlaces !== undefined ? decimalPlaces : 2;
 
     function floatToString(v) {
@@ -1289,8 +1326,10 @@ Path.prototype.toPathData = function (decimalPlaces) {
             if (v >= 0 && i > 0) {
                 s += ' ';
             }
+
             s += floatToString(v);
         }
+
         return s;
     }
 
@@ -1309,13 +1348,14 @@ Path.prototype.toPathData = function (decimalPlaces) {
             d += 'Z';
         }
     }
+
     return d;
 };
 
 // Convert the path to a SVG <path> element, as a string.
 // Parameters:
 // - decimalPlaces: The amount of decimal places for floating-point values (default: 2)
-Path.prototype.toSVG = function (decimalPlaces) {
+Path.prototype.toSVG = function(decimalPlaces) {
     var svg = '<path d="';
     svg += this.toPathData(decimalPlaces);
     svg += '"';
@@ -1326,9 +1366,11 @@ Path.prototype.toSVG = function (decimalPlaces) {
             svg += ' fill="' + this.fill + '"';
         }
     }
+
     if (this.stroke) {
         svg += ' stroke="' + this.stroke + '" stroke-width="' + this.strokeWidth + '"';
     }
+
     svg += '/>';
     return svg;
 };
@@ -1350,6 +1392,7 @@ function Table(tableName, fields, options) {
         var field = fields[i];
         this[field.name] = field.value;
     }
+
     this.tableName = tableName;
     this.fields = fields;
     if (options) {
@@ -1364,7 +1407,7 @@ function Table(tableName, fields, options) {
     }
 }
 
-Table.prototype.sizeOf = function () {
+Table.prototype.sizeOf = function() {
     var v = 0;
     for (var i = 0; i < this.fields.length; i += 1) {
         var field = this.fields[i];
@@ -1372,6 +1415,7 @@ Table.prototype.sizeOf = function () {
         if (value === undefined) {
             value = field.value;
         }
+
         if (typeof value.sizeOf === 'function') {
             v += value.sizeOf();
         } else {
@@ -1380,10 +1424,11 @@ Table.prototype.sizeOf = function () {
             v += sizeOfFunction(value);
         }
     }
+
     return v;
 };
 
-Table.prototype.encode = function () {
+Table.prototype.encode = function() {
     return encode.TABLE(this);
 };
 
@@ -1411,11 +1456,13 @@ function equals(a, b) {
         if (a.length !== b.length) {
             return false;
         }
+
         for (var i = 0; i < a.length; i += 1) {
             if (!equals(a[i], b[i])) {
                 return false;
             }
         }
+
         return true;
     } else {
         return false;
@@ -1425,65 +1472,78 @@ function equals(a, b) {
 // Parse a `CFF` INDEX array.
 // An index array consists of a list of offsets, then a list of objects at those offsets.
 function parseCFFIndex(data, start, conversionFn) {
-    var offsets, objects, count, endOffset, offsetSize, objectOffset, pos, i, value;
-    offsets = [];
-    objects = [];
-    count = parse.getCard16(data, start);
+    //var i, objectOffset, endOffset;
+    var offsets = [];
+    var objects = [];
+    var count = parse.getCard16(data, start);
+    var i;
+    var objectOffset;
+    var endOffset;
     if (count !== 0) {
-        offsetSize = parse.getByte(data, start + 2);
+        var offsetSize = parse.getByte(data, start + 2);
         objectOffset = start + ((count + 1) * offsetSize) + 2;
-        pos = start + 3;
+        var pos = start + 3;
         for (i = 0; i < count + 1; i += 1) {
             offsets.push(parse.getOffset(data, pos, offsetSize));
             pos += offsetSize;
         }
+
         // The total size of the index array is 4 header bytes + the value of the last offset.
         endOffset = objectOffset + offsets[count];
     } else {
         endOffset = start + 2;
     }
+
     for (i = 0; i < offsets.length - 1; i += 1) {
-        value = parse.getBytes(data, objectOffset + offsets[i], objectOffset + offsets[i + 1]);
+        var value = parse.getBytes(data, objectOffset + offsets[i], objectOffset + offsets[i + 1]);
         if (conversionFn) {
             value = conversionFn(value);
         }
+
         objects.push(value);
     }
+
     return {objects: objects, startOffset: start, endOffset: endOffset};
 }
 
 // Parse a `CFF` DICT real value.
 function parseFloatOperand(parser) {
-    var s, eof, lookup, b, n1, n2;
-    s = '';
-    eof = 15;
-    lookup = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', 'E', 'E-', null, '-'];
+    var s = '';
+    var eof = 15;
+    var lookup = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', 'E', 'E-', null, '-'];
     while (true) {
-        b = parser.parseByte();
-        n1 = b >> 4;
-        n2 = b & 15;
+        var b = parser.parseByte();
+        var n1 = b >> 4;
+        var n2 = b & 15;
 
         if (n1 === eof) {
             break;
         }
+
         s += lookup[n1];
 
         if (n2 === eof) {
             break;
         }
+
         s += lookup[n2];
     }
+
     return parseFloat(s);
 }
 
 // Parse a `CFF` DICT operand.
 function parseOperand(parser, b0) {
-    var b1, b2, b3, b4;
+    var b1;
+    var b2;
+    var b3;
+    var b4;
     if (b0 === 28) {
         b1 = parser.parseByte();
         b2 = parser.parseByte();
         return b1 << 8 | b2;
     }
+
     if (b0 === 29) {
         b1 = parser.parseByte();
         b2 = parser.parseByte();
@@ -1491,56 +1551,64 @@ function parseOperand(parser, b0) {
         b4 = parser.parseByte();
         return b1 << 24 | b2 << 16 | b3 << 8 | b4;
     }
+
     if (b0 === 30) {
         return parseFloatOperand(parser);
     }
+
     if (b0 >= 32 && b0 <= 246) {
         return b0 - 139;
     }
+
     if (b0 >= 247 && b0 <= 250) {
         b1 = parser.parseByte();
         return (b0 - 247) * 256 + b1 + 108;
     }
+
     if (b0 >= 251 && b0 <= 254) {
         b1 = parser.parseByte();
         return -(b0 - 251) * 256 - b1 - 108;
     }
+
     throw new Error('Invalid b0 ' + b0);
 }
 
 // Convert the entries returned by `parseDict` to a proper dictionary.
 // If a value is a list of one, it is unpacked.
 function entriesToObject(entries) {
-    var o, key, values, i, value;
-    o = {};
-    for (i = 0; i < entries.length; i += 1) {
-        key = entries[i][0];
-        values = entries[i][1];
+    var o = {};
+    for (var i = 0; i < entries.length; i += 1) {
+        var key = entries[i][0];
+        var values = entries[i][1];
+        var value;
         if (values.length === 1) {
             value = values[0];
         } else {
             value = values;
         }
+
         if (o.hasOwnProperty(key)) {
             throw new Error('Object ' + o + ' already has key ' + key);
         }
+
         o[key] = value;
     }
+
     return o;
 }
 
 // Parse a `CFF` DICT object.
 // A dictionary contains key-value pairs in a compact tokenized format.
 function parseCFFDict(data, start, size) {
-    var parser, entries, operands, op;
     start = start !== undefined ? start : 0;
-    parser = new parse.Parser(data, start);
-    entries = [];
-    operands = [];
+    var parser = new parse.Parser(data, start);
+    var entries = [];
+    var operands = [];
     size = size !== undefined ? size : data.length;
 
     while (parser.relativeOffset < size) {
-        op = parser.parseByte();
+        var op = parser.parseByte();
+
         // The first byte for each dict item distinguishes between operator (key) and operand (value).
         // Values <= 21 are operators.
         if (op <= 21) {
@@ -1548,6 +1616,7 @@ function parseCFFDict(data, start, size) {
             if (op === 12) {
                 op = 1200 + parser.parseByte();
             }
+
             entries.push([op, operands]);
             operands = [];
         } else {
@@ -1556,6 +1625,7 @@ function parseCFFDict(data, start, size) {
             operands.push(parseOperand(parser, op));
         }
     }
+
     return entriesToObject(entries);
 }
 
@@ -1567,27 +1637,31 @@ function getCFFString(strings, index) {
     } else {
         index = strings[index - 391];
     }
+
     return index;
 }
 
 // Interpret a dictionary and return a new dictionary with readable keys and values for missing entries.
 // This function takes `meta` which is a list of objects containing `operand`, `name` and `default`.
 function interpretDict(dict, meta, strings) {
-    var i, m, value, newDict;
-    newDict = {};
+    var newDict = {};
+
     // Because we also want to include missing values, we start out from the meta list
     // and lookup values in the dict.
-    for (i = 0; i < meta.length; i += 1) {
-        m = meta[i];
-        value = dict[m.op];
+    for (var i = 0; i < meta.length; i += 1) {
+        var m = meta[i];
+        var value = dict[m.op];
         if (value === undefined) {
             value = m.value !== undefined ? m.value : null;
         }
+
         if (m.type === 'SID') {
             value = getCFFString(strings, value);
         }
+
         newDict[m.name] = value;
     }
+
     return newDict;
 }
 
@@ -1636,15 +1710,13 @@ var PRIVATE_DICT_META = [
 // Parse the CFF top dictionary. A CFF table can contain multiple fonts, each with their own top dictionary.
 // The top dictionary contains the essential metadata for the font, together with the private dictionary.
 function parseCFFTopDict(data, strings) {
-    var dict;
-    dict = parseCFFDict(data, 0, data.byteLength);
+    var dict = parseCFFDict(data, 0, data.byteLength);
     return interpretDict(dict, TOP_DICT_META, strings);
 }
 
 // Parse the CFF private dictionary. We don't fully parse out all the values, only the ones we need.
 function parseCFFPrivateDict(data, start, size, strings) {
-    var dict;
-    dict = parseCFFDict(data, start, size);
+    var dict = parseCFFDict(data, start, size);
     return interpretDict(dict, PRIVATE_DICT_META, strings);
 }
 
@@ -1652,13 +1724,16 @@ function parseCFFPrivateDict(data, start, size, strings) {
 // This function will return a list of glyph names.
 // See Adobe TN #5176 chapter 13, "Charsets".
 function parseCFFCharset(data, start, nGlyphs, strings) {
-    var parser, format, charset, i, sid, count;
-    parser = new parse.Parser(data, start);
+    var i;
+    var sid;
+    var count;
+    var parser = new parse.Parser(data, start);
+
     // The .notdef glyph is not included, so subtract 1.
     nGlyphs -= 1;
-    charset = ['.notdef'];
+    var charset = ['.notdef'];
 
-    format = parser.parseCard8();
+    var format = parser.parseCard8();
     if (format === 0) {
         for (i = 0; i < nGlyphs; i += 1) {
             sid = parser.parseSID();
@@ -1692,23 +1767,24 @@ function parseCFFCharset(data, start, nGlyphs, strings) {
 // Parse the CFF encoding data. Only one encoding can be specified per font.
 // See Adobe TN #5176 chapter 12, "Encodings".
 function parseCFFEncoding(data, start, charset) {
-    var enc, parser, format, nCodes, i, code, nRanges, first, nLeft, j;
-    enc = {};
-    parser = new parse.Parser(data, start);
-    format = parser.parseCard8();
+    var i;
+    var code;
+    var enc = {};
+    var parser = new parse.Parser(data, start);
+    var format = parser.parseCard8();
     if (format === 0) {
-        nCodes = parser.parseCard8();
+        var nCodes = parser.parseCard8();
         for (i = 0; i < nCodes; i += 1) {
             code = parser.parseCard8();
             enc[code] = i;
         }
     } else if (format === 1) {
-        nRanges = parser.parseCard8();
+        var nRanges = parser.parseCard8();
         code = 1;
         for (i = 0; i < nRanges; i += 1) {
-            first = parser.parseCard8();
-            nLeft = parser.parseCard8();
-            for (j = first; j <= first + nLeft; j += 1) {
+            var first = parser.parseCard8();
+            var nLeft = parser.parseCard8();
+            for (var j = first; j <= first + nLeft; j += 1) {
                 enc[j] = code;
                 code += 1;
             }
@@ -1716,6 +1792,7 @@ function parseCFFEncoding(data, start, charset) {
     } else {
         throw new Error('Unknown encoding format ' + format);
     }
+
     return new encoding.CffEncoding(enc, charset);
 }
 
@@ -1723,41 +1800,60 @@ function parseCFFEncoding(data, start, charset) {
 // The encoding is described in the Type 2 Charstring Format
 // https://www.microsoft.com/typography/OTSPEC/charstr2.htm
 function parseCFFCharstring(code, font, index) {
-    var p, glyph, stack, nStems, haveWidth, width, open, x, y, c1x, c1y, c2x, c2y, v;
-    p = new path.Path();
-    stack = [];
-    nStems = 0;
-    haveWidth = false;
-    width = font.defaultWidthX;
-    open = false;
-    x = y = 0;
+    var c1x;
+    var c1y;
+    var c2x;
+    var c2y;
+    var p = new path.Path();
+    var stack = [];
+    var nStems = 0;
+    var haveWidth = false;
+    var width = font.defaultWidthX;
+    var open = false;
+    var x = 0;
+    var y = 0;
 
     function newContour(x, y) {
         if (open) {
             p.closePath();
         }
+
         p.moveTo(x, y);
         open = true;
     }
 
     function parseStems() {
         var hasWidthArg;
+
         // The number of stem operators on the stack is always even.
         // If the value is uneven, that means a width is specified.
         hasWidthArg = stack.length % 2 !== 0;
         if (hasWidthArg && !haveWidth) {
             width = stack.shift() + font.nominalWidthX;
         }
+
         nStems += stack.length >> 1;
         stack.length = 0;
         haveWidth = true;
     }
 
     function parse(code) {
-        var i, b1, b2, b3, b4, codeIndex, subrCode;
-        i = 0;
+        var b1;
+        var b2;
+        var b3;
+        var b4;
+        var codeIndex;
+        var subrCode;
+        var jpx;
+        var jpy;
+        var c3x;
+        var c3y;
+        var c4x;
+        var c4y;
+
+        var i = 0;
         while (i < code.length) {
-            v = code[i];
+            var v = code[i];
             i += 1;
             switch (v) {
             case 1: // hstem
@@ -1771,6 +1867,7 @@ function parseCFFCharstring(code, font, index) {
                     width = stack.shift() + font.nominalWidthX;
                     haveWidth = true;
                 }
+
                 y += stack.pop();
                 newContour(x, y);
                 break;
@@ -1780,6 +1877,7 @@ function parseCFFCharstring(code, font, index) {
                     y += stack.shift();
                     p.lineTo(x, y);
                 }
+
                 break;
             case 6: // hlineto
                 while (stack.length > 0) {
@@ -1788,9 +1886,11 @@ function parseCFFCharstring(code, font, index) {
                     if (stack.length === 0) {
                         break;
                     }
+
                     y += stack.shift();
                     p.lineTo(x, y);
                 }
+
                 break;
             case 7: // vlineto
                 while (stack.length > 0) {
@@ -1799,9 +1899,11 @@ function parseCFFCharstring(code, font, index) {
                     if (stack.length === 0) {
                         break;
                     }
+
                     x += stack.shift();
                     p.lineTo(x, y);
                 }
+
                 break;
             case 8: // rrcurveto
                 while (stack.length > 0) {
@@ -1813,6 +1915,7 @@ function parseCFFCharstring(code, font, index) {
                     y = c2y + stack.shift();
                     p.curveTo(c1x, c1y, c2x, c2y, x, y);
                 }
+
                 break;
             case 10: // callsubr
                 codeIndex = stack.pop() + font.subrsBias;
@@ -1820,13 +1923,13 @@ function parseCFFCharstring(code, font, index) {
                 if (subrCode) {
                     parse(subrCode);
                 }
+
                 break;
             case 11: // return
                 return;
             case 12: // flex operators
                 v = code[i];
                 i += 1;
-                var jpx, jpy, c3x, c3y, c4x, c4y, fd;
                 switch (v) {
                 case 35: // flex
                     // |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
@@ -1842,7 +1945,7 @@ function parseCFFCharstring(code, font, index) {
                     c4y = c3y + stack.shift();    // dy5
                     x = c4x + stack.shift();      // dx6
                     y = c4y + stack.shift();      // dy6
-                    fd = stack.shift();           // flex depth
+                    stack.shift();                // flex depth
                     p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
                     p.curveTo(c3x, c3y, c4x, c4y, x, y);
                     break;
@@ -1859,7 +1962,6 @@ function parseCFFCharstring(code, font, index) {
                     c4x = c3x + stack.shift();    // dx5
                     c4y = y;                      // dy5
                     x = c4x + stack.shift();      // dx6
-                    // y = y;                     // dy6
                     p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
                     p.curveTo(c3x, c3y, c4x, c4y, x, y);
                     break;
@@ -1876,7 +1978,6 @@ function parseCFFCharstring(code, font, index) {
                     c4x = c3x + stack.shift();    // dx5
                     c4y = c3y + stack.shift();    // dy5
                     x = c4x + stack.shift();      // dx6
-                    // y = y;                     // dy6
                     p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
                     p.curveTo(c3x, c3y, c4x, c4y, x, y);
                     break;
@@ -1892,12 +1993,12 @@ function parseCFFCharstring(code, font, index) {
                     c3y = jpy + stack.shift();    // dy4
                     c4x = c3x + stack.shift();    // dx5
                     c4y = c3y + stack.shift();    // dy5
-
                     if (Math.abs(c4x - x) > Math.abs(c4y - y)) {
-                        x = c4x + stack.shift();  // d6
+                        x = c4x + stack.shift();
                     } else {
-                        y = c4y + stack.shift();  // d6
+                        y = c4y + stack.shift();
                     }
+
                     p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
                     p.curveTo(c3x, c3y, c4x, c4y, x, y);
                     break;
@@ -1911,8 +2012,12 @@ function parseCFFCharstring(code, font, index) {
                     width = stack.shift() + font.nominalWidthX;
                     haveWidth = true;
                 }
-                p.closePath();
-                open = false;
+
+                if (open) {
+                    p.closePath();
+                    open = false;
+                }
+
                 break;
             case 18: // hstemhm
                 parseStems();
@@ -1927,6 +2032,7 @@ function parseCFFCharstring(code, font, index) {
                     width = stack.shift() + font.nominalWidthX;
                     haveWidth = true;
                 }
+
                 y += stack.pop();
                 x += stack.pop();
                 newContour(x, y);
@@ -1936,6 +2042,7 @@ function parseCFFCharstring(code, font, index) {
                     width = stack.shift() + font.nominalWidthX;
                     haveWidth = true;
                 }
+
                 x += stack.pop();
                 newContour(x, y);
                 break;
@@ -1952,6 +2059,7 @@ function parseCFFCharstring(code, font, index) {
                     y = c2y + stack.shift();
                     p.curveTo(c1x, c1y, c2x, c2y, x, y);
                 }
+
                 x += stack.shift();
                 y += stack.shift();
                 p.lineTo(x, y);
@@ -1962,6 +2070,7 @@ function parseCFFCharstring(code, font, index) {
                     y += stack.shift();
                     p.lineTo(x, y);
                 }
+
                 c1x = x + stack.shift();
                 c1y = y + stack.shift();
                 c2x = c1x + stack.shift();
@@ -1974,6 +2083,7 @@ function parseCFFCharstring(code, font, index) {
                 if (stack.length % 2) {
                     x += stack.shift();
                 }
+
                 while (stack.length > 0) {
                     c1x = x;
                     c1y = y + stack.shift();
@@ -1983,11 +2093,13 @@ function parseCFFCharstring(code, font, index) {
                     y = c2y + stack.shift();
                     p.curveTo(c1x, c1y, c2x, c2y, x, y);
                 }
+
                 break;
             case 27: // hhcurveto
                 if (stack.length % 2) {
                     y += stack.shift();
                 }
+
                 while (stack.length > 0) {
                     c1x = x + stack.shift();
                     c1y = y;
@@ -1997,6 +2109,7 @@ function parseCFFCharstring(code, font, index) {
                     y = c2y;
                     p.curveTo(c1x, c1y, c2x, c2y, x, y);
                 }
+
                 break;
             case 28: // shortint
                 b1 = code[i];
@@ -2010,6 +2123,7 @@ function parseCFFCharstring(code, font, index) {
                 if (subrCode) {
                     parse(subrCode);
                 }
+
                 break;
             case 30: // vhcurveto
                 while (stack.length > 0) {
@@ -2023,6 +2137,7 @@ function parseCFFCharstring(code, font, index) {
                     if (stack.length === 0) {
                         break;
                     }
+
                     c1x = x + stack.shift();
                     c1y = y;
                     c2x = c1x + stack.shift();
@@ -2031,6 +2146,7 @@ function parseCFFCharstring(code, font, index) {
                     x = c2x + (stack.length === 1 ? stack.shift() : 0);
                     p.curveTo(c1x, c1y, c2x, c2y, x, y);
                 }
+
                 break;
             case 31: // hvcurveto
                 while (stack.length > 0) {
@@ -2044,6 +2160,7 @@ function parseCFFCharstring(code, font, index) {
                     if (stack.length === 0) {
                         break;
                     }
+
                     c1x = x;
                     c1y = y + stack.shift();
                     c2x = c1x + stack.shift();
@@ -2052,6 +2169,7 @@ function parseCFFCharstring(code, font, index) {
                     y = c2y + (stack.length === 1 ? stack.shift() : 0);
                     p.curveTo(c1x, c1y, c2x, c2y, x, y);
                 }
+
                 break;
             default:
                 if (v < 32) {
@@ -2079,7 +2197,7 @@ function parseCFFCharstring(code, font, index) {
     }
 
     parse(code);
-    glyph = new _glyph.Glyph({font: font, index: index});
+    var glyph = new _glyph.Glyph({font: font, index: index});
     glyph.path = p;
     glyph.advanceWidth = width;
     return glyph;
@@ -2096,34 +2214,33 @@ function calcCFFSubroutineBias(subrs) {
     } else {
         bias = 32768;
     }
+
     return bias;
 }
 
 // Parse the `CFF` table, which contains the glyph outlines in PostScript format.
 function parseCFFTable(data, start, font) {
-    var header, nameIndex, topDictIndex, stringIndex, globalSubrIndex, topDict, privateDictOffset, privateDict,
-        subrOffset, subrIndex, charString, charStringsIndex, charset, i;
     font.tables.cff = {};
-    header = parseCFFHeader(data, start);
-    nameIndex = parseCFFIndex(data, header.endOffset, parse.bytesToString);
-    topDictIndex = parseCFFIndex(data, nameIndex.endOffset);
-    stringIndex = parseCFFIndex(data, topDictIndex.endOffset, parse.bytesToString);
-    globalSubrIndex = parseCFFIndex(data, stringIndex.endOffset);
+    var header = parseCFFHeader(data, start);
+    var nameIndex = parseCFFIndex(data, header.endOffset, parse.bytesToString);
+    var topDictIndex = parseCFFIndex(data, nameIndex.endOffset);
+    var stringIndex = parseCFFIndex(data, topDictIndex.endOffset, parse.bytesToString);
+    var globalSubrIndex = parseCFFIndex(data, stringIndex.endOffset);
     font.gsubrs = globalSubrIndex.objects;
     font.gsubrsBias = calcCFFSubroutineBias(font.gsubrs);
 
     var topDictData = new DataView(new Uint8Array(topDictIndex.objects[0]).buffer);
-    topDict = parseCFFTopDict(topDictData, stringIndex.objects);
+    var topDict = parseCFFTopDict(topDictData, stringIndex.objects);
     font.tables.cff.topDict = topDict;
 
-    privateDictOffset = start + topDict['private'][1];
-    privateDict = parseCFFPrivateDict(data, privateDictOffset, topDict['private'][0], stringIndex.objects);
+    var privateDictOffset = start + topDict['private'][1];
+    var privateDict = parseCFFPrivateDict(data, privateDictOffset, topDict['private'][0], stringIndex.objects);
     font.defaultWidthX = privateDict.defaultWidthX;
     font.nominalWidthX = privateDict.nominalWidthX;
 
     if (privateDict.subrs !== 0) {
-        subrOffset = privateDictOffset + privateDict.subrs;
-        subrIndex = parseCFFIndex(data, subrOffset);
+        var subrOffset = privateDictOffset + privateDict.subrs;
+        var subrIndex = parseCFFIndex(data, subrOffset);
         font.subrs = subrIndex.objects;
         font.subrsBias = calcCFFSubroutineBias(font.subrs);
     } else {
@@ -2132,10 +2249,10 @@ function parseCFFTable(data, start, font) {
     }
 
     // Offsets in the top dict are relative to the beginning of the CFF data, so add the CFF start offset.
-    charStringsIndex = parseCFFIndex(data, start + topDict.charStrings);
+    var charStringsIndex = parseCFFIndex(data, start + topDict.charStrings);
     font.nGlyphs = charStringsIndex.objects.length;
 
-    charset = parseCFFCharset(data, start + topDict.charset, font.nGlyphs, stringIndex.objects);
+    var charset = parseCFFCharset(data, start + topDict.charset, font.nGlyphs, stringIndex.objects);
     if (topDict.encoding === 0) { // Standard encoding
         font.cffEncoding = new encoding.CffEncoding(encoding.cffStandardEncoding, charset);
     } else if (topDict.encoding === 1) { // Expert encoding
@@ -2143,26 +2260,28 @@ function parseCFFTable(data, start, font) {
     } else {
         font.cffEncoding = parseCFFEncoding(data, start + topDict.encoding, charset);
     }
+
     // Prefer the CMAP encoding to the CFF encoding.
     font.encoding = font.encoding || font.cffEncoding;
 
     font.glyphs = [];
-    for (i = 0; i < font.nGlyphs; i += 1) {
-        charString = charStringsIndex.objects[i];
+    for (var i = 0; i < font.nGlyphs; i += 1) {
+        var charString = charStringsIndex.objects[i];
         font.glyphs.push(parseCFFCharstring(charString, font, i));
     }
 }
 
-
 // Convert a string to a String ID (SID).
 // The list of strings is modified in place.
 function encodeString(s, strings) {
-    var i, sid;
+    var sid;
+
     // Is the string in the CFF standard strings?
-    i = encoding.cffStandardStrings.indexOf(s);
+    var i = encoding.cffStandardStrings.indexOf(s);
     if (i >= 0) {
         sid = i;
     }
+
     // Is the string already in the string index?
     i = strings.indexOf(s);
     if (i >= 0) {
@@ -2171,6 +2290,7 @@ function encodeString(s, strings) {
         sid = encoding.cffStandardStrings.length + strings.length;
         strings.push(s);
     }
+
     return sid;
 }
 
@@ -2191,22 +2311,25 @@ function makeNameIndex(fontNames) {
     for (var i = 0; i < fontNames.length; i += 1) {
         t.names.push({name: 'name_' + i, type: 'NAME', value: fontNames[i]});
     }
+
     return t;
 }
 
 // Given a dictionary's metadata, create a DICT structure.
 function makeDict(meta, attrs, strings) {
-    var m = {}, i, entry, value;
-    for (i = 0; i < meta.length; i += 1) {
-        entry = meta[i];
-        value = attrs[entry.name];
+    var m = {};
+    for (var i = 0; i < meta.length; i += 1) {
+        var entry = meta[i];
+        var value = attrs[entry.name];
         if (value !== undefined && !equals(value, entry.value)) {
             if (entry.type === 'SID') {
                 value = encodeString(value, strings);
             }
+
             m[entry.op] = {name: entry.name, type: entry.type, value: value};
         }
     }
+
     return m;
 }
 
@@ -2235,6 +2358,7 @@ function makeStringIndex(strings) {
     for (var i = 0; i < strings.length; i += 1) {
         t.strings.push({name: 'string_' + i, type: 'STRING', value: strings[i]});
     }
+
     return t;
 }
 
@@ -2254,20 +2378,25 @@ function makeCharsets(glyphNames, strings) {
         var glyphSID = encodeString(glyphName, strings);
         t.fields.push({name: 'glyph_' + i, type: 'SID', value: glyphSID});
     }
+
     return t;
 }
 
 function glyphToOps(glyph) {
-    var ops = [], path = glyph.path, x, y, i, cmd, dx, dy, dx1, dy1, dx2, dy2;
+    var ops = [];
+    var path = glyph.path;
     ops.push({name: 'width', type: 'NUMBER', value: glyph.advanceWidth});
-    x = 0;
-    y = 0;
-    for (i = 0; i < path.commands.length; i += 1) {
-        cmd = path.commands[i];
+    var x = 0;
+    var y = 0;
+    for (var i = 0; i < path.commands.length; i += 1) {
+        var dx;
+        var dy;
+        var cmd = path.commands[i];
         if (cmd.type === 'Q') {
             // CFF only supports bézier curves, so convert the quad to a bézier.
             var _13 = 1 / 3;
             var _23 = 2 / 3;
+
             // We're going to create a new command so we don't change the original path.
             cmd = {
                 type: 'C',
@@ -2281,28 +2410,28 @@ function glyphToOps(glyph) {
         }
 
         if (cmd.type === 'M') {
-            dx = cmd.x - x;
-            dy = cmd.y - y;
+            dx = Math.round(cmd.x - x);
+            dy = Math.round(cmd.y - y);
             ops.push({name: 'dx', type: 'NUMBER', value: dx});
             ops.push({name: 'dy', type: 'NUMBER', value: dy});
             ops.push({name: 'rmoveto', type: 'OP', value: 21});
-            x = cmd.x;
-            y = cmd.y;
+            x = Math.round(cmd.x);
+            y = Math.round(cmd.y);
         } else if (cmd.type === 'L') {
-            dx = cmd.x - x;
-            dy = cmd.y - y;
+            dx = Math.round(cmd.x - x);
+            dy = Math.round(cmd.y - y);
             ops.push({name: 'dx', type: 'NUMBER', value: dx});
             ops.push({name: 'dy', type: 'NUMBER', value: dy});
             ops.push({name: 'rlineto', type: 'OP', value: 5});
-            x = cmd.x;
-            y = cmd.y;
+            x = Math.round(cmd.x);
+            y = Math.round(cmd.y);
         } else if (cmd.type === 'C') {
-            dx1 = cmd.x1 - x;
-            dy1 = cmd.y1 - y;
-            dx2 = cmd.x2 - cmd.x1;
-            dy2 = cmd.y2 - cmd.y1;
-            dx = cmd.x - cmd.x2;
-            dy = cmd.y - cmd.y2;
+            var dx1 = Math.round(cmd.x1 - x);
+            var dy1 = Math.round(cmd.y1 - y);
+            var dx2 = Math.round(cmd.x2 - cmd.x1);
+            var dy2 = Math.round(cmd.y2 - cmd.y1);
+            dx = Math.round(cmd.x - cmd.x2);
+            dy = Math.round(cmd.y - cmd.y2);
             ops.push({name: 'dx1', type: 'NUMBER', value: dx1});
             ops.push({name: 'dy1', type: 'NUMBER', value: dy1});
             ops.push({name: 'dx2', type: 'NUMBER', value: dx2});
@@ -2310,12 +2439,14 @@ function glyphToOps(glyph) {
             ops.push({name: 'dx', type: 'NUMBER', value: dx});
             ops.push({name: 'dy', type: 'NUMBER', value: dy});
             ops.push({name: 'rrcurveto', type: 'OP', value: 8});
-            x = cmd.x;
-            y = cmd.y;
-        } else if (cmd.type === 'Z') {
-            // Contours are closed automatically.
+            x = Math.round(cmd.x);
+            y = Math.round(cmd.y);
         }
+
+        // Contours are closed automatically.
+
     }
+
     ops.push({name: 'endchar', type: 'OP', value: 14});
     return ops;
 }
@@ -2329,6 +2460,7 @@ function makeCharStringsIndex(glyphs) {
         var ops = glyphToOps(glyph);
         t.charStrings.push({name: glyph.name, type: 'CHARSTRING', value: ops});
     }
+
     return t;
 }
 
@@ -2377,6 +2509,7 @@ function makeCFFTable(glyphs, options) {
     var privateAttrs = {};
 
     var glyphNames = [];
+
     // Skip first glyph (.notdef)
     for (var i = 1; i < glyphs.length; i += 1) {
         glyphNames.push(glyphs[i].name);
@@ -2403,7 +2536,9 @@ function makeCFFTable(glyphs, options) {
         t.stringIndex.sizeOf() +
         t.globalSubrIndex.sizeOf();
     attrs.charset = startOffset;
-    attrs.encoding = 0; // We use the CFF standard encoding; proper encoding will be handled in cmap.
+
+    // We use the CFF standard encoding; proper encoding will be handled in cmap.
+    attrs.encoding = 0;
     attrs.charStrings = attrs.charset + t.charsets.sizeOf();
     attrs.private[1] = attrs.charStrings + t.charStringsIndex.sizeOf();
 
@@ -2431,62 +2566,68 @@ var table = require('../table');
 // There are many available formats, but we only support the Windows format 4.
 // This function returns a `CmapEncoding` object or null if no supported format could be found.
 function parseCmapTable(data, start) {
-    var version, numTables, offset, platformId, encodingId, format, segCount,
-        endCountParser, startCountParser, idDeltaParser, idRangeOffsetParser, glyphIndexOffset,
-        endCount, startCount, i, c, idDelta, idRangeOffset, p, glyphIndex;
+    var i;
     var cmap = {};
-    cmap.version = version = parse.getUShort(data, start);
-    check.argument(version === 0, 'cmap table version should be 0.');
+    cmap.version = parse.getUShort(data, start);
+    check.argument(cmap.version === 0, 'cmap table version should be 0.');
 
     // The cmap table can contain many sub-tables, each with their own format.
     // We're only interested in a "platform 3" table. This is a Windows format.
-    cmap.numtables = numTables = parse.getUShort(data, start + 2);
-    offset = -1;
-    for (i = 0; i < numTables; i += 1) {
-        platformId = parse.getUShort(data, start + 4 + (i * 8));
-        encodingId = parse.getUShort(data, start + 4 + (i * 8) + 2);
+    cmap.numTables = parse.getUShort(data, start + 2);
+    var offset = -1;
+    for (i = 0; i < cmap.numTables; i += 1) {
+        var platformId = parse.getUShort(data, start + 4 + (i * 8));
+        var encodingId = parse.getUShort(data, start + 4 + (i * 8) + 2);
         if (platformId === 3 && (encodingId === 1 || encodingId === 0)) {
             offset = parse.getULong(data, start + 4 + (i * 8) + 4);
             break;
         }
     }
+
     if (offset === -1) {
         // There is no cmap table in the font that we support, so return null.
         // This font will be marked as unsupported.
         return null;
     }
 
-    p = new parse.Parser(data, start + offset);
-    cmap.format = format = p.parseUShort();
-    check.argument(format === 4, 'Only format 4 cmap tables are supported.');
+    var p = new parse.Parser(data, start + offset);
+    cmap.format = p.parseUShort();
+    check.argument(cmap.format === 4, 'Only format 4 cmap tables are supported.');
+
     // Length in bytes of the sub-tables.
     cmap.length = p.parseUShort();
     cmap.language = p.parseUShort();
+
     // segCount is stored x 2.
+    var segCount;
     cmap.segCount = segCount = p.parseUShort() >> 1;
+
     // Skip searchRange, entrySelector, rangeShift.
     p.skip('uShort', 3);
 
     // The "unrolled" mapping from character codes to glyph indices.
     cmap.glyphIndexMap = {};
 
-    endCountParser = new parse.Parser(data, start + offset + 14);
-    startCountParser = new parse.Parser(data, start + offset + 16 + segCount * 2);
-    idDeltaParser = new parse.Parser(data, start + offset + 16 + segCount * 4);
-    idRangeOffsetParser = new parse.Parser(data, start + offset + 16 + segCount * 6);
-    glyphIndexOffset = start + offset + 16 + segCount * 8;
+    var endCountParser = new parse.Parser(data, start + offset + 14);
+    var startCountParser = new parse.Parser(data, start + offset + 16 + segCount * 2);
+    var idDeltaParser = new parse.Parser(data, start + offset + 16 + segCount * 4);
+    var idRangeOffsetParser = new parse.Parser(data, start + offset + 16 + segCount * 6);
+    var glyphIndexOffset = start + offset + 16 + segCount * 8;
     for (i = 0; i < segCount - 1; i += 1) {
-        endCount = endCountParser.parseUShort();
-        startCount = startCountParser.parseUShort();
-        idDelta = idDeltaParser.parseShort();
-        idRangeOffset = idRangeOffsetParser.parseUShort();
-        for (c = startCount; c <= endCount; c += 1) {
+        var glyphIndex;
+        var endCount = endCountParser.parseUShort();
+        var startCount = startCountParser.parseUShort();
+        var idDelta = idDeltaParser.parseShort();
+        var idRangeOffset = idRangeOffsetParser.parseUShort();
+        for (var c = startCount; c <= endCount; c += 1) {
             if (idRangeOffset !== 0) {
                 // The idRangeOffset is relative to the current position in the idRangeOffset array.
                 // Take the current offset in the idRangeOffset array.
                 glyphIndexOffset = (idRangeOffsetParser.offset + idRangeOffsetParser.relativeOffset - 2);
+
                 // Add the value of the idRangeOffset, which will move us into the glyphIndex array.
                 glyphIndexOffset += idRangeOffset;
+
                 // Then add the character index of the current segment, multiplied by 2 for USHORTs.
                 glyphIndexOffset += (c - startCount) * 2;
                 glyphIndex = parse.getUShort(data, glyphIndexOffset);
@@ -2496,9 +2637,11 @@ function parseCmapTable(data, start) {
             } else {
                 glyphIndex = (c + idDelta) & 0xFFFF;
             }
+
             cmap.glyphIndexMap[c] = glyphIndex;
         }
     }
+
     return cmap;
 }
 
@@ -2521,7 +2664,7 @@ function addTerminatorSegment(t) {
 }
 
 function makeCmapTable(glyphs) {
-    var i, j, glyph;
+    var i;
     var t = new table.Table('cmap', [
         {name: 'version', type: 'USHORT', value: 0},
         {name: 'numTables', type: 'USHORT', value: 1},
@@ -2539,11 +2682,16 @@ function makeCmapTable(glyphs) {
 
     t.segments = [];
     for (i = 0; i < glyphs.length; i += 1) {
-        glyph = glyphs[i];
-        for (j = 0; j < glyph.unicodes.length; j += 1) {
+        var glyph = glyphs[i];
+        for (var j = 0; j < glyph.unicodes.length; j += 1) {
             addSegment(t, glyph.unicodes[j], i);
         }
+
+        t.segments = t.segments.sort(function(a, b) {
+            return a.start - b.start;
+        });
     }
+
     addTerminatorSegment(t);
 
     var segCount;
@@ -2553,12 +2701,12 @@ function makeCmapTable(glyphs) {
     t.entrySelector = Math.log(t.searchRange / 2) / Math.log(2);
     t.rangeShift = t.segCountX2 - t.searchRange;
 
-     // Set up parallel segment arrays.
-    var endCounts = [],
-        startCounts = [],
-        idDeltas = [],
-        idRangeOffsets = [],
-        glyphIds = [];
+    // Set up parallel segment arrays.
+    var endCounts = [];
+    var startCounts = [];
+    var idDeltas = [];
+    var idRangeOffsets = [];
+    var glyphIds = [];
 
     for (i = 0; i < segCount; i += 1) {
         var segment = t.segments[i];
@@ -2570,6 +2718,7 @@ function makeCmapTable(glyphs) {
             glyphIds = glyphIds.concat({name: 'glyph_' + i, type: 'USHORT', value: segment.glyphId});
         }
     }
+
     t.fields = t.fields.concat(endCounts);
     t.fields.push({name: 'reservedPad', type: 'USHORT', value: 0});
     t.fields = t.fields.concat(startCounts);
@@ -2584,6 +2733,7 @@ function makeCmapTable(glyphs) {
         idDeltas.length * 2 +
         idRangeOffsets.length * 2 +
         glyphIds.length * 2;
+
     return t;
 }
 
@@ -2611,6 +2761,7 @@ function parseGlyphCoordinate(p, flag, previousValue, shortVectorBitMask, sameBi
         if ((flag & sameBitMask) === 0) {
             v = -v;
         }
+
         v = previousValue + v;
     } else {
         //  The coordinate is 2 bytes long.
@@ -2622,24 +2773,28 @@ function parseGlyphCoordinate(p, flag, previousValue, shortVectorBitMask, sameBi
             v = previousValue + p.parseShort();
         }
     }
+
     return v;
 }
 
 // Parse a TrueType glyph.
 function parseGlyph(data, start, index, font) {
-    var p, glyph, flag, i, j, flags,
-        endPointIndices, numberOfCoordinates, repeatCount, points, point, px, py,
-        component, moreComponents;
-    p = new parse.Parser(data, start);
-    glyph = new _glyph.Glyph({font: font, index: index});
+    //var p, glyph, flag, i, j, flags,
+    //    endPointIndices, numberOfCoordinates, repeatCount, points, point, px, py,
+    //    component, moreComponents;
+    var p = new parse.Parser(data, start);
+    var glyph = new _glyph.Glyph({font: font, index: index});
     glyph.numberOfContours = p.parseShort();
     glyph.xMin = p.parseShort();
     glyph.yMin = p.parseShort();
     glyph.xMax = p.parseShort();
     glyph.yMax = p.parseShort();
+    var flags;
+    var flag;
     if (glyph.numberOfContours > 0) {
+        var i;
         // This glyph is not a composite.
-        endPointIndices = glyph.endPointIndices = [];
+        var endPointIndices = glyph.endPointIndices = [];
         for (i = 0; i < glyph.numberOfContours; i += 1) {
             endPointIndices.push(p.parseUShort());
         }
@@ -2650,24 +2805,26 @@ function parseGlyph(data, start, index, font) {
             glyph.instructions.push(p.parseByte());
         }
 
-        numberOfCoordinates = endPointIndices[endPointIndices.length - 1] + 1;
+        var numberOfCoordinates = endPointIndices[endPointIndices.length - 1] + 1;
         flags = [];
         for (i = 0; i < numberOfCoordinates; i += 1) {
             flag = p.parseByte();
             flags.push(flag);
             // If bit 3 is set, we repeat this flag n times, where n is the next byte.
             if ((flag & 8) > 0) {
-                repeatCount = p.parseByte();
-                for (j = 0; j < repeatCount; j += 1) {
+                var repeatCount = p.parseByte();
+                for (var j = 0; j < repeatCount; j += 1) {
                     flags.push(flag);
                     i += 1;
                 }
             }
         }
+
         check.argument(flags.length === numberOfCoordinates, 'Bad flags.');
 
         if (endPointIndices.length > 0) {
-            points = [];
+            var points = [];
+            var point;
             // X/Y coordinates are relative to the previous point, except for the first point which is relative to 0,0.
             if (numberOfCoordinates > 0) {
                 for (i = 0; i < numberOfCoordinates; i += 1) {
@@ -2677,7 +2834,8 @@ function parseGlyph(data, start, index, font) {
                     point.lastPointOfContour = endPointIndices.indexOf(i) >= 0;
                     points.push(point);
                 }
-                px = 0;
+
+                var px = 0;
                 for (i = 0; i < numberOfCoordinates; i += 1) {
                     flag = flags[i];
                     point = points[i];
@@ -2685,7 +2843,7 @@ function parseGlyph(data, start, index, font) {
                     px = point.x;
                 }
 
-                py = 0;
+                var py = 0;
                 for (i = 0; i < numberOfCoordinates; i += 1) {
                     flag = flags[i];
                     point = points[i];
@@ -2693,6 +2851,7 @@ function parseGlyph(data, start, index, font) {
                     py = point.y;
                 }
             }
+
             glyph.points = points;
         } else {
             glyph.points = [];
@@ -2703,18 +2862,18 @@ function parseGlyph(data, start, index, font) {
         glyph.isComposite = true;
         glyph.points = [];
         glyph.components = [];
-        moreComponents = true;
+        var moreComponents = true;
         while (moreComponents) {
             flags = p.parseUShort();
-            component = {
+            var component = {
                 glyphIndex: p.parseUShort(),
-                 xScale: 1,
-                 scale01: 0,
-                 scale10: 0,
-                 yScale: 1,
-                 dx: 0,
-                 dy: 0
-             };
+                xScale: 1,
+                scale01: 0,
+                scale10: 0,
+                yScale: 1,
+                dx: 0,
+                dy: 0
+            };
             if ((flags & 1) > 0) {
                 // The arguments are words
                 component.dx = p.parseShort();
@@ -2724,6 +2883,7 @@ function parseGlyph(data, start, index, font) {
                 component.dx = p.parseChar();
                 component.dy = p.parseChar();
             }
+
             if ((flags & 8) > 0) {
                 // We have a scale
                 component.xScale = component.yScale = p.parseF2Dot14();
@@ -2743,16 +2903,16 @@ function parseGlyph(data, start, index, font) {
             moreComponents = !!(flags & 32);
         }
     }
+
     return glyph;
 }
 
 // Transform an array of points and return a new array.
 function transformPoints(points, transform) {
-    var newPoints, i, pt, newPt;
-    newPoints = [];
-    for (i = 0; i < points.length; i += 1) {
-        pt = points[i];
-        newPt = {
+    var newPoints = [];
+    for (var i = 0; i < points.length; i += 1) {
+        var pt = points[i];
+        var newPt = {
             x: transform.xScale * pt.x + transform.scale01 * pt.y + transform.dx,
             y: transform.scale10 * pt.x + transform.yScale * pt.y + transform.dy,
             onCurve: pt.onCurve,
@@ -2760,39 +2920,40 @@ function transformPoints(points, transform) {
         };
         newPoints.push(newPt);
     }
+
     return newPoints;
 }
 
-
 function getContours(points) {
-    var contours, currentContour, i, pt;
-    contours = [];
-    currentContour = [];
-    for (i = 0; i < points.length; i += 1) {
-        pt = points[i];
+    var contours = [];
+    var currentContour = [];
+    for (var i = 0; i < points.length; i += 1) {
+        var pt = points[i];
         currentContour.push(pt);
         if (pt.lastPointOfContour) {
             contours.push(currentContour);
             currentContour = [];
         }
     }
+
     check.argument(currentContour.length === 0, 'There are still points left in the current contour.');
     return contours;
 }
 
 // Convert the TrueType glyph outline to a Path.
 function getPath(points) {
-    var p, contours, i, realFirstPoint, j, contour, pt, firstPt,
-        prevPt, midPt, curvePt, lastPt;
-    p = new path.Path();
+    var p = new path.Path();
     if (!points) {
         return p;
     }
-    contours = getContours(points);
-    for (i = 0; i < contours.length; i += 1) {
-        contour = contours[i];
-        firstPt = contour[0];
-        lastPt = contour[contour.length - 1];
+
+    var contours = getContours(points);
+    for (var i = 0; i < contours.length; i += 1) {
+        var contour = contours[i];
+        var firstPt = contour[0];
+        var lastPt = contour[contour.length - 1];
+        var curvePt;
+        var realFirstPoint;
         if (firstPt.onCurve) {
             curvePt = null;
             // The first point will be consumed by the moveTo command,
@@ -2807,22 +2968,24 @@ function getPath(points) {
                 // If both first and last points are off-curve, start at their middle.
                 firstPt = { x: (firstPt.x + lastPt.x) / 2, y: (firstPt.y + lastPt.y) / 2 };
             }
+
             curvePt = firstPt;
             // The first point is synthesized, so don't skip the real first point.
             realFirstPoint = false;
         }
+
         p.moveTo(firstPt.x, firstPt.y);
 
-        for (j = realFirstPoint ? 1 : 0; j < contour.length; j += 1) {
-            pt = contour[j];
-            prevPt = j === 0 ? firstPt : contour[j - 1];
+        for (var j = realFirstPoint ? 1 : 0; j < contour.length; j += 1) {
+            var pt = contour[j];
+            var prevPt = j === 0 ? firstPt : contour[j - 1];
             if (prevPt.onCurve && pt.onCurve) {
                 // This is a straight line.
                 p.lineTo(pt.x, pt.y);
             } else if (prevPt.onCurve && !pt.onCurve) {
                 curvePt = pt;
             } else if (!prevPt.onCurve && !pt.onCurve) {
-                midPt = { x: (prevPt.x + pt.x) / 2, y: (prevPt.y + pt.y) / 2 };
+                var midPt = { x: (prevPt.x + pt.x) / 2, y: (prevPt.y + pt.y) / 2 };
                 p.quadraticCurveTo(prevPt.x, prevPt.y, midPt.x, midPt.y);
                 curvePt = pt;
             } else if (!prevPt.onCurve && pt.onCurve) {
@@ -2833,6 +2996,7 @@ function getPath(points) {
                 throw new Error('Invalid state.');
             }
         }
+
         if (firstPt !== lastPt) {
             // Connect the last and first points
             if (curvePt) {
@@ -2842,19 +3006,19 @@ function getPath(points) {
             }
         }
     }
+
     p.closePath();
     return p;
 }
 
 // Parse all the glyphs according to the offsets from the `loca` table.
 function parseGlyfTable(data, start, loca, font) {
-    var glyphs, i, j, offset, nextOffset, glyph,
-        component, componentGlyph, transformedPoints;
-    glyphs = [];
+    var glyphs = [];
+    var i;
     // The last element of the loca table is invalid.
     for (i = 0; i < loca.length - 1; i += 1) {
-        offset = loca[i];
-        nextOffset = loca[i + 1];
+        var offset = loca[i];
+        var nextOffset = loca[i + 1];
         if (offset !== nextOffset) {
             glyphs.push(parseGlyph(data, start + offset, i, font));
         } else {
@@ -2863,19 +3027,21 @@ function parseGlyfTable(data, start, loca, font) {
     }
     // Go over the glyphs again, resolving the composite glyphs.
     for (i = 0; i < glyphs.length; i += 1) {
-        glyph = glyphs[i];
+        var glyph = glyphs[i];
         if (glyph.isComposite) {
-            for (j = 0; j < glyph.components.length; j += 1) {
-                component = glyph.components[j];
-                componentGlyph = glyphs[component.glyphIndex];
+            for (var j = 0; j < glyph.components.length; j += 1) {
+                var component = glyph.components[j];
+                var componentGlyph = glyphs[component.glyphIndex];
                 if (componentGlyph.points) {
-                    transformedPoints = transformPoints(componentGlyph.points, component);
+                    var transformedPoints = transformPoints(componentGlyph.points, component);
                     glyph.points = glyph.points.concat(transformedPoints);
                 }
             }
         }
+
         glyph.path = getPath(glyph.points);
     }
+
     return glyphs;
 }
 
@@ -2893,12 +3059,13 @@ var parse = require('../parse');
 // Parse ScriptList and FeatureList tables of GPOS, GSUB, GDEF, BASE, JSTF tables.
 // These lists are unused by now, this function is just the basis for a real parsing.
 function parseTaggedListTable(data, start) {
-    var p = new parse.Parser(data, start),
-        n = p.parseUShort(),
-        list = [];
+    var p = new parse.Parser(data, start);
+    var n = p.parseUShort();
+    var list = [];
     for (var i = 0; i < n; i++) {
         list[p.parseTag()] = { offset: p.parseUShort() };
     }
+
     return list;
 }
 
@@ -2906,22 +3073,23 @@ function parseTaggedListTable(data, start) {
 // Format 1 is a simple list of glyph ids,
 // Format 2 is a list of ranges. It is expanded in a list of glyphs, maybe not the best idea.
 function parseCoverageTable(data, start) {
-    var p = new parse.Parser(data, start),
-        format = p.parseUShort(),
-        count =  p.parseUShort();
+    var p = new parse.Parser(data, start);
+    var format = p.parseUShort();
+    var count =  p.parseUShort();
     if (format === 1) {
         return p.parseUShortList(count);
     }
     else if (format === 2) {
-        var i, begin, end, index, coverage = [];
+        var coverage = [];
         for (; count--;) {
-            begin = p.parseUShort();
-            end = p.parseUShort();
-            index = p.parseUShort();
-            for (i = begin; i <= end; i++) {
+            var begin = p.parseUShort();
+            var end = p.parseUShort();
+            var index = p.parseUShort();
+            for (var i = begin; i <= end; i++) {
                 coverage[index++] = i;
             }
         }
+
         return coverage;
     }
 }
@@ -2929,43 +3097,45 @@ function parseCoverageTable(data, start) {
 // Parse a Class Definition Table in a GSUB, GPOS or GDEF table.
 // Returns a function that gets a class value from a glyph ID.
 function parseClassDefTable(data, start) {
-    var p = new parse.Parser(data, start),
-        format = p.parseUShort();
+    var p = new parse.Parser(data, start);
+    var format = p.parseUShort();
     if (format === 1) {
         // Format 1 specifies a range of consecutive glyph indices, one class per glyph ID.
-        var startGlyph = p.parseUShort(),
-            glyphCount = p.parseUShort(),
-            classes = p.parseUShortList(glyphCount);
+        var startGlyph = p.parseUShort();
+        var glyphCount = p.parseUShort();
+        var classes = p.parseUShortList(glyphCount);
         return function(glyphID) {
             return classes[glyphID - startGlyph] || 0;
         };
     }
     else if (format === 2) {
         // Format 2 defines multiple groups of glyph indices that belong to the same class.
-        var rangeCount = p.parseUShort(),
-            startGlyphs = [],
-            endGlyphs = [],
-            classValues = [];
+        var rangeCount = p.parseUShort();
+        var startGlyphs = [];
+        var endGlyphs = [];
+        var classValues = [];
         for (var i = 0; i < rangeCount; i++) {
             startGlyphs[i] = p.parseUShort();
             endGlyphs[i] = p.parseUShort();
             classValues[i] = p.parseUShort();
         }
+
         return function(glyphID) {
-            var l, c, r;
-            l = 0;
-            r = startGlyphs.length - 1;
+            var l = 0;
+            var r = startGlyphs.length - 1;
             while (l < r) {
-                c = (l + r + 1) >> 1;
+                var c = (l + r + 1) >> 1;
                 if (glyphID < startGlyphs[c]) {
                     r = c - 1;
                 } else {
                     l = c;
                 }
             }
+
             if (startGlyphs[l] <= glyphID && glyphID <= endGlyphs[l]) {
                 return classValues[l] || 0;
             }
+
             return 0;
         };
     }
@@ -2975,35 +3145,34 @@ function parseClassDefTable(data, start) {
 // The subtable is returned in the form of a lookup function.
 function parsePairPosSubTable(data, start) {
     var p = new parse.Parser(data, start);
-    var format, coverageOffset, coverage, valueFormat1, valueFormat2,
-        sharedPairSets, firstGlyph, secondGlyph, value1, value2;
     // This part is common to format 1 and format 2 subtables
-    format = p.parseUShort();
-    coverageOffset = p.parseUShort();
-    coverage = parseCoverageTable(data, start + coverageOffset);
+    var format = p.parseUShort();
+    var coverageOffset = p.parseUShort();
+    var coverage = parseCoverageTable(data, start + coverageOffset);
     // valueFormat 4: XAdvance only, 1: XPlacement only, 0: no ValueRecord for second glyph
     // Only valueFormat1=4 and valueFormat2=0 is supported.
-    valueFormat1 = p.parseUShort();
-    valueFormat2 = p.parseUShort();
+    var valueFormat1 = p.parseUShort();
+    var valueFormat2 = p.parseUShort();
+    var value1;
+    var value2;
     if (valueFormat1 !== 4 || valueFormat2 !== 0) return;
-    sharedPairSets = {};
+    var sharedPairSets = {};
     if (format === 1) {
         // Pair Positioning Adjustment: Format 1
-        var pairSetCount, pairSetOffsets, pairSetOffset, sharedPairSet, pairValueCount, pairSet;
-        pairSetCount = p.parseUShort();
-        pairSet = [];
+        var pairSetCount = p.parseUShort();
+        var pairSet = [];
         // Array of offsets to PairSet tables-from beginning of PairPos subtable-ordered by Coverage Index
-        pairSetOffsets = p.parseOffset16List(pairSetCount);
-        for (firstGlyph = 0; firstGlyph < pairSetCount; firstGlyph++) {
-            pairSetOffset = pairSetOffsets[firstGlyph];
-            sharedPairSet = sharedPairSets[pairSetOffset];
+        var pairSetOffsets = p.parseOffset16List(pairSetCount);
+        for (var firstGlyph = 0; firstGlyph < pairSetCount; firstGlyph++) {
+            var pairSetOffset = pairSetOffsets[firstGlyph];
+            var sharedPairSet = sharedPairSets[pairSetOffset];
             if (!sharedPairSet) {
                 // Parse a pairset table in a pair adjustment subtable format 1
                 sharedPairSet = {};
                 p.relativeOffset = pairSetOffset;
-                pairValueCount = p.parseUShort();
+                var pairValueCount = p.parseUShort();
                 for (; pairValueCount--;) {
-                    secondGlyph = p.parseUShort();
+                    var secondGlyph = p.parseUShort();
                     if (valueFormat1) value1 = p.parseShort();
                     if (valueFormat2) value2 = p.parseShort();
                     // We only support valueFormat1 = 4 and valueFormat2 = 0,
@@ -3011,8 +3180,10 @@ function parsePairPosSubTable(data, start) {
                     sharedPairSet[secondGlyph] = value1;
                 }
             }
+
             pairSet[coverage[firstGlyph]] = sharedPairSet;
         }
+
         return function(leftGlyph, rightGlyph) {
             var pairs = pairSet[leftGlyph];
             if (pairs) return pairs[rightGlyph];
@@ -3020,20 +3191,18 @@ function parsePairPosSubTable(data, start) {
     }
     else if (format === 2) {
         // Pair Positioning Adjustment: Format 2
-        var classDef1Offset, classDef2Offset, class1Count, class2Count, i, j,
-            getClass1, getClass2, kerningMatrix, kerningRow, covered;
-        classDef1Offset = p.parseUShort();
-        classDef2Offset = p.parseUShort();
-        class1Count = p.parseUShort();
-        class2Count = p.parseUShort();
-        getClass1 = parseClassDefTable(data, start+classDef1Offset);
-        getClass2 = parseClassDefTable(data, start+classDef2Offset);
+        var classDef1Offset = p.parseUShort();
+        var classDef2Offset = p.parseUShort();
+        var class1Count = p.parseUShort();
+        var class2Count = p.parseUShort();
+        var getClass1 = parseClassDefTable(data, start + classDef1Offset);
+        var getClass2 = parseClassDefTable(data, start + classDef2Offset);
 
         // Parse kerning values by class pair.
-        kerningMatrix = [];
-        for (i = 0; i < class1Count; i++) {
-            kerningRow = kerningMatrix[i] = [];
-            for (j = 0; j < class2Count; j++) {
+        var kerningMatrix = [];
+        for (var i = 0; i < class1Count; i++) {
+            var kerningRow = kerningMatrix[i] = [];
+            for (var j = 0; j < class2Count; j++) {
                 if (valueFormat1) value1 = p.parseShort();
                 if (valueFormat2) value2 = p.parseShort();
                 // We only support valueFormat1 = 4 and valueFormat2 = 0,
@@ -3043,15 +3212,15 @@ function parsePairPosSubTable(data, start) {
         }
 
         // Convert coverage list to a hash
-        covered = {};
-        for(i = 0; i < coverage.length; i++) covered[coverage[i]] = 1;
+        var covered = {};
+        for (i = 0; i < coverage.length; i++) covered[coverage[i]] = 1;
 
         // Get the kerning value for a specific glyph pair.
         return function(leftGlyph, rightGlyph) {
             if (!covered[leftGlyph]) return;
-            var class1 = getClass1(leftGlyph),
-                class2 = getClass2(rightGlyph),
-                kerningRow = kerningMatrix[class1];
+            var class1 = getClass1(leftGlyph);
+            var class2 = getClass2(rightGlyph);
+            var kerningRow = kerningMatrix[class1];
 
             if (kerningRow) {
                 return kerningRow[class2];
@@ -3063,21 +3232,20 @@ function parsePairPosSubTable(data, start) {
 // Parse a LookupTable (present in of GPOS, GSUB, GDEF, BASE, JSTF tables).
 function parseLookupTable(data, start) {
     var p = new parse.Parser(data, start);
-    var table, lookupType, lookupFlag, useMarkFilteringSet, subTableCount, subTableOffsets, subtables, i;
-    lookupType = p.parseUShort();
-    lookupFlag = p.parseUShort();
-    useMarkFilteringSet = lookupFlag & 0x10;
-    subTableCount = p.parseUShort();
-    subTableOffsets = p.parseOffset16List(subTableCount);
-    table = {
+    var lookupType = p.parseUShort();
+    var lookupFlag = p.parseUShort();
+    var useMarkFilteringSet = lookupFlag & 0x10;
+    var subTableCount = p.parseUShort();
+    var subTableOffsets = p.parseOffset16List(subTableCount);
+    var table = {
         lookupType: lookupType,
         lookupFlag: lookupFlag,
         markFilteringSet: useMarkFilteringSet ? p.parseUShort() : -1
     };
     // LookupType 2, Pair adjustment
     if (lookupType === 2) {
-        subtables = [];
-        for (i = 0; i < subTableCount; i++) {
+        var subtables = [];
+        for (var i = 0; i < subTableCount; i++) {
             subtables.push(parsePairPosSubTable(data, start + subTableOffsets[i]));
         }
         // Return a function which finds the kerning values in the subtables.
@@ -3086,35 +3254,34 @@ function parseLookupTable(data, start) {
                 var value = subtables[i](leftGlyph, rightGlyph);
                 if (value !== undefined) return value;
             }
+
             return 0;
         };
     }
+
     return table;
 }
 
 // Parse the `GPOS` table which contains, among other things, kerning pairs.
 // https://www.microsoft.com/typography/OTSPEC/gpos.htm
 function parseGposTable(data, start, font) {
-    var p, tableVersion, lookupListOffset, scriptList, i, featureList, lookupCount,
-        lookupTableOffsets, lookupListAbsoluteOffset, table;
-
-    p = new parse.Parser(data, start);
-    tableVersion = p.parseFixed();
+    var p = new parse.Parser(data, start);
+    var tableVersion = p.parseFixed();
     check.argument(tableVersion === 1, 'Unsupported GPOS table version.');
 
     // ScriptList and FeatureList - ignored for now
-    scriptList = parseTaggedListTable(data, start+p.parseUShort());
+    parseTaggedListTable(data, start + p.parseUShort());
     // 'kern' is the feature we are looking for.
-    featureList = parseTaggedListTable(data, start+p.parseUShort());
+    parseTaggedListTable(data, start + p.parseUShort());
 
     // LookupList
-    lookupListOffset = p.parseUShort();
+    var lookupListOffset = p.parseUShort();
     p.relativeOffset = lookupListOffset;
-    lookupCount = p.parseUShort();
-    lookupTableOffsets = p.parseOffset16List(lookupCount);
-    lookupListAbsoluteOffset = start + lookupListOffset;
-    for (i = 0; i < lookupCount; i++) {
-        table = parseLookupTable(data, lookupListAbsoluteOffset + lookupTableOffsets[i]);
+    var lookupCount = p.parseUShort();
+    var lookupTableOffsets = p.parseOffset16List(lookupCount);
+    var lookupListAbsoluteOffset = start + lookupListOffset;
+    for (var i = 0; i < lookupCount; i++) {
+        var table = parseLookupTable(data, lookupListAbsoluteOffset + lookupTableOffsets[i]);
         if (table.lookupType === 2 && !font.getGposKerningValue) font.getGposKerningValue = table.getKerningValue;
     }
 }
@@ -3133,8 +3300,8 @@ var table = require('../table');
 
 // Parse the header `head` table
 function parseHeadTable(data, start) {
-    var head = {},
-        p = new parse.Parser(data, start);
+    var head = {};
+    var p = new parse.Parser(data, start);
     head.version = p.parseVersion();
     head.fontRevision = Math.round(p.parseFixed() * 1000) / 1000;
     head.checkSumAdjustment = p.parseULong();
@@ -3192,8 +3359,8 @@ var table = require('../table');
 
 // Parse the horizontal header `hhea` table
 function parseHheaTable(data, start) {
-    var hhea = {},
-        p = new parse.Parser(data, start);
+    var hhea = {};
+    var p = new parse.Parser(data, start);
     hhea.version = p.parseVersion();
     hhea.ascender = p.parseShort();
     hhea.descender = p.parseShort();
@@ -3248,15 +3415,17 @@ var table = require('../table');
 // Parse the `hmtx` table, which contains the horizontal metrics for all glyphs.
 // This function augments the glyph array, adding the advanceWidth and leftSideBearing to each glyph.
 function parseHmtxTable(data, start, numMetrics, numGlyphs, glyphs) {
-    var p, i, glyph, advanceWidth, leftSideBearing;
-    p = new parse.Parser(data, start);
-    for (i = 0; i < numGlyphs; i += 1) {
+    var advanceWidth;
+    var leftSideBearing;
+    var p = new parse.Parser(data, start);
+    for (var i = 0; i < numGlyphs; i += 1) {
         // If the font is monospaced, only one entry is needed. This last entry applies to all subsequent glyphs.
         if (i < numMetrics) {
             advanceWidth = p.parseUShort();
             leftSideBearing = p.parseShort();
         }
-        glyph = glyphs[i];
+
+        var glyph = glyphs[i];
         glyph.advanceWidth = advanceWidth;
         glyph.leftSideBearing = leftSideBearing;
     }
@@ -3271,14 +3440,12 @@ function makeHmtxTable(glyphs) {
         t.fields.push({name: 'advanceWidth_' + i, type: 'USHORT', value: advanceWidth});
         t.fields.push({name: 'leftSideBearing_' + i, type: 'SHORT', value: leftSideBearing});
     }
+
     return t;
 }
 
 exports.parse = parseHmtxTable;
 exports.make = makeHmtxTable;
-
-
-
 
 },{"../parse":7,"../table":9}],17:[function(require,module,exports){
 // The `kern` table contains kerning pairs.
@@ -3292,27 +3459,26 @@ var parse = require('../parse');
 
 // Parse the `kern` table which contains kerning pairs.
 function parseKernTable(data, start) {
-    var pairs, p, tableVersion, subTableVersion, nPairs,
-        i, leftIndex, rightIndex, value;
-    pairs = {};
-    p = new parse.Parser(data, start);
-    tableVersion = p.parseUShort();
+    var pairs = {};
+    var p = new parse.Parser(data, start);
+    var tableVersion = p.parseUShort();
     check.argument(tableVersion === 0, 'Unsupported kern table version.');
     // Skip nTables.
     p.skip('uShort', 1);
-    subTableVersion = p.parseUShort();
+    var subTableVersion = p.parseUShort();
     check.argument(subTableVersion === 0, 'Unsupported kern sub-table version.');
     // Skip subTableLength, subTableCoverage
     p.skip('uShort', 2);
-    nPairs = p.parseUShort();
+    var nPairs = p.parseUShort();
     // Skip searchRange, entrySelector, rangeShift.
     p.skip('uShort', 3);
-    for (i = 0; i < nPairs; i += 1) {
-        leftIndex = p.parseUShort();
-        rightIndex = p.parseUShort();
-        value = p.parseShort();
+    for (var i = 0; i < nPairs; i += 1) {
+        var leftIndex = p.parseUShort();
+        var rightIndex = p.parseUShort();
+        var value = p.parseShort();
         pairs[leftIndex + ',' + rightIndex] = value;
     }
+
     return pairs;
 }
 
@@ -3333,20 +3499,21 @@ var parse = require('../parse');
 // version where offsets are stored as uLongs. The `head` table specifies which version to use
 // (under indexToLocFormat).
 function parseLocaTable(data, start, numGlyphs, shortVersion) {
-    var p, parseFn, glyphOffsets, glyphOffset, i;
-    p = new parse.Parser(data, start);
-    parseFn = shortVersion ? p.parseUShort : p.parseULong;
+    var p = new parse.Parser(data, start);
+    var parseFn = shortVersion ? p.parseUShort : p.parseULong;
     // There is an extra entry after the last index element to compute the length of the last glyph.
     // That's why we use numGlyphs + 1.
-    glyphOffsets = [];
-    for (i = 0; i < numGlyphs + 1; i += 1) {
-        glyphOffset = parseFn.call(p);
+    var glyphOffsets = [];
+    for (var i = 0; i < numGlyphs + 1; i += 1) {
+        var glyphOffset = parseFn.call(p);
         if (shortVersion) {
             // The short table version stores the actual offset divided by 2.
             glyphOffset *= 2;
         }
+
         glyphOffsets.push(glyphOffset);
     }
+
     return glyphOffsets;
 }
 
@@ -3364,8 +3531,8 @@ var table = require('../table');
 
 // Parse the maximum profile `maxp` table.
 function parseMaxpTable(data, start) {
-    var maxp = {},
-        p = new parse.Parser(data, start);
+    var maxp = {};
+    var p = new parse.Parser(data, start);
     maxp.version = p.parseVersion();
     maxp.numGlyphs = p.parseUShort();
     if (maxp.version === 1.0) {
@@ -3383,6 +3550,7 @@ function parseMaxpTable(data, start) {
         maxp.maxComponentElements = p.parseUShort();
         maxp.maxComponentDepth = p.parseUShort();
     }
+
     return maxp;
 }
 
@@ -3437,45 +3605,46 @@ var nameTableNames = [
 // Only Windows Unicode English names are supported.
 // Format 1 additional fields are not supported
 function parseNameTable(data, start) {
-    var name = {},
-        p = new parse.Parser(data, start);
+    var name = {};
+    var p = new parse.Parser(data, start);
     name.format = p.parseUShort();
-    var count = p.parseUShort(),
-        stringOffset = p.offset + p.parseUShort();
-    var platformID, encodingID, languageID, nameID, property, byteLength,
-        offset, str, i, j, codePoints;
+    var count = p.parseUShort();
+    var stringOffset = p.offset + p.parseUShort();
     var unknownCount = 0;
-    for(i = 0; i < count; i++) {
-        platformID = p.parseUShort();
-        encodingID = p.parseUShort();
-        languageID = p.parseUShort();
-        nameID = p.parseUShort();
-        property = nameTableNames[nameID];
-        byteLength = p.parseUShort();
-        offset = p.parseUShort();
+    for (var i = 0; i < count; i++) {
+        var platformID = p.parseUShort();
+        var encodingID = p.parseUShort();
+        var languageID = p.parseUShort();
+        var nameID = p.parseUShort();
+        var property = nameTableNames[nameID];
+        var byteLength = p.parseUShort();
+        var offset = p.parseUShort();
         // platformID - encodingID - languageID standard combinations :
         // 1 - 0 - 0 : Macintosh, Roman, English
         // 3 - 1 - 0x409 : Windows, Unicode BMP (UCS-2), en-US
         if (platformID === 3 && encodingID === 1 && languageID === 0x409) {
-            codePoints = [];
-            var length = byteLength/2;
-            for(j = 0; j < length; j++, offset += 2) {
-                codePoints[j] = parse.getShort(data, stringOffset+offset);
+            var codePoints = [];
+            var length = byteLength / 2;
+            for (var j = 0; j < length; j++, offset += 2) {
+                codePoints[j] = parse.getShort(data, stringOffset + offset);
             }
-            str = String.fromCharCode.apply(null, codePoints);
+
+            var str = String.fromCharCode.apply(null, codePoints);
             if (property) {
                 name[property] = str;
             }
             else {
                 unknownCount++;
-                name['unknown'+unknownCount] = str;
+                name['unknown' + unknownCount] = str;
             }
         }
 
     }
+
     if (name.format === 1) {
         name.langTagCount = p.parseUShort();
     }
+
     return name;
 }
 
@@ -3509,7 +3678,6 @@ function addWindowsNameRecord(t, recordID, s, offset) {
 }
 
 function makeNameTable(options) {
-    var i, s;
     var t = new table.Table('name', [
         {name: 'format', type: 'USHORT', value: 0},
         {name: 'count', type: 'USHORT', value: 0},
@@ -3518,6 +3686,8 @@ function makeNameTable(options) {
     t.records = [];
     t.strings = [];
     var offset = 0;
+    var i;
+    var s;
     // Add Macintosh records first
     for (i = 0; i < nameTableNames.length; i += 1) {
         if (options[nameTableNames[i]] !== undefined) {
@@ -3538,9 +3708,11 @@ function makeNameTable(options) {
     for (i = 0; i < t.records.length; i += 1) {
         t.fields.push({name: 'record_' + i, type: 'TABLE', value: t.records[i]});
     }
+
     for (i = 0; i < t.strings.length; i += 1) {
         t.fields.push({name: 'string_' + i, type: 'LITERAL', value: t.strings[i]});
     }
+
     return t;
 }
 
@@ -3556,10 +3728,147 @@ exports.make = makeNameTable;
 var parse = require('../parse');
 var table = require('../table');
 
+var unicodeRanges = [
+    {begin: 0x0000, end: 0x007F}, // Basic Latin
+    {begin: 0x0080, end: 0x00FF}, // Latin-1 Supplement
+    {begin: 0x0100, end: 0x017F}, // Latin Extended-A
+    {begin: 0x0180, end: 0x024F}, // Latin Extended-B
+    {begin: 0x0250, end: 0x02AF}, // IPA Extensions
+    {begin: 0x02B0, end: 0x02FF}, // Spacing Modifier Letters
+    {begin: 0x0300, end: 0x036F}, // Combining Diacritical Marks
+    {begin: 0x0370, end: 0x03FF}, // Greek and Coptic
+    {begin: 0x2C80, end: 0x2CFF}, // Coptic
+    {begin: 0x0400, end: 0x04FF}, // Cyrillic
+    {begin: 0x0530, end: 0x058F}, // Armenian
+    {begin: 0x0590, end: 0x05FF}, // Hebrew
+    {begin: 0xA500, end: 0xA63F}, // Vai
+    {begin: 0x0600, end: 0x06FF}, // Arabic
+    {begin: 0x07C0, end: 0x07FF}, // NKo
+    {begin: 0x0900, end: 0x097F}, // Devanagari
+    {begin: 0x0980, end: 0x09FF}, // Bengali
+    {begin: 0x0A00, end: 0x0A7F}, // Gurmukhi
+    {begin: 0x0A80, end: 0x0AFF}, // Gujarati
+    {begin: 0x0B00, end: 0x0B7F}, // Oriya
+    {begin: 0x0B80, end: 0x0BFF}, // Tamil
+    {begin: 0x0C00, end: 0x0C7F}, // Telugu
+    {begin: 0x0C80, end: 0x0CFF}, // Kannada
+    {begin: 0x0D00, end: 0x0D7F}, // Malayalam
+    {begin: 0x0E00, end: 0x0E7F}, // Thai
+    {begin: 0x0E80, end: 0x0EFF}, // Lao
+    {begin: 0x10A0, end: 0x10FF}, // Georgian
+    {begin: 0x1B00, end: 0x1B7F}, // Balinese
+    {begin: 0x1100, end: 0x11FF}, // Hangul Jamo
+    {begin: 0x1E00, end: 0x1EFF}, // Latin Extended Additional
+    {begin: 0x1F00, end: 0x1FFF}, // Greek Extended
+    {begin: 0x2000, end: 0x206F}, // General Punctuation
+    {begin: 0x2070, end: 0x209F}, // Superscripts And Subscripts
+    {begin: 0x20A0, end: 0x20CF}, // Currency Symbol
+    {begin: 0x20D0, end: 0x20FF}, // Combining Diacritical Marks For Symbols
+    {begin: 0x2100, end: 0x214F}, // Letterlike Symbols
+    {begin: 0x2150, end: 0x218F}, // Number Forms
+    {begin: 0x2190, end: 0x21FF}, // Arrows
+    {begin: 0x2200, end: 0x22FF}, // Mathematical Operators
+    {begin: 0x2300, end: 0x23FF}, // Miscellaneous Technical
+    {begin: 0x2400, end: 0x243F}, // Control Pictures
+    {begin: 0x2440, end: 0x245F}, // Optical Character Recognition
+    {begin: 0x2460, end: 0x24FF}, // Enclosed Alphanumerics
+    {begin: 0x2500, end: 0x257F}, // Box Drawing
+    {begin: 0x2580, end: 0x259F}, // Block Elements
+    {begin: 0x25A0, end: 0x25FF}, // Geometric Shapes
+    {begin: 0x2600, end: 0x26FF}, // Miscellaneous Symbols
+    {begin: 0x2700, end: 0x27BF}, // Dingbats
+    {begin: 0x3000, end: 0x303F}, // CJK Symbols And Punctuation
+    {begin: 0x3040, end: 0x309F}, // Hiragana
+    {begin: 0x30A0, end: 0x30FF}, // Katakana
+    {begin: 0x3100, end: 0x312F}, // Bopomofo
+    {begin: 0x3130, end: 0x318F}, // Hangul Compatibility Jamo
+    {begin: 0xA840, end: 0xA87F}, // Phags-pa
+    {begin: 0x3200, end: 0x32FF}, // Enclosed CJK Letters And Months
+    {begin: 0x3300, end: 0x33FF}, // CJK Compatibility
+    {begin: 0xAC00, end: 0xD7AF}, // Hangul Syllables
+    {begin: 0xD800, end: 0xDFFF}, // Non-Plane 0 *
+    {begin: 0x10900, end: 0x1091F}, // Phoenicia
+    {begin: 0x4E00, end: 0x9FFF}, // CJK Unified Ideographs
+    {begin: 0xE000, end: 0xF8FF}, // Private Use Area (plane 0)
+    {begin: 0x31C0, end: 0x31EF}, // CJK Strokes
+    {begin: 0xFB00, end: 0xFB4F}, // Alphabetic Presentation Forms
+    {begin: 0xFB50, end: 0xFDFF}, // Arabic Presentation Forms-A
+    {begin: 0xFE20, end: 0xFE2F}, // Combining Half Marks
+    {begin: 0xFE10, end: 0xFE1F}, // Vertical Forms
+    {begin: 0xFE50, end: 0xFE6F}, // Small Form Variants
+    {begin: 0xFE70, end: 0xFEFF}, // Arabic Presentation Forms-B
+    {begin: 0xFF00, end: 0xFFEF}, // Halfwidth And Fullwidth Forms
+    {begin: 0xFFF0, end: 0xFFFF}, // Specials
+    {begin: 0x0F00, end: 0x0FFF}, // Tibetan
+    {begin: 0x0700, end: 0x074F}, // Syriac
+    {begin: 0x0780, end: 0x07BF}, // Thaana
+    {begin: 0x0D80, end: 0x0DFF}, // Sinhala
+    {begin: 0x1000, end: 0x109F}, // Myanmar
+    {begin: 0x1200, end: 0x137F}, // Ethiopic
+    {begin: 0x13A0, end: 0x13FF}, // Cherokee
+    {begin: 0x1400, end: 0x167F}, // Unified Canadian Aboriginal Syllabics
+    {begin: 0x1680, end: 0x169F}, // Ogham
+    {begin: 0x16A0, end: 0x16FF}, // Runic
+    {begin: 0x1780, end: 0x17FF}, // Khmer
+    {begin: 0x1800, end: 0x18AF}, // Mongolian
+    {begin: 0x2800, end: 0x28FF}, // Braille Patterns
+    {begin: 0xA000, end: 0xA48F}, // Yi Syllables
+    {begin: 0x1700, end: 0x171F}, // Tagalog
+    {begin: 0x10300, end: 0x1032F}, // Old Italic
+    {begin: 0x10330, end: 0x1034F}, // Gothic
+    {begin: 0x10400, end: 0x1044F}, // Deseret
+    {begin: 0x1D000, end: 0x1D0FF}, // Byzantine Musical Symbols
+    {begin: 0x1D400, end: 0x1D7FF}, // Mathematical Alphanumeric Symbols
+    {begin: 0xFF000, end: 0xFFFFD}, // Private Use (plane 15)
+    {begin: 0xFE00, end: 0xFE0F}, // Variation Selectors
+    {begin: 0xE0000, end: 0xE007F}, // Tags
+    {begin: 0x1900, end: 0x194F}, // Limbu
+    {begin: 0x1950, end: 0x197F}, // Tai Le
+    {begin: 0x1980, end: 0x19DF}, // New Tai Lue
+    {begin: 0x1A00, end: 0x1A1F}, // Buginese
+    {begin: 0x2C00, end: 0x2C5F}, // Glagolitic
+    {begin: 0x2D30, end: 0x2D7F}, // Tifinagh
+    {begin: 0x4DC0, end: 0x4DFF}, // Yijing Hexagram Symbols
+    {begin: 0xA800, end: 0xA82F}, // Syloti Nagri
+    {begin: 0x10000, end: 0x1007F}, // Linear B Syllabary
+    {begin: 0x10140, end: 0x1018F}, // Ancient Greek Numbers
+    {begin: 0x10380, end: 0x1039F}, // Ugaritic
+    {begin: 0x103A0, end: 0x103DF}, // Old Persian
+    {begin: 0x10450, end: 0x1047F}, // Shavian
+    {begin: 0x10480, end: 0x104AF}, // Osmanya
+    {begin: 0x10800, end: 0x1083F}, // Cypriot Syllabary
+    {begin: 0x10A00, end: 0x10A5F}, // Kharoshthi
+    {begin: 0x1D300, end: 0x1D35F}, // Tai Xuan Jing Symbols
+    {begin: 0x12000, end: 0x123FF}, // Cuneiform
+    {begin: 0x1D360, end: 0x1D37F}, // Counting Rod Numerals
+    {begin: 0x1B80, end: 0x1BBF}, // Sundanese
+    {begin: 0x1C00, end: 0x1C4F}, // Lepcha
+    {begin: 0x1C50, end: 0x1C7F}, // Ol Chiki
+    {begin: 0xA880, end: 0xA8DF}, // Saurashtra
+    {begin: 0xA900, end: 0xA92F}, // Kayah Li
+    {begin: 0xA930, end: 0xA95F}, // Rejang
+    {begin: 0xAA00, end: 0xAA5F}, // Cham
+    {begin: 0x10190, end: 0x101CF}, // Ancient Symbols
+    {begin: 0x101D0, end: 0x101FF}, // Phaistos Disc
+    {begin: 0x102A0, end: 0x102DF}, // Carian
+    {begin: 0x1F030, end: 0x1F09F}  // Domino Tiles
+];
+
+function getUnicodeRange(unicode) {
+    for (var i = 0; i < unicodeRanges.length; i += 1) {
+        var range = unicodeRanges[i];
+        if (unicode >= range.begin && unicode < range.end) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 // Parse the OS/2 and Windows metrics `OS/2` table
 function parseOS2Table(data, start) {
-    var os2 = {},
-        p = new parse.Parser(data, start);
+    var os2 = {};
+    var p = new parse.Parser(data, start);
     os2.version = p.parseUShort();
     os2.xAvgCharWidth = p.parseShort();
     os2.usWeightClass = p.parseUShort();
@@ -3580,6 +3889,7 @@ function parseOS2Table(data, start) {
     for (var i = 0; i < 10; i++) {
         os2.panose[i] = p.parseByte();
     }
+
     os2.ulUnicodeRange1 = p.parseULong();
     os2.ulUnicodeRange2 = p.parseULong();
     os2.ulUnicodeRange3 = p.parseULong();
@@ -3597,6 +3907,7 @@ function parseOS2Table(data, start) {
         os2.ulCodePageRange1 = p.parseULong();
         os2.ulCodePageRange2 = p.parseULong();
     }
+
     if (os2.version >= 2) {
         os2.sxHeight = p.parseShort();
         os2.sCapHeight = p.parseShort();
@@ -3604,6 +3915,7 @@ function parseOS2Table(data, start) {
         os2.usBreakChar = p.parseUShort();
         os2.usMaxContent = p.parseUShort();
     }
+
     return os2;
 }
 
@@ -3614,16 +3926,16 @@ function makeOS2Table(options) {
         {name: 'usWeightClass', type: 'USHORT', value: 0},
         {name: 'usWidthClass', type: 'USHORT', value: 0},
         {name: 'fsType', type: 'USHORT', value: 0},
-        {name: 'ySubscriptXSize', type: 'SHORT', value: 0},
-        {name: 'ySubscriptYSize', type: 'SHORT', value: 0},
+        {name: 'ySubscriptXSize', type: 'SHORT', value: 650},
+        {name: 'ySubscriptYSize', type: 'SHORT', value: 699},
         {name: 'ySubscriptXOffset', type: 'SHORT', value: 0},
-        {name: 'ySubscriptYOffset', type: 'SHORT', value: 0},
-        {name: 'ySuperscriptXSize', type: 'SHORT', value: 0},
-        {name: 'ySuperscriptYSize', type: 'SHORT', value: 0},
+        {name: 'ySubscriptYOffset', type: 'SHORT', value: 140},
+        {name: 'ySuperscriptXSize', type: 'SHORT', value: 650},
+        {name: 'ySuperscriptYSize', type: 'SHORT', value: 699},
         {name: 'ySuperscriptXOffset', type: 'SHORT', value: 0},
-        {name: 'ySuperscriptYOffset', type: 'SHORT', value: 0},
-        {name: 'yStrikeoutSize', type: 'SHORT', value: 0},
-        {name: 'yStrikeoutPosition', type: 'SHORT', value: 0},
+        {name: 'ySuperscriptYOffset', type: 'SHORT', value: 479},
+        {name: 'yStrikeoutSize', type: 'SHORT', value: 49},
+        {name: 'yStrikeoutPosition', type: 'SHORT', value: 258},
         {name: 'sFamilyClass', type: 'SHORT', value: 0},
         {name: 'bFamilyType', type: 'BYTE', value: 0},
         {name: 'bSerifStyle', type: 'BYTE', value: 0},
@@ -3658,6 +3970,8 @@ function makeOS2Table(options) {
     ], options);
 }
 
+exports.unicodeRanges = unicodeRanges;
+exports.getUnicodeRange = getUnicodeRange;
 exports.parse = parseOS2Table;
 exports.make = makeOS2Table;
 
@@ -3673,9 +3987,9 @@ var table = require('../table');
 
 // Parse the PostScript `post` table
 function parsePostTable(data, start) {
-    var post = {},
-        p = new parse.Parser(data, start),
-        i, nameLength;
+    var post = {};
+    var p = new parse.Parser(data, start);
+    var i;
     post.version = p.parseVersion();
     post.italicAngle = p.parseFixed();
     post.underlinePosition = p.parseShort();
@@ -3695,13 +4009,15 @@ function parsePostTable(data, start) {
         for (i = 0; i < post.numberOfGlyphs; i++) {
             post.glyphNameIndex[i] = p.parseUShort();
         }
+
         post.names = [];
         for (i = 0; i < post.numberOfGlyphs; i++) {
             if (post.glyphNameIndex[i] >= encoding.standardNames.length) {
-                nameLength = p.parseChar();
+                var nameLength = p.parseChar();
                 post.names.push(p.parseString(nameLength));
             }
         }
+
         break;
     case 2.5:
         post.numberOfGlyphs = p.parseUShort();
@@ -3709,6 +4025,7 @@ function parsePostTable(data, start) {
         for (i = 0; i < post.numberOfGlyphs; i++) {
             post.offset[i] = p.parseChar();
         }
+
         break;
     }
     return post;
@@ -3761,6 +4078,7 @@ function computeCheckSum(bytes) {
     while (bytes.length % 4 !== 0) {
         bytes.push(0);
     }
+
     var sum = 0;
     for (var i = 0; i < bytes.length; i += 4) {
         sum += (bytes[i] << 24) +
@@ -3768,6 +4086,7 @@ function computeCheckSum(bytes) {
             (bytes[i + 2] << 8) +
             (bytes[i + 3]);
     }
+
     sum %= Math.pow(2, 32);
     return sum;
 }
@@ -3821,7 +4140,7 @@ function makeSfntTable(tables) {
     }
 
     // Table records need to be sorted alphabetically.
-    recordFields.sort(function (r1, r2) {
+    recordFields.sort(function(r1, r2) {
         if (r1.value.tag > r2.value.tag) {
             return 1;
         } else {
@@ -3845,29 +4164,8 @@ function metricsForChar(font, chars, notFoundMetrics) {
             return glyph.getMetrics();
         }
     }
-    return notFoundMetrics;
-}
 
-// Return the smallest and largest unicode values of the characters in this font.
-// For most fonts the smallest value would be 20 (space).
-function charCodeBounds(glyphs) {
-    var minCode, maxCode;
-    for (var i = 0; i < glyphs.length; i += 1) {
-        var glyph = glyphs[i];
-        if (glyph.unicode >= 20) {
-            if (minCode === undefined) {
-                minCode = glyph.unicode;
-            } else if (glyph.unicode < minCode) {
-                minCode = glyph.unicode;
-            }
-            if (maxCode === undefined) {
-                maxCode = glyph.unicode;
-            } else if (glyph.unicode > maxCode) {
-                maxCode = glyph.unicode;
-            }
-        }
-    }
-    return [minCode, maxCode];
+    return notFoundMetrics;
 }
 
 function average(vs) {
@@ -3875,6 +4173,7 @@ function average(vs) {
     for (var i = 0; i < vs.length; i += 1) {
         sum += vs[i];
     }
+
     return sum / vs.length;
 }
 
@@ -3888,8 +4187,35 @@ function fontToSfntTable(font) {
     var advanceWidths = [];
     var leftSideBearings = [];
     var rightSideBearings = [];
+    var firstCharIndex = null;
+    var lastCharIndex = 0;
+    var ulUnicodeRange1 = 0;
+    var ulUnicodeRange2 = 0;
+    var ulUnicodeRange3 = 0;
+    var ulUnicodeRange4 = 0;
     for (var i = 0; i < font.glyphs.length; i += 1) {
         var glyph = font.glyphs[i];
+        var unicode = glyph.unicode | 0;
+        if (firstCharIndex > unicode || firstCharIndex === null) {
+            firstCharIndex = unicode;
+        }
+
+        if (lastCharIndex < unicode) {
+            lastCharIndex = unicode;
+        }
+
+        var position = os2.getUnicodeRange(unicode);
+        if (position < 32) {
+            ulUnicodeRange1 |= 1 << position;
+        } else if (position < 64) {
+            ulUnicodeRange2 |= 1 << position - 32;
+        } else if (position < 96) {
+            ulUnicodeRange3 |= 1 << position - 64;
+        } else if (position < 123) {
+            ulUnicodeRange4 |= 1 << position - 96;
+        } else {
+            throw new Error('Unicode ranges bits > 123 are reserved for internal usage');
+        }
         // Skip non-important characters.
         if (glyph.name === '.notdef') continue;
         var metrics = glyph.getMetrics();
@@ -3901,6 +4227,7 @@ function fontToSfntTable(font) {
         rightSideBearings.push(metrics.rightSideBearing);
         advanceWidths.push(glyph.advanceWidth);
     }
+
     var globals = {
         xMin: Math.min.apply(null, xMins),
         yMin: Math.min.apply(null, yMins),
@@ -3924,7 +4251,6 @@ function fontToSfntTable(font) {
     });
 
     var hheaTable = hhea.make({
-        // Adding a little here makes OS X Quick Look happy
         ascender: globals.ascender,
         descender: globals.descender,
         advanceWidthMax: globals.advanceWidthMax,
@@ -3936,14 +4262,16 @@ function fontToSfntTable(font) {
 
     var maxpTable = maxp.make(font.glyphs.length);
 
-    var codeBounds = charCodeBounds(font.glyphs);
     var os2Table = os2.make({
         xAvgCharWidth: Math.round(globals.advanceWidthAvg),
         usWeightClass: 500, // Medium FIXME Make this configurable
         usWidthClass: 5, // Medium (normal) FIXME Make this configurable
-        usFirstCharIndex: codeBounds[0],
-        usLastCharIndex: codeBounds[1],
-        ulUnicodeRange1: 0x00000001, // Basic Latin
+        usFirstCharIndex: firstCharIndex,
+        usLastCharIndex: lastCharIndex,
+        ulUnicodeRange1: ulUnicodeRange1,
+        ulUnicodeRange2: ulUnicodeRange2,
+        ulUnicodeRange3: ulUnicodeRange3,
+        ulUnicodeRange4: ulUnicodeRange4,
         // See http://typophile.com/node/13081 for more info on vertical metrics.
         // We get metrics for typical characters (such as "x" for xHeight).
         // We provide some fallback characters if characters are unavailable: their
@@ -3953,12 +4281,10 @@ function fontToSfntTable(font) {
         sTypoLineGap: 0,
         usWinAscent: globals.ascender,
         usWinDescent: -globals.descender,
-        ulCodePageRange1: 0x00000001, // Basic Latin
         sxHeight: metricsForChar(font, 'xyvw', {yMax: 0}).yMax,
         sCapHeight: metricsForChar(font, 'HIKLEFJMNTZBDPRAGOQSUVWXY', globals).yMax,
         usBreakChar: font.hasChar(' ') ? 32 : 0 // Use space as the break character, if available.
     });
-
 
     var hmtxTable = hmtx.make(font.glyphs);
     var cmapTable = cmap.make(font.glyphs);
@@ -3997,12 +4323,22 @@ function fontToSfntTable(font) {
 
     var sfntTable = makeSfntTable(tables);
 
+    // Compute the font's checkSum and store it in head.checkSumAdjustment.
     var bytes = sfntTable.encode();
     var checkSum = computeCheckSum(bytes);
-    headTable.checkSumAdjustment = 0xB1B0AFBA - checkSum;
+    var tableFields = sfntTable.fields;
+    var checkSumAdjusted = false;
+    for (i = 0; i < tableFields.length; i += 1) {
+        if (tableFields[i].name === 'head table') {
+            tableFields[i].value.checkSumAdjustment = 0xB1B0AFBA - checkSum;
+            checkSumAdjusted = true;
+            break;
+        }
+    }
 
-    // Build the font again, now with the proper checkSum.
-    sfntTable = makeSfntTable(tables);
+    if (!checkSumAdjusted) {
+        throw new Error('Could not find head table with checkSum to adjust.');
+    }
 
     return sfntTable;
 }
@@ -4030,7 +4366,7 @@ var sizeOf = {};
 
 // Return a function that always returns the same value.
 function constant(v) {
-    return function () {
+    return function() {
         return v;
     };
 }
@@ -4038,7 +4374,7 @@ function constant(v) {
 // OpenType data types //////////////////////////////////////////////////////
 
 // Convert an 8-bit unsigned integer to a list of 1 byte.
-encode.BYTE = function (v) {
+encode.BYTE = function(v) {
     check.argument(v >= 0 && v <= 255, 'Byte value should be between 0 and 255.');
     return [v];
 };
@@ -4046,63 +4382,66 @@ encode.BYTE = function (v) {
 sizeOf.BYTE = constant(1);
 
 // Convert a 8-bit signed integer to a list of 1 byte.
-encode.CHAR = function (v) {
+encode.CHAR = function(v) {
     return [v.charCodeAt(0)];
 };
 
 sizeOf.BYTE = constant(1);
 
 // Convert an ASCII string to a list of bytes.
-encode.CHARARRAY = function (v) {
+encode.CHARARRAY = function(v) {
     var b = [];
     for (var i = 0; i < v.length; i += 1) {
         b.push(v.charCodeAt(i));
     }
+
     return b;
 };
 
-sizeOf.CHARARRAY = function (v) {
+sizeOf.CHARARRAY = function(v) {
     return v.length;
 };
 
 // Convert a 16-bit unsigned integer to a list of 2 bytes.
-encode.USHORT = function (v) {
+encode.USHORT = function(v) {
     return [(v >> 8) & 0xFF, v & 0xFF];
 };
 
 sizeOf.USHORT = constant(2);
 
 // Convert a 16-bit signed integer to a list of 2 bytes.
-encode.SHORT = function (v) {
+encode.SHORT = function(v) {
     // Two's complement
-    if (v >= LIMIT16){
-        v = - ( 2 * LIMIT16 - v);
+    if (v >= LIMIT16) {
+        v = -(2 * LIMIT16 - v);
     }
+
     return [(v >> 8) & 0xFF, v & 0xFF];
 };
 
 sizeOf.SHORT = constant(2);
 
 // Convert a 24-bit unsigned integer to a list of 3 bytes.
-encode.UINT24 = function (v) {
+encode.UINT24 = function(v) {
     return [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 };
 
 sizeOf.UINT24 = constant(3);
 
 // Convert a 32-bit unsigned integer to a list of 4 bytes.
-encode.ULONG = function (v) {
+encode.ULONG = function(v) {
     return [(v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 };
 
 sizeOf.ULONG = constant(4);
 
 // Convert a 32-bit unsigned integer to a list of 4 bytes.
-encode.LONG = function (v) {
-     // Two's complement
-    if (v >= LIMIT32){
-        v = - ( 2 * LIMIT32 - v);
+encode.LONG = function(v) {
+    // Two's complement
+    if (v >= LIMIT32) {
+        v = -(2 * LIMIT32 - v);
     }
+
     return [(v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 };
 
@@ -4117,16 +4456,15 @@ sizeOf.FWORD = sizeOf.SHORT;
 encode.UFWORD = encode.USHORT;
 sizeOf.UFWORD = sizeOf.USHORT;
 
-
 // FIXME Implement LONGDATETIME
-encode.LONGDATETIME = function () {
+encode.LONGDATETIME = function() {
     return [0, 0, 0, 0, 0, 0, 0, 0];
 };
 
 sizeOf.LONGDATETIME = constant(8);
 
 // Convert a 4-char tag to a list of 4 bytes.
-encode.TAG = function (v) {
+encode.TAG = function(v) {
     check.argument(v.length === 4, 'Tag should be exactly 4 ASCII characters.');
     return [v.charCodeAt(0),
             v.charCodeAt(1),
@@ -4151,10 +4489,10 @@ encode.SID = encode.USHORT;
 sizeOf.SID = sizeOf.USHORT;
 
 // Convert a numeric operand or charstring number to a variable-size list of bytes.
-encode.NUMBER = function (v) {
+encode.NUMBER = function(v) {
     if (v >= -107 && v <= 107) {
         return [v + 139];
-    } else if (v >= 108 && v <= 1131 ) {
+    } else if (v >= 108 && v <= 1131) {
         v = v - 108;
         return [(v >> 8) + 247, v & 0xFF];
     } else if (v >= -1131 && v <= -108) {
@@ -4167,13 +4505,13 @@ encode.NUMBER = function (v) {
     }
 };
 
-sizeOf.NUMBER = function (v) {
+sizeOf.NUMBER = function(v) {
     return encode.NUMBER(v).length;
 };
 
 // Convert a signed number between -32768 and +32767 to a three-byte value.
 // This ensures we always use three bytes, but is not the most compact format.
-encode.NUMBER16 = function (v) {
+encode.NUMBER16 = function(v) {
     return [28, (v >> 8) & 0xFF, v & 0xFF];
 };
 
@@ -4182,7 +4520,7 @@ sizeOf.NUMBER16 = constant(2);
 // Convert a signed number between -(2^31) and +(2^31-1) to a four-byte value.
 // This is useful if you want to be sure you always use four bytes,
 // at the expense of wasting a few bytes for smaller numbers.
-encode.NUMBER32 = function (v) {
+encode.NUMBER32 = function(v) {
     return [29, (v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 };
 
@@ -4195,33 +4533,35 @@ encode.STRING = encode.CHARARRAY;
 sizeOf.STRING = sizeOf.CHARARRAY;
 
 // Convert a ASCII string to a list of UTF16 bytes.
-encode.UTF16 = function (v) {
+encode.UTF16 = function(v) {
     var b = [];
     for (var i = 0; i < v.length; i += 1) {
         b.push(0);
         b.push(v.charCodeAt(i));
     }
+
     return b;
 };
 
-sizeOf.UTF16 = function (v) {
+sizeOf.UTF16 = function(v) {
     return v.length * 2;
 };
 
 // Convert a list of values to a CFF INDEX structure.
 // The values should be objects containing name / type / value.
-encode.INDEX = function (l) {
-    var offSize, offset, offsets, offsetEncoder, encodedOffsets, encodedOffset, data,
-        dataSize, i, v;
+encode.INDEX = function(l) {
+    var i;
+    //var offset, offsets, offsetEncoder, encodedOffsets, encodedOffset, data,
+    //    dataSize, i, v;
     // Because we have to know which data type to use to encode the offsets,
     // we have to go through the values twice: once to encode the data and
     // calculate the offets, then again to encode the offsets using the fitting data type.
-    offset = 1; // First offset is always 1.
-    offsets = [offset];
-    data = [];
-    dataSize = 0;
+    var offset = 1; // First offset is always 1.
+    var offsets = [offset];
+    var data = [];
+    var dataSize = 0;
     for (i = 0; i < l.length; i += 1) {
-        v = encode.OBJECT(l[i]);
+        var v = encode.OBJECT(l[i]);
         Array.prototype.push.apply(data, v);
         dataSize += v.length;
         offset += v.length;
@@ -4232,30 +4572,31 @@ encode.INDEX = function (l) {
         return [0, 0];
     }
 
-    encodedOffsets = [];
-    offSize = (1 + Math.floor(Math.log(dataSize)/Math.log(2)) / 8) | 0;
-    offsetEncoder = [undefined, encode.BYTE, encode.USHORT, encode.UINT24, encode.ULONG][offSize];
+    var encodedOffsets = [];
+    var offSize = (1 + Math.floor(Math.log(dataSize) / Math.log(2)) / 8) | 0;
+    var offsetEncoder = [undefined, encode.BYTE, encode.USHORT, encode.UINT24, encode.ULONG][offSize];
     for (i = 0; i < offsets.length; i += 1) {
-        encodedOffset = offsetEncoder(offsets[i]);
+        var encodedOffset = offsetEncoder(offsets[i]);
         Array.prototype.push.apply(encodedOffsets, encodedOffset);
     }
+
     return Array.prototype.concat(encode.Card16(l.length),
                            encode.OffSize(offSize),
                            encodedOffsets,
                            data);
 };
 
-sizeOf.INDEX = function (v) {
+sizeOf.INDEX = function(v) {
     return encode.INDEX(v).length;
 };
 
 // Convert an object to a CFF DICT structure.
 // The keys should be numeric.
 // The values should be objects containing name / type / value.
-encode.DICT = function (m) {
-    var d = [],
-        keys = Object.keys(m),
-        length = keys.length;
+encode.DICT = function(m) {
+    var d = [];
+    var keys = Object.keys(m);
+    var length = keys.length;
 
     for (var i = 0; i < length; i += 1) {
         // Object.keys() return string keys, but our keys are always numeric.
@@ -4269,11 +4610,11 @@ encode.DICT = function (m) {
     return d;
 };
 
-sizeOf.DICT = function (m) {
+sizeOf.DICT = function(m) {
     return encode.DICT(m).length;
 };
 
-encode.OPERATOR = function (v) {
+encode.OPERATOR = function(v) {
     if (v < 1200) {
         return [v];
     } else {
@@ -4281,11 +4622,10 @@ encode.OPERATOR = function (v) {
     }
 };
 
-encode.OPERAND = function (v, type) {
-    var d, i;
-    d = [];
+encode.OPERAND = function(v, type) {
+    var d = [];
     if (Array.isArray(type)) {
-        for (i = 0; i < type.length; i += 1) {
+        for (var i = 0; i < type.length; i += 1) {
             check.argument(v.length === type.length, 'Not enough arguments given for type' + type);
             d = d.concat(encode.OPERAND(v[i], type[i]));
         }
@@ -4301,6 +4641,7 @@ encode.OPERAND = function (v, type) {
             d = d.concat(encode.NUMBER(v));
         }
     }
+
     return d;
 };
 
@@ -4310,36 +4651,34 @@ sizeOf.OP = sizeOf.BYTE;
 // memoize charstring encoding using WeakMap if available
 var wmm = typeof WeakMap === 'function' && new WeakMap();
 // Convert a list of CharString operations to bytes.
-encode.CHARSTRING = function (ops) {
-    if ( wmm && wmm.has( ops ) ) {
-        return wmm.get( ops );
+encode.CHARSTRING = function(ops) {
+    if (wmm && wmm.has(ops)) {
+        return wmm.get(ops);
     }
 
-    var d = [],
-        length = ops.length,
-        op,
-        i;
+    var d = [];
+    var length = ops.length;
 
-    for (i = 0; i < length; i += 1) {
-        op = ops[i];
-        d = d.concat( encode[op.type](op.value) );
+    for (var i = 0; i < length; i += 1) {
+        var op = ops[i];
+        d = d.concat(encode[op.type](op.value));
     }
 
-    if ( wmm ) {
-        wmm.set( ops, d );
+    if (wmm) {
+        wmm.set(ops, d);
     }
 
     return d;
 };
 
-sizeOf.CHARSTRING = function (ops) {
+sizeOf.CHARSTRING = function(ops) {
     return encode.CHARSTRING(ops).length;
 };
 
 // Utility functions ////////////////////////////////////////////////////////
 
 // Convert an object containing name / type / value to bytes.
-encode.OBJECT = function (v) {
+encode.OBJECT = function(v) {
     var encodingFunction = encode[v.type];
     check.argument(encodingFunction !== undefined, 'No encoding function for type ' + v.type);
     return encodingFunction(v.value);
@@ -4348,12 +4687,11 @@ encode.OBJECT = function (v) {
 // Convert a table object to bytes.
 // A table contains a list of fields containing the metadata (name, type and default value).
 // The table itself has the field values set as attributes.
-encode.TABLE = function (table) {
-    var d = [],
-        length = table.fields.length,
-        i;
+encode.TABLE = function(table) {
+    var d = [];
+    var length = table.fields.length;
 
-    for (i = 0; i < length; i += 1) {
+    for (var i = 0; i < length; i += 1) {
         var field = table.fields[i];
         var encodingFunction = encode[field.type];
         check.argument(encodingFunction !== undefined, 'No encoding function for field type ' + field.type);
@@ -4361,21 +4699,22 @@ encode.TABLE = function (table) {
         if (value === undefined) {
             value = field.value;
         }
+
         var bytes = encodingFunction(value);
         d = d.concat(bytes);
     }
+
     return d;
 };
 
 // Merge in a list of bytes.
-encode.LITERAL = function (v) {
+encode.LITERAL = function(v) {
     return v;
 };
 
-sizeOf.LITERAL = function (v) {
+sizeOf.LITERAL = function(v) {
     return v.length;
 };
-
 
 exports.decode = decode;
 exports.encode = encode;
@@ -17586,9 +17925,17 @@ function Font( args ) {
 	}
 }
 
+// Todo: handle unicode updates
+Object.defineProperty(Glyph.prototype, 'children', {
+	get: function() {
+		return this.glyphs;
+	}
+});
+
 Font.prototype.addGlyph = function( glyph ) {
 	this.glyphs.push( glyph );
 	this.glyphMap[glyph.name] = glyph;
+	glyph._parent = this;
 
 	if ( glyph.ot.unicode === undefined ) {
 		return glyph;

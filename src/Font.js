@@ -58,9 +58,17 @@ function Font( args ) {
 	}
 }
 
+// Todo: handle unicode updates
+Object.defineProperty(Glyph.prototype, 'children', {
+	get: function() {
+		return this.glyphs;
+	}
+});
+
 Font.prototype.addGlyph = function( glyph ) {
 	this.glyphs.push( glyph );
 	this.glyphMap[glyph.name] = glyph;
+	glyph._parent = this;
 
 	if ( glyph.ot.unicode === undefined ) {
 		return glyph;

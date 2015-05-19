@@ -151,7 +151,9 @@ Amazingly few discotheques provide jukeboxes
 				);
 
 				worker.onmessage = function(e) {
+					console.log(e);
 					font.addToFonts( lastBuffer = e.data );
+					font.addToFonts( lightBuffer );
 				};
 			}
 
@@ -193,6 +195,7 @@ Amazingly few discotheques provide jukeboxes
 
 		<script id="workerscript" type="text/workerscript">
 			var window = self,
+				otFont,
 				otFont0,
 				otFont1,
 				font,
@@ -226,13 +229,14 @@ Amazingly few discotheques provide jukeboxes
 						return;
 					}
 
+					otFont = plumin.opentype.parse( data[0] );
 					otFont0 = plumin.opentype.parse( data[0] );
 					otFont1 = plumin.opentype.parse( data[1] );
 
 					font = new plumin.paper.Font();
 					// save default encoding
 					var encoding = font.ot.encoding;
-					font.importOT( otFont0 );
+					font.importOT( otFont );
 					font.ot.familyName = 'Demo';
 					font.ot.encoding = encoding;
 
@@ -249,16 +253,14 @@ Amazingly few discotheques provide jukeboxes
 				case 'string':
 					// TODO: optimize to only interpolate new glyphs added to the subset
 					font.subset = data.split('');
-					font.interpolate(font0, font1, coef)
-						.updateOTCommands()
+					font.updateOTCommands()
 						.addToFonts();
 					break;
 
 				// parse incoming interpolation coef
 				case 'number':
 					coef = data;
-					font.interpolate(font0, font1, coef)
-						.updateOTCommands()
+					font.updateOTCommands()
 						.addToFonts();
 					break;
 				}
