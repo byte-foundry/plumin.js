@@ -18,34 +18,47 @@ Object.defineProperties(proto, {
 	lastNode: Object.getOwnPropertyDescriptor( proto, 'lastSegment' )
 });
 
-proto._updateData = function( data, pushSimple, pushBezier ) {
+proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 	if ( this.visible === false ) {
 		return data;
 	}
 
+	var start = this.curves[0].point1.transform( matrix );
+
 	pushSimple(
 		'M',
-		Math.round( this.curves[0].point1.x ) || 0,
-		Math.round( this.curves[0].point1.y ) || 0
+		Math.round( start.x ) || 0,
+		Math.round( start.y ) || 0
 	);
 
 	this.curves.forEach(function( curve ) {
+		var end = curve.point2.transform( matrix );
+
 		if ( curve.isLinear() ) {
 			pushSimple(
 				'L',
-				Math.round( curve.point2.x ) || 0,
-				Math.round( curve.point2.y ) || 0
+				Math.round( end.x ) || 0,
+				Math.round( end.y ) || 0
 			);
 
 		} else {
+			var ctrl1 = new paper.Point(
+					curve.point1.x + curve.handle1.x,
+					curve.point1.y + curve.handle1.y
+				).transform( matrix ),
+				ctrl2 = new paper.Point(
+					curve.point2.x + curve.handle2.x,
+					curve.point2.y + curve.handle2.y
+				).transform( matrix );
+
 			pushBezier(
 				'C',
-				Math.round( curve.point1.x + curve.handle1.x ) || 0,
-				Math.round( curve.point1.y + curve.handle1.y ) || 0,
-				Math.round( curve.point2.x + curve.handle2.x ) || 0,
-				Math.round( curve.point2.y + curve.handle2.y ) || 0,
-				Math.round( curve.point2.x ) || 0,
-				Math.round( curve.point2.y ) || 0
+				Math.round( ctrl1.x ) || 0,
+				Math.round( ctrl1.y ) || 0,
+				Math.round( ctrl2.x ) || 0,
+				Math.round( ctrl2.y ) || 0,
+				Math.round( end.x ) || 0,
+				Math.round( end.y ) || 0
 			);
 		}
 	});
@@ -57,9 +70,10 @@ proto._updateData = function( data, pushSimple, pushBezier ) {
 	return data;
 };
 
-proto.updateOTCommands = function( data ) {
+proto.updateOTCommands = function( data, matrix ) {
 	return this._updateData(
 		data,
+		matrix,
 		function pushSimple() {
 			data.commands.push({
 				type: arguments[0],
@@ -81,9 +95,10 @@ proto.updateOTCommands = function( data ) {
 	);
 };
 
-proto.updateSVGData = function( data ) {
+proto.updateSVGData = function( data, matrix ) {
 	return this._updateData(
 		data,
+		matrix,
 		function pushSimple() {
 			data.push.apply( data, arguments );
 		},

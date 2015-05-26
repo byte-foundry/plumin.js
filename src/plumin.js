@@ -2,12 +2,14 @@ var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	paper = require('../node_modules/paper/dist/paper-core.js'),
 	Font = require('./Font.js'),
 	Glyph = require('./Glyph.js'),
+	Outline = require('./Outline'),
 	Path = require('./Path.js'),
 	Node = require('./Node.js'),
 	Collection = require('./Collection.js');
 
 paper.PaperScope.prototype.Font = Font;
 paper.PaperScope.prototype.Glyph = Glyph;
+paper.PaperScope.prototype.Outline = Outline;
 paper.PaperScope.prototype.Path = Path;
 paper.PaperScope.prototype.Node = Node;
 paper.PaperScope.prototype.Collection = Collection;

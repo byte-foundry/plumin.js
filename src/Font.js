@@ -1,7 +1,10 @@
 var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
+	paper = require('../node_modules/paper/dist/paper-core.js'),
 	Glyph = require('./Glyph.js');
 
 function Font( args ) {
+	paper.Group.prototype.constructor.apply( this );
+
 	if ( !args ) {
 		args = {};
 	}
@@ -16,7 +19,6 @@ function Font( args ) {
 
 	this.ot = new opentype.Font( args );
 
-	this.glyphs = [];
 	this.glyphMap = {};
 	this.charMap = {};
 	this.altMap = {};
@@ -58,8 +60,21 @@ function Font( args ) {
 	}
 }
 
+Font.prototype = Object.create(paper.Group.prototype);
+Font.prototype.constructor = Font;
+
+// proxy .glyphs to .children
+// Todo: handle unicode updates
+Object.defineProperty(
+	Font.prototype,
+	'glyphs',
+	Object.getOwnPropertyDescriptor( paper.Item.prototype, 'children' )
+);
+
+// TODO: proper proxying of ...Glyph[s] methods to ...Child[ren] methods
+// see Glyph.js
 Font.prototype.addGlyph = function( glyph ) {
-	this.glyphs.push( glyph );
+	this.addChild( glyph );
 	this.glyphMap[glyph.name] = glyph;
 
 	if ( glyph.ot.unicode === undefined ) {
@@ -110,7 +125,7 @@ Object.defineProperty( Font.prototype, 'subset', {
 
 Font.prototype.getGlyphSubset = function( set ) {
 	if ( set === true ) {
-		return this.glyphs;
+		return this.children;
 	}
 
 	set = set !== undefined ?
@@ -128,7 +143,7 @@ Font.prototype.getGlyphSubset = function( set ) {
 	// memoize last subset
 	this._lastSubset = [
 		( this._subset || [] ).join(),
-		this.glyphs.filter(function( glyph ) {
+		this.children.filter(function( glyph ) {
 			if ( this._subset === false &&
 					( glyph.ot.unicode !== undefined ||
 					( glyph.ot.unicodes && glyph.ot.unicodes.length ) ) ) {
