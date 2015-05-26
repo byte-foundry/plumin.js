@@ -50,6 +50,7 @@ describe('Font', function() {
 			function() {
 				var data = [],
 					result = closedPath._updateData(data,
+						null,
 						function() {
 							data.push.apply(data, arguments);
 						}, function() {
@@ -73,6 +74,7 @@ describe('Font', function() {
 			function() {
 				var data = [],
 					result = openPath._updateData(data,
+						null,
 						function() {
 							data.push.apply(data, arguments);
 						}, function() {
@@ -94,6 +96,7 @@ describe('Font', function() {
 			function() {
 				var data = [],
 					result = circle._updateData(data,
+						null,
 						function() {
 							data.push.apply(data, arguments);
 						}, function() {

@@ -1,8 +1,9 @@
 var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
-	paper = require('../node_modules/paper/dist/paper-core.js');
+	paper = require('../node_modules/paper/dist/paper-core.js'),
+	Outline = require('./Outline.js');
 
 function Glyph( args ) {
-	paper.CompoundPath.prototype.constructor.apply( this );
+	paper.Group.prototype.constructor.apply( this );
 
 	if ( args && typeof args.unicode === 'string' ) {
 		args.unicode = args.unicode.charCodeAt(0);
@@ -15,18 +16,15 @@ function Glyph( args ) {
 	// workaround opentype 'unicode === 0' bug
 	this.ot.unicode = args.unicode;
 
-	//this.contours = ( args && args.contours ) || [];
+	this.addChild( new Outline() );
+	// the second child will hold all components
+	this.addChild( new paper.Group() );
+	// Should all anchors and parentAnchors also leave in child groups?
 	this.anchors = ( args && args.anchors ) || [];
-	this.components = ( args && args.components ) || [];
 	this.parentAnchors = ( args && args.parentAnchors ) || [];
-
-	// default fill color needed to display the glyph in a canvas
-	this.fillColor = new paper.Color(0, 0, 0);
-	// but each individual glyph must be explicitely made visible
-	this.visible = false;
 }
 
-Glyph.prototype = Object.create(paper.CompoundPath.prototype);
+Glyph.prototype = Object.create(paper.Group.prototype);
 Glyph.prototype.constructor = Glyph;
 
 // Todo: handle unicode updates
@@ -41,59 +39,51 @@ Object.defineProperty(Glyph.prototype, 'unicode', {
 	}
 });
 
-// proxy *Child/*Children methods to *Contour/*Contours
-// This has the added benefit of preventing CompoundPath#insertChildren
-// from arbitrarily changing the direction of paths
-Object.getOwnPropertyNames( paper.Item.prototype )
-	.forEach(function(name) {
-		// exclude getters and non-methods
-		if ( Object.getOwnPropertyDescriptor(this, name).get ||
-				typeof this[name] !== 'function' ) {
-			return;
-		}
+// proxy .contours to .children[0]
+Object.defineProperty( Glyph.prototype, 'contours', {
+	get: function() {
+		return this.children[0].children;
+	}
+});
 
-		if ( name.indexOf('Children') !== -1 ) {
-			this[name.replace('Children', 'Contours')] = this[name];
+// proxy .components to .children[1]
+Object.defineProperty( Glyph.prototype, 'components', {
+	get: function() {
+		return this.children[1].children;
+	}
+});
 
-		} else if ( name.indexOf('Child') !== -1 ) {
-			this[name.replace('Child', 'Contour')] = this[name];
-		}
+// proxy ...Contour[s] methods to children[0]...Child[ren] methods
+// and proxy ...Component[s] methods to children[1]...Child[ren] methods
+Object.getOwnPropertyNames( paper.Item.prototype ).forEach(function(name) {
+	var proto = this;
 
-	}, paper.Item.prototype);
-
-// Fix two problems with CompoundPath#insertChildren:
-// - it arbitrarily changes the direction of paths
-// - it seems that it doesn't handle CompoundPath arguments
-Glyph.prototype.insertChildren = function(index, items, _preserve) {
-	if ( Array.isArray( items ) ) {
-		// flatten items to handle CompoundPath children
-		items = [].concat.apply([], items.map(function(item) {
-			return item instanceof paper.Path ? item : item.children;
-		}));
+	// exclude getters and non-methods
+	if ( Object.getOwnPropertyDescriptor(proto, name).get ||
+			typeof proto[name] !== 'function' ) {
+		return;
 	}
 
-	return paper.Item.prototype.insertChildren.call(
-		this, index, items, _preserve, paper.Path
-	);
-};
+	if ( name.indexOf('Children') !== -1 ) {
+		proto[name.replace('Children', 'Contours')] = function() {
+			proto[name].apply( this.children[0], arguments );
+		};
 
-// proxy .children to .contours
-Object.defineProperty(
-	Glyph.prototype,
-	'contours',
-	Object.getOwnPropertyDescriptor( paper.Item.prototype, 'children' )
-);
+		proto[name.replace('Children', 'Components')] = function() {
+			proto[name].apply( this.children[1], arguments );
+		};
 
-Glyph.prototype.addComponent = function( item ) {
-	this.components.push( item );
-	return item;
-};
+	} else if ( name.indexOf('Child') !== -1 ) {
+		proto[name.replace('Child', 'Contour')] = function() {
+			proto[name].apply( this.children[0], arguments );
+		};
 
-Glyph.prototype.addComponents = function( components ) {
-	return components.forEach(function(component) {
-		this.addComponent(component);
-	}, this);
-};
+		proto[name.replace('Child', 'Component')] = function() {
+			proto[name].apply( this.children[1], arguments );
+		};
+	}
+
+}, paper.Item.prototype);
 
 Glyph.prototype.addAnchor = function( item ) {
 	this.anchors.push( item );
@@ -118,42 +108,31 @@ Glyph.prototype.addUnicode = function( code ) {
 };
 
 Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
-	for (var i = 0, l = this.contours.length; i < l; i++) {
-		// The number of children should be the same everywhere,
-		// but we're going to try our best anyway
-		if ( !glyph0.contours[i] || !glyph1.contours[i] ) {
-			break;
-		}
-
-		this.contours[i].interpolate(
-			glyph0.contours[i],
-			glyph1.contours[i],
-			coef
+	// If we added an interpolate method to Group, we'd be able to just
+	// interpolate all this.children directly.
+	// instead we interpolate the outline first
+	this.children[0].interpolate( glyph0.children[0], glyph1.children[0] );
+	// and then the components
+	this.children[1].children.forEach(function(component, j) {
+		component.interpolate(
+			glyph0.children[1].children[j], glyph1.children[1].children[j], coef
 		);
+	});
 
-		/* eslint-disable no-loop-func */
-		this.components.forEach(function(component, j) {
-			component.interpolate(
-				glyph0.components[j], glyph1.components[j], coef
-			);
-		});
-		/* eslint-enable no-loop-func */
-
-		this.ot.advanceWidth =
-			glyph0.ot.advanceWidth +
-			( glyph1.ot.advanceWidth - glyph0.ot.advanceWidth ) * coef;
-		this.ot.leftSideBearing =
-			glyph0.ot.leftSideBearing +
-			( glyph1.ot.leftSideBearing - glyph0.ot.leftSideBearing ) * coef;
-		this.ot.xMax =
-			glyph0.ot.xMax + ( glyph1.ot.xMax - glyph0.ot.xMax ) * coef;
-		this.ot.xMin =
-			glyph0.ot.xMin + ( glyph1.ot.xMin - glyph0.ot.xMin ) * coef;
-		this.ot.yMax =
-			glyph0.ot.yMax + ( glyph1.ot.yMax - glyph0.ot.yMax ) * coef;
-		this.ot.yMin =
-			glyph0.ot.yMin + ( glyph1.ot.yMin - glyph0.ot.yMin ) * coef;
-	}
+	this.ot.advanceWidth =
+		glyph0.ot.advanceWidth +
+		( glyph1.ot.advanceWidth - glyph0.ot.advanceWidth ) * coef;
+	this.ot.leftSideBearing =
+		glyph0.ot.leftSideBearing +
+		( glyph1.ot.leftSideBearing - glyph0.ot.leftSideBearing ) * coef;
+	this.ot.xMax =
+		glyph0.ot.xMax + ( glyph1.ot.xMax - glyph0.ot.xMax ) * coef;
+	this.ot.xMin =
+		glyph0.ot.xMin + ( glyph1.ot.xMin - glyph0.ot.xMin ) * coef;
+	this.ot.yMax =
+		glyph0.ot.yMax + ( glyph1.ot.yMax - glyph0.ot.yMax ) * coef;
+	this.ot.yMin =
+		glyph0.ot.yMin + ( glyph1.ot.yMin - glyph0.ot.yMin ) * coef;
 
 	return this;
 };
@@ -164,11 +143,9 @@ Glyph.prototype.updateSVGData = function( path ) {
 		path = this.svgData;
 	}
 
-	this.contours.forEach(function( contour ) {
-		contour.updateSVGData( path );
-	}, this);
+	this.children[0].updateSVGData( path );
 
-	this.components.forEach(function( component ) {
+	this.children[1].children.forEach(function( component ) {
 		component.updateSVGData( path );
 	});
 
@@ -181,11 +158,9 @@ Glyph.prototype.updateOTCommands = function( path ) {
 		path = this.ot.path;
 	}
 
-	this.contours.forEach(function( contour ) {
-		contour.updateOTCommands( path );
-	}, this);
+	this.children[0].updateOTCommands( path );
 
-	this.components.forEach(function( component ) {
+	this.children[1].children.forEach(function( component ) {
 		component.updateOTCommands( path );
 	});
 
