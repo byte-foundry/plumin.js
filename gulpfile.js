@@ -48,6 +48,7 @@ shelter({
 		cmd: [ 'watchify src/${project}.js',
 				'${browserifyArgs}',
 				'-o dist/${project}.js',
+				'--debug',
 				'--verbose'
 		]
 	},

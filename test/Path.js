@@ -1,7 +1,7 @@
 var expect = require('../node_modules/chai').expect,
 	plumin = require('../src/plumin');
 
-describe('Font', function() {
+describe('Path', function() {
 	before(function() {
 		plumin.setup({
 			width: 1024,
@@ -110,6 +110,33 @@ describe('Font', function() {
 					'C', 75, 100, 100, 75, 100, 50,
 					'C', 100, 25, 75, 0, 50, 0,
 					'C', 25, 0, 0, 25, 0, 50,
+					'Z'
+				]);
+
+			}
+		);
+
+		it('should return an array with pseudo-svg commands' +
+			' - export:clockwise circle',
+			function() {
+				circle.export = 'clockwise';
+
+				var data = [],
+					result = circle._updateData(data,
+						null,
+						function() {
+							data.push.apply(data, arguments);
+						}, function() {
+							data.push.apply(data, arguments);
+						}
+					);
+
+				expect(result).to.deep.equal([
+					'M', 0, 50,
+					'C', 0, 25, 25, 0, 50, 0,
+					'C', 75, 0, 100, 25, 100, 50,
+					'C', 100, 75, 75, 100, 50, 100,
+					'C', 25, 100, 0, 75, 0, 50,
 					'Z'
 				]);
 

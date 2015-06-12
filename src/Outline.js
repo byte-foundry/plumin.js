@@ -2,11 +2,6 @@ var paper = require('../node_modules/paper/dist/paper-core.js');
 
 function Outline() {
 	paper.CompoundPath.prototype.constructor.apply( this );
-
-	// default fill color needed to display the glyph in a canvas
-	this.fillColor = new paper.Color(0, 0, 0);
-	// but each individual glyph must be explicitely made visible
-	this.visible = false;
 }
 
 // inehrit CompoundPath

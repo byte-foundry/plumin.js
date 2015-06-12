@@ -23,7 +23,13 @@ proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 		return data;
 	}
 
-	var start = this.curves[0].point1.transform( matrix );
+	// prototypo needs to be able to change the direction of the updated data.
+	var reverse = ( this.export === 'clockwise' && !this.clockwise ) ||
+			( this.export === 'anticlockwise' && this.clockwise ),
+		curves = this.curves,
+		start = curves[ reverse ? curves.length - 1 : 0 ]
+			[ 'point' + ( reverse ? 2 : 1 ) ]
+			.transform( matrix );
 
 	pushSimple(
 		'M',
@@ -31,8 +37,9 @@ proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 		Math.round( start.y ) || 0
 	);
 
-	this.curves.forEach(function( curve ) {
-		var end = curve.point2.transform( matrix );
+	for ( var i = -1, l = curves.length; ++i < l; ) {
+		var curve = curves[ reverse ? l - 1 - i : i ],
+			end = curve['point' + ( reverse ? 1 : 2 ) ].transform( matrix );
 
 		if ( curve.isLinear() ) {
 			pushSimple(
@@ -51,17 +58,29 @@ proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 					curve.point2.y + curve.handle2.y
 				).transform( matrix );
 
-			pushBezier(
-				'C',
-				Math.round( ctrl1.x ) || 0,
-				Math.round( ctrl1.y ) || 0,
-				Math.round( ctrl2.x ) || 0,
-				Math.round( ctrl2.y ) || 0,
-				Math.round( end.x ) || 0,
-				Math.round( end.y ) || 0
-			);
+			if ( reverse ) {
+				pushBezier(
+					'C',
+					Math.round( ctrl2.x ) || 0,
+					Math.round( ctrl2.y ) || 0,
+					Math.round( ctrl1.x ) || 0,
+					Math.round( ctrl1.y ) || 0,
+					Math.round( end.x ) || 0,
+					Math.round( end.y ) || 0
+				);
+			} else {
+				pushBezier(
+					'C',
+					Math.round( ctrl1.x ) || 0,
+					Math.round( ctrl1.y ) || 0,
+					Math.round( ctrl2.x ) || 0,
+					Math.round( ctrl2.y ) || 0,
+					Math.round( end.x ) || 0,
+					Math.round( end.y ) || 0
+				);
+			}
 		}
-	});
+	}
 
 	if ( this.closed ) {
 		pushSimple('Z');

@@ -22,6 +22,12 @@ function Glyph( args ) {
 	// Should all anchors and parentAnchors also leave in child groups?
 	this.anchors = ( args && args.anchors ) || [];
 	this.parentAnchors = ( args && args.parentAnchors ) || [];
+
+	// each individual glyph must be explicitely made visible
+	this.visible = false;
+	// required to display the glyph properly in a canvas
+	this.fillColor = this.strokeColor = new paper.Color(0, 0, 0);
+	this.strokeScaling = false;
 }
 
 Glyph.prototype = Object.create(paper.Group.prototype);
@@ -52,6 +58,8 @@ Object.defineProperty( Glyph.prototype, 'components', {
 		return this.children[1].children;
 	}
 });
+
+// proxy .visible to
 
 // proxy ...Contour[s] methods to children[0]...Child[ren] methods
 // and proxy ...Component[s] methods to children[1]...Child[ren] methods
