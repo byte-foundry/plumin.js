@@ -17980,46 +17980,51 @@ Font.prototype.addGlyphs = function( glyphs ) {
 
 Object.defineProperty( Font.prototype, 'subset', {
 	get: function() {
-		return this._subset;
+		return this.getGlyphSubset();
 	},
 	set: function( set ) {
-		this._subset = set === false ?
-			false : Font.normalizeSubset( set );
-
-		return this._subset;
+		this._subset =
+			typeof set === 'boolean' ? set :
+			Font.normalizeSubset( set );
 	}
 });
 
-Font.prototype.getGlyphSubset = function( set ) {
+Font.prototype.getGlyphSubset = function( _set ) {
+	var set =
+			_set === undefined ? this._subset :
+			typeof _set === 'boolean' ? _set :
+			Font.normalizeSubset( _set );
+
+	// true returns all glyphs
 	if ( set === true ) {
 		return this.children;
 	}
 
-	set = set !== undefined ?
-		Font.normalizeSubset( set ) :
-		this._subset;
-
 	// reuse last subset if possible
 	// TODO: implement caching using immutable.js
 	if ( this._lastSubset &&
-			this._lastSubset[0] === ( this._subset || [] ).join() ) {
+			this._lastSubset[0] ===
+			( typeof set === 'object' ? set.join() : set ) ) {
 
 		return this._lastSubset[1];
 	}
 
 	// memoize last subset
 	this._lastSubset = [
-		( this._subset || [] ).join(),
+		// store the set serialized to make subsequent comparisons easier
+		typeof set === 'object' ? set.join() : set,
 		this.children.filter(function( glyph ) {
-			if ( this._subset === false &&
+			// false will return all glyphs that have one or more unicodes
+			if ( set === false &&
 					( glyph.ot.unicode !== undefined ||
 					( glyph.ot.unicodes && glyph.ot.unicodes.length ) ) ) {
 
 				return true;
 			}
 
-			if ( this._subset &&
-					this._subset.indexOf( glyph.ot.unicode ) !== -1 ) {
+			if ( set &&
+					( set.indexOf( glyph.ot.unicode ) !== -1 ) ||
+					( glyph.ot.unicode === 0 ) ) {
 
 				return true;
 			}
@@ -18069,8 +18074,12 @@ Font.prototype.updateSVGData = function( set ) {
 };
 
 Font.prototype.updateOTCommands = function( set ) {
-	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
+	this.getGlyphSubset( set ).map(function( glyph ) {
 		return glyph.updateOTCommands();
+	});
+
+	this.ot.glyphs = this.getGlyphSubset().map(function( glyph ) {
+		return glyph.ot;
 	});
 
 	return this;
@@ -18154,7 +18163,7 @@ Font.normalizeSubset = function( set ) {
 			set.split('').map(function(e) {
 				return e.charCodeAt(0);
 			}) :
-			set
+			set || []
 		)
 		.filter(function(e, i, arr) {
 			return arr.lastIndexOf(e) === i;

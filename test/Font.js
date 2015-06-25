@@ -112,4 +112,81 @@ describe('Font', function() {
 		});
 	});
 
+	describe('#subset', function() {
+		it('should be possible to isolate some glyphs of the font', function() {
+			var font = new plumin.Font(),
+				glyphs = font.glyphMap;
+
+			font.addGlyph({
+				name: 'A',
+				_remove: noop,
+				_setProject: noop,
+				ot: { unicode: 'A'.charCodeAt(0) }
+			});
+			font.addGlyph({
+				name: 'B',
+				_remove: noop,
+				_setProject: noop,
+				ot: { unicode: 'B'.charCodeAt(0) }
+			});
+			font.addGlyph({
+				name: 'C',
+				_remove: noop,
+				_setProject: noop,
+				ot: { unicode: 'C'.charCodeAt(0) }
+			});
+			font.addGlyph({
+				name: 'Zob',
+				_remove: noop,
+				_setProject: noop,
+				ot: { unicode: undefined }
+			});
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.B,
+				glyphs.C
+			]);
+
+			font.subset = true;
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.B,
+				glyphs.C,
+				glyphs.Zob
+			]);
+
+			font.subset = 'AB';
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.B
+			]);
+
+			font.subset = [ 66, 67 ];
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.B,
+				glyphs.C
+			]);
+
+			font.subset = false;
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.B,
+				glyphs.C
+			]);
+
+			font.subset = '';
+
+			expect( font.subset ).to.have.members([ glyphs['.notdef'] ]);
+		});
+	});
 });
