@@ -25,8 +25,10 @@ function Glyph( args ) {
 
 	// each individual glyph must be explicitely made visible
 	this.visible = false;
-	// required to display the glyph properly in a canvas
-	this.fillColor = this.strokeColor = new paper.Color(0, 0, 0);
+	// default colors required to display the glyph in a canvas
+	this.fillColor = new paper.Color(0, 0, 0);
+	// stroke won't be displayed unless strokeWidth is set to 1
+	this.strokeColor = new paper.Color(0, 0, 0);
 	this.strokeScaling = false;
 }
 
