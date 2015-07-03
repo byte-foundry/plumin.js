@@ -18000,6 +18000,15 @@ Font.prototype.getGlyphSubset = function( _set ) {
 		return this.children;
 	}
 
+	// Assume the set provided was an array of glyphs
+	if ( set.length && typeof set[0] !== 'number' ) {
+		// always include .undef
+		if ( set.indexOf( this.glyphMap['.notdef'] ) === -1 ) {
+			set.unshift( this.glyphMap['.notdef'] );
+		}
+		return set;
+	}
+
 	// reuse last subset if possible
 	// TODO: implement caching using immutable.js
 	if ( this._lastSubset &&

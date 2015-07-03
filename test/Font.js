@@ -187,6 +187,14 @@ describe('Font', function() {
 			font.subset = '';
 
 			expect( font.subset ).to.have.members([ glyphs['.notdef'] ]);
+
+			font.subset = [ glyphs.A, glyphs.B ];
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.B
+			]);
 		});
 	});
 });
