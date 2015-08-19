@@ -17900,17 +17900,30 @@ function Font( args ) {
 		this.addGlyphs( args.glyphs );
 	}
 
-	if ( typeof window === 'object' && window.document && !document.fonts ) {
-		document.head.appendChild(
-			this.styleElement = document.createElement('style')
-		);
-		// let's find the corresponding CSSStyleSheet
-		// (would be much easier with Array#find)
-		this.styleSheet = document.styleSheets[
-			[].map.call(document.styleSheets, function(ss) {
-				return ss.ownerNode;
-			}).indexOf(this.styleElement)
-		];
+	if ( typeof window === 'object' && window.document ) {
+		// work around https://bugzilla.mozilla.org/show_bug.cgi?id=1100005
+		// by using fonts.delete in batch, every 1 second
+		if ( document.fonts ) {
+			this.addedFonts = [];
+
+			setInterval(function() {
+				while ( this.addedFonts.length > 1 ) {
+					document.fonts.delete( this.addedFonts.shift() );
+				}
+			}.bind(this), 1000);
+
+		} else {
+			document.head.appendChild(
+				this.styleElement = document.createElement('style')
+			);
+			// let's find the corresponding CSSStyleSheet
+			// (would be much easier with Array#find)
+			this.styleSheet = document.styleSheets[
+				[].map.call(document.styleSheets, function(ss) {
+					return ss.ownerNode;
+				}).indexOf(this.styleElement)
+			];
+		}
 	}
 }
 
@@ -18123,12 +18136,7 @@ if ( typeof window === 'object' && window.document ) {
 			);
 
 			document.fonts.add( fontface );
-
-			if ( this.lastFontFace ) {
-				document.fonts.delete( this.lastFontFace );
-			}
-
-			this.lastFontFace = fontface;
+			this.addedFonts.push( fontface );
 
 			return this;
 		} :
