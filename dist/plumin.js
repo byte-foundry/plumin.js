@@ -17931,7 +17931,7 @@ Font.prototype = Object.create(paper.Group.prototype);
 Font.prototype.constructor = Font;
 
 // proxy .glyphs to .children
-// Todo: handle unicode updates
+// TODO: handle unicode updates
 Object.defineProperty(
 	Font.prototype,
 	'glyphs',
@@ -17980,84 +17980,56 @@ Font.prototype.addGlyphs = function( glyphs ) {
 
 Object.defineProperty( Font.prototype, 'subset', {
 	get: function() {
-		return this.getGlyphSubset();
+		if ( !this._subset ) {
+			this._subset = this.normalizeSubset( false );
+		}
+		return this._subset;
 	},
 	set: function( set ) {
-		this._subset =
-			typeof set === 'boolean' ? set :
-			Font.normalizeSubset( set );
+		this._subset = this.normalizeSubset( set );
 	}
 });
 
-Font.normalizeSubset = function( set ) {
-	return ( typeof set === 'string' ?
-			set.split('').map(function(e) {
-				return e.charCodeAt(0);
-			}) :
-			set || []
-		)
-		.filter(function(e, i, arr) {
-			return arr.lastIndexOf(e) === i;
-		})
-		.sort();
+Font.prototype.normalizeSubset = function( _set ) {
+	var set;
+
+	// two cases where _set isn't an array
+	// false set = all glyphs in the charMap
+	if ( _set === false ) {
+		set = Object.keys( this.charMap ).map(function( unicode ) {
+			return this.charMap[unicode];
+		}.bind(this));
+
+	// convert string to array of chars
+	} else if ( typeof _set === 'string' ) {
+		set = _set.split('').map(function(e) {
+			return e.charCodeAt(0);
+		});
+
+	} else {
+		set = _set;
+	}
+
+	// convert array of number to array of glyphs
+	if ( Array.isArray( set ) && typeof set[0] === 'number' ) {
+		set = set.map(function( unicode ) {
+			return this.charMap[ unicode ];
+		}.bind(this));
+	}
+
+	// always include .undef
+	if ( set.indexOf( this.glyphMap['.notdef'] ) === -1 ) {
+		set.unshift( this.glyphMap['.notdef'] );
+	}
+
+	// remove undefined glyphs and dedupe the set
+	return set.filter(function(e, i, arr) {
+		return e && arr.lastIndexOf(e) === i;
+	});
 };
 
 Font.prototype.getGlyphSubset = function( _set ) {
-	var set =
-			_set === undefined ? this._subset :
-			typeof _set === 'boolean' ? _set :
-			Font.normalizeSubset( _set );
-
-	// true returns all glyphs
-	if ( set === true ) {
-		return this.children;
-	}
-
-	// Assume the set provided was an array of glyphs
-	if ( set.length && typeof set[0] !== 'number' ) {
-		// always include .undef
-		if ( set.indexOf( this.glyphMap['.notdef'] ) === -1 ) {
-			set.unshift( this.glyphMap['.notdef'] );
-		}
-		return set;
-	}
-
-	// reuse last subset if possible
-	// TODO: implement caching using immutable.js
-	if ( this._lastSubset &&
-			this._lastSubset[0] ===
-			( typeof set === 'object' ? set.join() : set ) ) {
-
-		return this._lastSubset[1];
-	}
-
-	// memoize last subset
-	this._lastSubset = [
-		// store the set serialized to make subsequent comparisons easier
-		typeof set === 'object' ? set.join() : set,
-		this.children.filter(function( glyph ) {
-			// false will return all glyphs that have one or more unicodes
-			if ( set === false &&
-					( glyph.ot.unicode !== undefined ||
-					( glyph.ot.unicodes && glyph.ot.unicodes.length ) ) ) {
-
-				return true;
-			}
-
-			if ( set &&
-					( set.indexOf( glyph.ot.unicode ) !== -1 ) ||
-					( glyph.ot.unicode === 0 ) ) {
-
-				return true;
-			}
-
-			// TODO: handle multiple unicodes
-			return false;
-
-		}, this)
-	];
-
-	return this._lastSubset[1];
+	return _set !== undefined ? this.normalizeSubset( _set ) : this.subset;
 };
 
 Font.prototype.interpolate = function( font0, font1, coef, set ) {
@@ -18100,7 +18072,7 @@ Font.prototype.updateOTCommands = function( set ) {
 		return glyph.updateOTCommands();
 	});
 
-	this.ot.glyphs = this.getGlyphSubset().map(function( glyph ) {
+	this.ot.glyphs = this.getGlyphSubset( false ).map(function( glyph ) {
 		return glyph.ot;
 	});
 
