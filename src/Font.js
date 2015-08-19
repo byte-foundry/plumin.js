@@ -33,30 +33,17 @@ function Font( args ) {
 		this.addGlyphs( args.glyphs );
 	}
 
-	if ( typeof window === 'object' && window.document ) {
-		// work around https://bugzilla.mozilla.org/show_bug.cgi?id=1100005
-		// by using fonts.delete in batch, every 1 second
-		if ( document.fonts ) {
-			this.addedFonts = [];
-
-			setInterval(function() {
-				while ( this.addedFonts.length > 1 ) {
-					document.fonts.delete( this.addedFonts.shift() );
-				}
-			}.bind(this), 1000);
-
-		} else {
-			document.head.appendChild(
-				this.styleElement = document.createElement('style')
-			);
-			// let's find the corresponding CSSStyleSheet
-			// (would be much easier with Array#find)
-			this.styleSheet = document.styleSheets[
-				[].map.call(document.styleSheets, function(ss) {
-					return ss.ownerNode;
-				}).indexOf(this.styleElement)
-			];
-		}
+	if ( typeof window === 'object' && window.document && !document.fonts ) {
+		document.head.appendChild(
+			this.styleElement = document.createElement('style')
+		);
+		// let's find the corresponding CSSStyleSheet
+		// (would be much easier with Array#find)
+		this.styleSheet = document.styleSheets[
+			[].map.call(document.styleSheets, function(ss) {
+				return ss.ownerNode;
+			}).indexOf(this.styleElement)
+		];
 	}
 }
 
@@ -121,6 +108,19 @@ Object.defineProperty( Font.prototype, 'subset', {
 			Font.normalizeSubset( set );
 	}
 });
+
+Font.normalizeSubset = function( set ) {
+	return ( typeof set === 'string' ?
+			set.split('').map(function(e) {
+				return e.charCodeAt(0);
+			}) :
+			set || []
+		)
+		.filter(function(e, i, arr) {
+			return arr.lastIndexOf(e) === i;
+		})
+		.sort();
+};
 
 Font.prototype.getGlyphSubset = function( _set ) {
 	var set =
@@ -256,7 +256,12 @@ if ( typeof window === 'object' && window.document ) {
 			);
 
 			document.fonts.add( fontface );
-			this.addedFonts.push( fontface );
+
+			if ( this.lastFontFace ) {
+				document.fonts.delete( this.lastFontFace );
+			}
+
+			this.lastFontFace = fontface;
 
 			return this;
 		} :
@@ -283,11 +288,20 @@ if ( typeof window === 'object' && window.document ) {
 			return this;
 		};
 
+	var a = document.createElement('a');
 	Font.prototype.download = function( buffer ) {
-		var reader = new FileReader();
+		var reader = new FileReader(),
+			familyName = this.ot.familyName;
 
 		reader.onloadend = function() {
-			window.location = reader.result;
+			a.download = familyName + '.otf';
+			a.href = reader.result;
+			a.dispatchEvent(new MouseEvent('click'));
+
+			setTimeout(function() {
+				a.href = '#';
+				_URL.revokeObjectURL( reader.result );
+			}, 100);
 		};
 
 		reader.readAsDataURL(new Blob(
@@ -299,18 +313,5 @@ if ( typeof window === 'object' && window.document ) {
 	};
 
 }
-
-Font.normalizeSubset = function( set ) {
-	return ( typeof set === 'string' ?
-			set.split('').map(function(e) {
-				return e.charCodeAt(0);
-			}) :
-			set || []
-		)
-		.filter(function(e, i, arr) {
-			return arr.lastIndexOf(e) === i;
-		})
-		.sort();
-};
 
 module.exports = Font;

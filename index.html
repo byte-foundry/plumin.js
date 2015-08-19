@@ -89,7 +89,7 @@
 (function(p) {
 
 var font = p.Font({
-		familyName: 'Demo',
+		familyName: 'Ali-Baba',
 		ascender: 800,
 		descender: -200
 	}),
@@ -170,7 +170,7 @@ window.font = font.addGlyphs([ A, B, C ])
 	.addToFonts();
 
 /*
-// animation are only fluid in Chrome
+// animation is only fluid in Chrome and Firefox
 var center = p.Point([256, 500]);
 window.onFrame = function() {
 	A.rotate(3, center);
@@ -193,7 +193,7 @@ window.onFrame = function() {
 				<textarea id="result" class="result pal"> A B C</textarea>
 
 				<div class="mtm txtcenter">
-					<a href="#" class="btn" onclick="_download();" download="demo.otf">▽ Download</a>
+					<a href="#" class="btn" onclick="_download(event);">▽ Download</a>
 				</div>
 			</div>
 		</div>
@@ -288,7 +288,9 @@ window.onFrame = function() {
 				})();
 			}
 
-			function _download() {
+			function _download(e) {
+				e.preventDefault();
+
 				return lastBuffer ?
 					_font.download( lastBuffer ):
 					window.font
