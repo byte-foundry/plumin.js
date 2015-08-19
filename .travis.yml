@@ -2,7 +2,7 @@
 sudo: false
 language: node_js
 node_js:
-- 'iojs'
+- 'iojs-v2.5.0'
 before_script:
 - npm install
 after_script:
