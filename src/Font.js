@@ -201,12 +201,8 @@ Font.prototype.updateSVGData = function( set ) {
 };
 
 Font.prototype.updateOTCommands = function( set ) {
-	this.getGlyphSubset( set ).map(function( glyph ) {
+	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
 		return glyph.updateOTCommands();
-	});
-
-	this.ot.glyphs = this.getGlyphSubset( false ).map(function( glyph ) {
-		return glyph.ot;
 	});
 
 	return this;
