@@ -117,9 +117,9 @@ describe('Path', function() {
 		);
 
 		it('should return an array with pseudo-svg commands' +
-			' - export:clockwise circle',
+			' - exportReversed circle',
 			function() {
-				circle.export = 'clockwise';
+				circle.exportReversed = true;
 
 				var data = [],
 					result = circle._updateData(data,

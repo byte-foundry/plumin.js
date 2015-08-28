@@ -18511,8 +18511,7 @@ proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 	}
 
 	// prototypo needs to be able to change the direction of the updated data.
-	var reverse = ( this.export === 'clockwise' && !this.clockwise ) ||
-			( this.export === 'anticlockwise' && this.clockwise ),
+	var reverse = this.exportReversed,
 		curves = this.curves,
 		start = curves[ reverse ? curves.length - 1 : 0 ]
 			[ 'point' + ( reverse ? 2 : 1 ) ]
