@@ -1,6 +1,6 @@
 {
   "name": "plumin.js",
-  "version": "0.9.8",
+  "version": "0.9.9",
   "description": "Create and manipulate fonts using javascript",
   "main": "dist/plumin.js",
   "//scripts": "NPM 2+ REQUIRED to use gulp tasks without global gulp",
