@@ -200,9 +200,9 @@ Font.prototype.updateSVGData = function( set ) {
 	return this;
 };
 
-Font.prototype.updateOTCommands = function( set ) {
+Font.prototype.updateOTCommands = function( set, united ) {
 	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
-		return glyph.updateOTCommands();
+		return glyph.updateOTCommands( null, united);
 	});
 
 	return this;

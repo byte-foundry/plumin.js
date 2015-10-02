@@ -1,6 +1,7 @@
 var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	paper = require('../node_modules/paper/dist/paper-core.js'),
-	Outline = require('./Outline.js');
+	Outline = require('./Outline.js'),
+	clipper = require('../node_modules/jsclipper/clipper_unminified.js');
 
 function Glyph( args ) {
 	paper.Group.prototype.constructor.apply( this );
@@ -162,19 +163,63 @@ Glyph.prototype.updateSVGData = function( path ) {
 	return this.svgData;
 };
 
-Glyph.prototype.updateOTCommands = function( path ) {
+Glyph.prototype.updateOTCommands = function( path, united ) {
 	if ( !path ) {
 		this.ot.path.commands = [];
 		path = this.ot.path;
 	}
 
-	this.children[0].updateOTCommands( path );
+/* eslint-disable */
+	if ( united ) {
 
-	this.children[1].children.forEach(function( component ) {
-		component.updateOTCommands( path );
-	});
+		var c = new clipper.Clipper();
+		c.StriclySimple = true;
+		var solution = new clipper.Paths();
+
+		var solution = this.getPaths( solution );
+
+		if ( solution.length > 0 ) {
+			solution = clipper.Clipper.CleanPolygons( solution, 0.1 );
+			solution = clipper.Clipper.SimplifyPolygons( solution, clipper.PolyFillType.pftNonZero );
+
+			var unionedPath = new Outline();
+			solution.forEach(function( path ) {
+				var constructedPath = new paper.Path();
+
+				path.forEach(function( point ) {
+					constructedPath.add( new paper.Point(point.X, point.Y ) );
+				});
+
+				unionedPath.addChild( constructedPath );
+			});
+
+			unionedPath.isPrepared = true;
+
+			unionedPath.updateOTCommands( path );
+		}
+	} else {
+
+		this.children[0].updateOTCommands( path );
+
+		this.children[1].children.forEach(function( component ) {
+			component.updateOTCommands( path );
+		});
+
+	}
+/* eslint-enable */
 
 	return this.ot;
+};
+
+Glyph.prototype.getPaths = function( solution ) {
+
+	solution = this.children[0].getPaths( solution );
+
+	this.children[1].children.forEach(function( component ) {
+		solution = component.getPaths( solution );
+	});
+
+	return solution;
 };
 
 Glyph.prototype.importOT = function( otGlyph ) {

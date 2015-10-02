@@ -24,6 +24,11 @@ Outline.prototype.insertChildren = function(index, items, _preserve) {
 	);
 };
 
+Outline.fromPath = function( path ) {
+	var result = new Outline();
+	return path._clone( result, false );
+};
+
 Outline.prototype.interpolate = function( outline0, outline1, coef ) {
 	for (var i = 0, l = this.contours.length; i < l; i++) {
 		// The number of children should be the same everywhere,
@@ -66,6 +71,25 @@ Outline.prototype.updateOTCommands = function( path ) {
 	}, this);
 
 	return this.ot;
+};
+
+Outline.prototype.getPaths = function( solution ) {
+	this.children.forEach(function( contour ) {
+		if ( contour.expandedFrom ) {
+			return solution;
+		}
+
+		if ( contour.skeleton !== true ) {
+			solution = contour.getPath( solution, contour.globalMatrix );
+		} else if ( !contour.expandedTo[1] ) {
+			solution = contour.expandedTo[0].getPath( solution, contour.globalMatrix );
+		} else {
+			solution.push( contour.expandedTo[0].getSimplePath( null, contour.globalMatrix ) );
+			solution.push( contour.expandedTo[1].getSimplePath( null, contour.globalMatrix ) );
+		}
+	});
+
+	return solution;
 };
 
 module.exports = Outline;

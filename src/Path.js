@@ -1,7 +1,8 @@
 /* Extend the Path prototype to add OpenType conversion
  * and alias *segments methods and properties to *nodes
  */
-var paper = require('../node_modules/paper/dist/paper-core.js');
+var paper = require('../node_modules/paper/dist/paper-core.js'),
+	clipper = require('../node_modules/jsclipper/clipper_unminified.js');
 
 var proto = paper.PaperScope.prototype.Path.prototype;
 
@@ -124,6 +125,63 @@ proto.updateSVGData = function( data, matrix ) {
 			data.push.apply( data, arguments );
 		}
 	);
+};
+
+proto.getSimplePath = function( precision, matrix ) {
+	var path = [],
+		offset,
+		locationOnCurve;
+		precision = precision || 50;
+
+	if ( this.visible === false ) {
+			return path;
+	}
+
+	if ( this.exportReversed ) {
+		for (var i = this.curves.length - 1; i >= 0; i--) {
+			var point2 = this.curves[i].point2.transform( matrix );
+			path.push( { X: point2.x, Y: point2.y } );
+			for (var j = precision - 1; j > 0; j--) {
+				offset = j / precision;
+
+				locationOnCurve = this.curves[i].getLocationAt( offset, true ).point.transform( matrix );
+				path.push( { X: locationOnCurve.x, Y: locationOnCurve.y } );
+			}
+		}
+	} else {
+		this.curves.forEach( function( item ) {
+			var point1 = item.point1.transform( matrix );
+			path.push( { X: point1.x, Y: point1.y } );
+			for (var k = 1; k < precision; k++) {
+				offset = k / precision;
+
+				locationOnCurve = item.getLocationAt( offset, true ).point.transform( matrix );
+				path.push( { X: locationOnCurve.x, Y: locationOnCurve.y } );
+			}
+		});
+	}
+
+	return path;
+};
+
+proto.getPath = function( solution, matrix ) {
+/* eslint-disable */
+	var path = this.getSimplePath( null, matrix );
+	var newPathToAdd = new clipper.Paths();
+	var c = new clipper.Clipper();
+	c.StriclySimple = true;
+
+	c.AddPaths( solution, clipper.PolyType.ptSubject, true );
+	c.AddPath( path, clipper.PolyType.ptClip, true );
+	try {
+		c.Execute( clipper.ClipType.ctUnion, newPathToAdd, clipper.PolyFillType.pftNonZero, clipper.PolyFillType.pftNonZero);
+	} catch ( err ) {
+		newPathToAdd = solution;
+		newPathToAdd.push( path );
+	}
+
+	return newPathToAdd;
+/* eslint-enable */
 };
 
 module.exports = paper.Path;
