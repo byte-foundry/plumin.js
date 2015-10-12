@@ -20,7 +20,7 @@ Object.defineProperties(proto, {
 });
 
 proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
-	if ( this.visible === false ) {
+	if ( this.visible === false || this.curves.length === 0) {
 		return data;
 	}
 

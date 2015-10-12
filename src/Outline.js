@@ -82,10 +82,16 @@ Outline.prototype.getPaths = function( solution ) {
 		if ( contour.skeleton !== true ) {
 			solution = contour.getPath( solution, contour.globalMatrix );
 		} else if ( !contour.expandedTo[1] ) {
-			solution = contour.expandedTo[0].getPath( solution, contour.globalMatrix );
+			solution = contour
+				.expandedTo[0]
+				.getPath( solution, contour.globalMatrix );
 		} else {
-			solution.push( contour.expandedTo[0].getSimplePath( null, contour.globalMatrix ) );
-			solution.push( contour.expandedTo[1].getSimplePath( null, contour.globalMatrix ) );
+			solution.push(
+				contour.expandedTo[0]
+					.getSimplePath( null, contour.globalMatrix ) );
+			solution.push(
+				contour.expandedTo[1]
+					.getSimplePath( null, contour.globalMatrix ) );
 		}
 	});
 

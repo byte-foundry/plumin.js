@@ -180,7 +180,9 @@ Glyph.prototype.updateOTCommands = function( path, united ) {
 
 		if ( solution.length > 0 ) {
 			solution = clipper.Clipper.CleanPolygons( solution, 0.1 );
-			solution = clipper.Clipper.SimplifyPolygons( solution, clipper.PolyFillType.pftNonZero );
+			solution = clipper
+				.Clipper
+				.SimplifyPolygons( solution, clipper.PolyFillType.pftNonZero );
 
 			var unionedPath = new Outline();
 			solution.forEach(function( path ) {
