@@ -165,6 +165,10 @@ Font.prototype.getGlyphSubset = function( _set ) {
 	return _set !== undefined ? this.normalizeSubset( _set ) : this.subset;
 };
 
+Font.prototype.setAlternateFor = function( unicode, glyphName ) {
+	this.charMap[ unicode ] = this.glyphMap[ glyphName ];
+};
+
 Font.prototype.interpolate = function( font0, font1, coef, set ) {
 	this.getGlyphSubset( set ).map(function( glyph ) {
 		glyph.interpolate(
