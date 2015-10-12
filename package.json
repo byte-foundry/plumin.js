@@ -37,6 +37,7 @@
     "ghooks": "^0.3.0",
     "gulp": "^3.8.11",
     "gulp-shelter": "^0.9.1",
+    "jsclipper": "byte-foundry/jsclipper",
     "jscs": "^1.11.3",
     "knacss": "^4.0.3",
     "mocha": "^2.2.1",
