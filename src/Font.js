@@ -269,27 +269,55 @@ if ( typeof window === 'object' && window.document ) {
 		};
 
 	var a = document.createElement('a');
-	Font.prototype.download = function( buffer ) {
-		var reader = new FileReader(),
-			familyName = this.ot.familyName;
 
-		reader.onloadend = function() {
-			a.download = familyName + '.otf';
-			a.href = reader.result;
-			a.dispatchEvent(new MouseEvent('click'));
+	Font.prototype.downloadFromLink = function( buffer ) {
+			var reader = new FileReader(),
+				familyName = this.ot.familyName;
 
-			setTimeout(function() {
-				a.href = '#';
-				_URL.revokeObjectURL( reader.result );
-			}, 100);
-		};
+			reader.onloadend = function() {
+				a.download = familyName + '.otf';
+				a.href = reader.result;
+				a.dispatchEvent(new MouseEvent('click'));
 
-		reader.readAsDataURL(new Blob(
-			[ new DataView( buffer || this.ot.toBuffer() ) ],
-			{ type: 'font/opentype' }
-		));
+				setTimeout(function() {
+					a.href = '#';
+					_URL.revokeObjectURL( reader.result );
+				}, 100);
+			};
 
-		return this;
+			reader.readAsDataURL(new Blob(
+				[ new DataView( buffer || this.ot.toBuffer() ) ],
+				{ type: 'font/opentype' }
+			));
+	};
+
+	Font.prototype.download = function( buffer, merged, name, user ) {
+		if ( merged ) {
+			var headers = new Headers();
+			headers.append('Content-Type', 'application/otf');
+
+			fetch('http://fontforgeconv.cloudapp.net/' + name + '/' + user, {
+					method: 'POST',
+					headers: headers,
+					body: buffer
+				})
+				.then(function( response ) {
+
+					response.arrayBuffer()
+						.then(function( bufferToDownload ) {
+							this.downloadFromLink(bufferToDownload);
+						}.bind(this));
+
+				}.bind(this))
+				.catch(function(err) {
+					console.log('error: ', err);
+				});
+
+		} else {
+			this.downloadFromLink( buffer );
+
+			return this;
+		}
 	};
 
 }
