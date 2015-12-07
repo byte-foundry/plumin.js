@@ -1,21 +1,18 @@
 var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	paper = require('../node_modules/paper/dist/paper-core.js'),
-	Glyph = require('./Glyph.js');
+	Glyph = require('./Glyph.js'),
+	assign = require('es6-object-assign').assign;
 
 function Font( args ) {
 	paper.Group.prototype.constructor.apply( this );
 
-	if ( !args ) {
-		args = {};
-	}
-
-	if ( !args.styleName ) {
-		args.styleName = 'Regular';
-	}
-
-	if ( !args.unitsPerEm ) {
-		args.unitsPerEm = 1024;
-	}
+	args = assign({
+		familyName: 'Default familyName',
+		styleName: 'Regular',
+		ascender: 1,
+		descender: -1,
+		unitsPerEm: 1024
+	}, args);
 
 	this.fontinfo = this.ot = new opentype.Font( args );
 
@@ -309,8 +306,8 @@ if ( typeof window === 'object' && window.document ) {
 						}.bind(this));
 
 				}.bind(this))
-				.catch(function(err) {
-					console.log('error: ', err);
+				.catch(function(/*err*/) {
+					//console.log('error: ', err);
 				});
 
 		} else {

@@ -1,5 +1,430 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.plumin = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+/**
+ * Code refactored from Mozilla Developer Network:
+ * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign
+ */
+
+'use strict';
+
+function assign(target, firstSource) {
+  if (target === undefined || target === null) {
+    throw new TypeError('Cannot convert first argument to object');
+  }
+
+  var to = Object(target);
+  for (var i = 1; i < arguments.length; i++) {
+    var nextSource = arguments[i];
+    if (nextSource === undefined || nextSource === null) {
+      continue;
+    }
+
+    var keysArray = Object.keys(Object(nextSource));
+    for (var nextIndex = 0, len = keysArray.length; nextIndex < len; nextIndex++) {
+      var nextKey = keysArray[nextIndex];
+      var desc = Object.getOwnPropertyDescriptor(nextSource, nextKey);
+      if (desc !== undefined && desc.enumerable) {
+        to[nextKey] = nextSource[nextKey];
+      }
+    }
+  }
+  return to;
+}
+
+function polyfill() {
+  if (!Object.assign) {
+    Object.defineProperty(Object, 'assign', {
+      enumerable: false,
+      configurable: true,
+      writable: true,
+      value: assign
+    });
+  }
+}
+
+module.exports = {
+  assign: assign,
+  polyfill: polyfill
+};
+
+},{}],2:[function(require,module,exports){
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.opentype = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+var TINF_OK = 0;
+var TINF_DATA_ERROR = -3;
+
+function Tree() {
+  this.table = new Uint16Array(16);   /* table of code length counts */
+  this.trans = new Uint16Array(288);  /* code -> symbol translation table */
+}
+
+function Data(source, dest) {
+  this.source = source;
+  this.sourceIndex = 0;
+  this.tag = 0;
+  this.bitcount = 0;
+  
+  this.dest = dest;
+  this.destLen = 0;
+  
+  this.ltree = new Tree();  /* dynamic length/symbol tree */
+  this.dtree = new Tree();  /* dynamic distance tree */
+}
+
+/* --------------------------------------------------- *
+ * -- uninitialized global data (static structures) -- *
+ * --------------------------------------------------- */
+
+var sltree = new Tree();
+var sdtree = new Tree();
+
+/* extra bits and base tables for length codes */
+var length_bits = new Uint8Array(30);
+var length_base = new Uint16Array(30);
+
+/* extra bits and base tables for distance codes */
+var dist_bits = new Uint8Array(30);
+var dist_base = new Uint16Array(30);
+
+/* special ordering of code length codes */
+var clcidx = new Uint8Array([
+  16, 17, 18, 0, 8, 7, 9, 6,
+  10, 5, 11, 4, 12, 3, 13, 2,
+  14, 1, 15
+]);
+
+/* used by tinf_decode_trees, avoids allocations every call */
+var code_tree = new Tree();
+var lengths = new Uint8Array(288 + 32);
+
+/* ----------------------- *
+ * -- utility functions -- *
+ * ----------------------- */
+
+/* build extra bits and base tables */
+function tinf_build_bits_base(bits, base, delta, first) {
+  var i, sum;
+
+  /* build bits table */
+  for (i = 0; i < delta; ++i) bits[i] = 0;
+  for (i = 0; i < 30 - delta; ++i) bits[i + delta] = i / delta | 0;
+
+  /* build base table */
+  for (sum = first, i = 0; i < 30; ++i) {
+    base[i] = sum;
+    sum += 1 << bits[i];
+  }
+}
+
+/* build the fixed huffman trees */
+function tinf_build_fixed_trees(lt, dt) {
+  var i;
+
+  /* build fixed length tree */
+  for (i = 0; i < 7; ++i) lt.table[i] = 0;
+
+  lt.table[7] = 24;
+  lt.table[8] = 152;
+  lt.table[9] = 112;
+
+  for (i = 0; i < 24; ++i) lt.trans[i] = 256 + i;
+  for (i = 0; i < 144; ++i) lt.trans[24 + i] = i;
+  for (i = 0; i < 8; ++i) lt.trans[24 + 144 + i] = 280 + i;
+  for (i = 0; i < 112; ++i) lt.trans[24 + 144 + 8 + i] = 144 + i;
+
+  /* build fixed distance tree */
+  for (i = 0; i < 5; ++i) dt.table[i] = 0;
+
+  dt.table[5] = 32;
+
+  for (i = 0; i < 32; ++i) dt.trans[i] = i;
+}
+
+/* given an array of code lengths, build a tree */
+var offs = new Uint16Array(16);
+
+function tinf_build_tree(t, lengths, off, num) {
+  var i, sum;
+
+  /* clear code length count table */
+  for (i = 0; i < 16; ++i) t.table[i] = 0;
+
+  /* scan symbol lengths, and sum code length counts */
+  for (i = 0; i < num; ++i) t.table[lengths[off + i]]++;
+
+  t.table[0] = 0;
+
+  /* compute offset table for distribution sort */
+  for (sum = 0, i = 0; i < 16; ++i) {
+    offs[i] = sum;
+    sum += t.table[i];
+  }
+
+  /* create code->symbol translation table (symbols sorted by code) */
+  for (i = 0; i < num; ++i) {
+    if (lengths[off + i]) t.trans[offs[lengths[off + i]]++] = i;
+  }
+}
+
+/* ---------------------- *
+ * -- decode functions -- *
+ * ---------------------- */
+
+/* get one bit from source stream */
+function tinf_getbit(d) {
+  /* check if tag is empty */
+  if (!d.bitcount--) {
+    /* load next tag */
+    d.tag = d.source[d.sourceIndex++];
+    d.bitcount = 7;
+  }
+
+  /* shift bit out of tag */
+  var bit = d.tag & 1;
+  d.tag >>>= 1;
+
+  return bit;
+}
+
+/* read a num bit value from a stream and add base */
+function tinf_read_bits(d, num, base) {
+  if (!num)
+    return base;
+
+  while (d.bitcount < 24) {
+    d.tag |= d.source[d.sourceIndex++] << d.bitcount;
+    d.bitcount += 8;
+  }
+
+  var val = d.tag & (0xffff >>> (16 - num));
+  d.tag >>>= num;
+  d.bitcount -= num;
+  return val + base;
+}
+
+/* given a data stream and a tree, decode a symbol */
+function tinf_decode_symbol(d, t) {
+  while (d.bitcount < 24) {
+    d.tag |= d.source[d.sourceIndex++] << d.bitcount;
+    d.bitcount += 8;
+  }
+  
+  var sum = 0, cur = 0, len = 0;
+  var tag = d.tag;
+
+  /* get more bits while code value is above sum */
+  do {
+    cur = 2 * cur + (tag & 1);
+    tag >>>= 1;
+    ++len;
+
+    sum += t.table[len];
+    cur -= t.table[len];
+  } while (cur >= 0);
+  
+  d.tag = tag;
+  d.bitcount -= len;
+
+  return t.trans[sum + cur];
+}
+
+/* given a data stream, decode dynamic trees from it */
+function tinf_decode_trees(d, lt, dt) {
+  var hlit, hdist, hclen;
+  var i, num, length;
+
+  /* get 5 bits HLIT (257-286) */
+  hlit = tinf_read_bits(d, 5, 257);
+
+  /* get 5 bits HDIST (1-32) */
+  hdist = tinf_read_bits(d, 5, 1);
+
+  /* get 4 bits HCLEN (4-19) */
+  hclen = tinf_read_bits(d, 4, 4);
+
+  for (i = 0; i < 19; ++i) lengths[i] = 0;
+
+  /* read code lengths for code length alphabet */
+  for (i = 0; i < hclen; ++i) {
+    /* get 3 bits code length (0-7) */
+    var clen = tinf_read_bits(d, 3, 0);
+    lengths[clcidx[i]] = clen;
+  }
+
+  /* build code length tree */
+  tinf_build_tree(code_tree, lengths, 0, 19);
+
+  /* decode code lengths for the dynamic trees */
+  for (num = 0; num < hlit + hdist;) {
+    var sym = tinf_decode_symbol(d, code_tree);
+
+    switch (sym) {
+      case 16:
+        /* copy previous code length 3-6 times (read 2 bits) */
+        var prev = lengths[num - 1];
+        for (length = tinf_read_bits(d, 2, 3); length; --length) {
+          lengths[num++] = prev;
+        }
+        break;
+      case 17:
+        /* repeat code length 0 for 3-10 times (read 3 bits) */
+        for (length = tinf_read_bits(d, 3, 3); length; --length) {
+          lengths[num++] = 0;
+        }
+        break;
+      case 18:
+        /* repeat code length 0 for 11-138 times (read 7 bits) */
+        for (length = tinf_read_bits(d, 7, 11); length; --length) {
+          lengths[num++] = 0;
+        }
+        break;
+      default:
+        /* values 0-15 represent the actual code lengths */
+        lengths[num++] = sym;
+        break;
+    }
+  }
+
+  /* build dynamic trees */
+  tinf_build_tree(lt, lengths, 0, hlit);
+  tinf_build_tree(dt, lengths, hlit, hdist);
+}
+
+/* ----------------------------- *
+ * -- block inflate functions -- *
+ * ----------------------------- */
+
+/* given a stream and two trees, inflate a block of data */
+function tinf_inflate_block_data(d, lt, dt) {
+  while (1) {
+    var sym = tinf_decode_symbol(d, lt);
+
+    /* check for end of block */
+    if (sym === 256) {
+      return TINF_OK;
+    }
+
+    if (sym < 256) {
+      d.dest[d.destLen++] = sym;
+    } else {
+      var length, dist, offs;
+      var i;
+
+      sym -= 257;
+
+      /* possibly get more bits from length code */
+      length = tinf_read_bits(d, length_bits[sym], length_base[sym]);
+
+      dist = tinf_decode_symbol(d, dt);
+
+      /* possibly get more bits from distance code */
+      offs = d.destLen - tinf_read_bits(d, dist_bits[dist], dist_base[dist]);
+
+      /* copy match */
+      for (i = offs; i < offs + length; ++i) {
+        d.dest[d.destLen++] = d.dest[i];
+      }
+    }
+  }
+}
+
+/* inflate an uncompressed block of data */
+function tinf_inflate_uncompressed_block(d) {
+  var length, invlength;
+  var i;
+  
+  /* unread from bitbuffer */
+  while (d.bitcount > 8) {
+    d.sourceIndex--;
+    d.bitcount -= 8;
+  }
+
+  /* get length */
+  length = d.source[d.sourceIndex + 1];
+  length = 256 * length + d.source[d.sourceIndex];
+
+  /* get one's complement of length */
+  invlength = d.source[d.sourceIndex + 3];
+  invlength = 256 * invlength + d.source[d.sourceIndex + 2];
+
+  /* check length */
+  if (length !== (~invlength & 0x0000ffff))
+    return TINF_DATA_ERROR;
+
+  d.sourceIndex += 4;
+
+  /* copy block */
+  for (i = length; i; --i)
+    d.dest[d.destLen++] = d.source[d.sourceIndex++];
+
+  /* make sure we start next block on a byte boundary */
+  d.bitcount = 0;
+
+  return TINF_OK;
+}
+
+/* inflate stream from source to dest */
+function tinf_uncompress(source, dest) {
+  var d = new Data(source, dest);
+  var bfinal, res;
+
+  do {
+    /* read final block flag */
+    bfinal = tinf_getbit(d);
+
+    /* read block type (2 bits) */
+    btype = tinf_read_bits(d, 2, 0);
+
+    /* decompress block */
+    switch (btype) {
+      case 0:
+        /* decompress uncompressed block */
+        res = tinf_inflate_uncompressed_block(d);
+        break;
+      case 1:
+        /* decompress block with fixed huffman trees */
+        res = tinf_inflate_block_data(d, sltree, sdtree);
+        break;
+      case 2:
+        /* decompress block with dynamic huffman trees */
+        tinf_decode_trees(d, d.ltree, d.dtree);
+        res = tinf_inflate_block_data(d, d.ltree, d.dtree);
+        break;
+      default:
+        res = TINF_DATA_ERROR;
+    }
+
+    if (res !== TINF_OK)
+      throw new Error('Data error');
+
+  } while (!bfinal);
+
+  if (d.destLen < d.dest.length) {
+    if (typeof d.dest.slice === 'function')
+      return d.dest.slice(0, d.destLen);
+    else
+      return d.dest.subarray(0, d.destLen);
+  }
+  
+  return d.dest;
+}
+
+/* -------------------- *
+ * -- initialization -- *
+ * -------------------- */
+
+/* build fixed huffman trees */
+tinf_build_fixed_trees(sltree, sdtree);
+
+/* build extra bits and base tables */
+tinf_build_bits_base(length_bits, length_base, 4, 3);
+tinf_build_bits_base(dist_bits, dist_base, 2, 1);
+
+/* fix a special case */
+length_bits[28] = 0;
+length_base[28] = 258;
+
+module.exports = tinf_uncompress;
+
+},{}],2:[function(require,module,exports){
 // Run-time checking of preconditions.
 
 'use strict';
@@ -16,7 +441,7 @@ exports.argument = function(predicate, message) {
 // If not, it will throw an error.
 exports.assert = exports.argument;
 
-},{}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 // Drawing utility functions.
 
 'use strict';
@@ -31,7 +456,7 @@ function line(ctx, x1, y1, x2, y2) {
 
 exports.line = line;
 
-},{}],3:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 // Glyph encoding
 
 'use strict';
@@ -167,7 +592,7 @@ DefaultEncoding.prototype.charToGlyphIndex = function(c) {
     var glyphs = this.font.glyphs;
     if (glyphs) {
         for (var i = 0; i < glyphs.length; i += 1) {
-            var glyph = glyphs[i];
+            var glyph = glyphs.get(i);
             for (var j = 0; j < glyph.unicodes.length; j += 1) {
                 if (glyph.unicodes[j] === code) {
                     return i;
@@ -240,15 +665,16 @@ function addGlyphNames(font) {
     var glyph;
     var glyphIndexMap = font.tables.cmap.glyphIndexMap;
     var charCodes = Object.keys(glyphIndexMap);
+
     for (var i = 0; i < charCodes.length; i += 1) {
         var c = charCodes[i];
         var glyphIndex = glyphIndexMap[c];
-        glyph = font.glyphs[glyphIndex];
+        glyph = font.glyphs.get(glyphIndex);
         glyph.addUnicode(parseInt(c));
     }
 
     for (i = 0; i < font.glyphs.length; i += 1) {
-        glyph = font.glyphs[i];
+        glyph = font.glyphs.get(i);
         if (font.cffEncoding) {
             glyph.name = font.cffEncoding.charset[i];
         } else {
@@ -267,7 +693,7 @@ exports.CffEncoding = CffEncoding;
 exports.GlyphNames = GlyphNames;
 exports.addGlyphNames = addGlyphNames;
 
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 // The Font object
 
 'use strict';
@@ -275,6 +701,8 @@ exports.addGlyphNames = addGlyphNames;
 var path = require('./path');
 var sfnt = require('./tables/sfnt');
 var encoding = require('./encoding');
+var glyphset = require('./glyphset');
+var util = require('./util');
 
 // A Font represents a loaded OpenType font file.
 // It contains a set of glyphs and methods to draw text on a drawing context,
@@ -282,24 +710,39 @@ var encoding = require('./encoding');
 function Font(options) {
     options = options || {};
 
-    // OS X will complain if the names are empty, so we put a single space everywhere by default.
-    this.familyName = options.familyName || ' ';
-    this.styleName = options.styleName || ' ';
-    this.designer = options.designer || ' ';
-    this.designerURL = options.designerURL || ' ';
-    this.manufacturer = options.manufacturer || ' ';
-    this.manufacturerURL = options.manufacturerURL || ' ';
-    this.license = options.license || ' ';
-    this.licenseURL = options.licenseURL || ' ';
-    this.version = options.version || 'Version 0.1';
-    this.description = options.description || ' ';
-    this.copyright = options.copyright || ' ';
-    this.trademark = options.trademark || ' ';
-    this.unitsPerEm = options.unitsPerEm || 1000;
-    this.ascender = options.ascender;
-    this.descender = options.descender;
-    this.supported = true;
-    this.glyphs = options.glyphs || [];
+    if (!options.empty) {
+        // Check that we've provided the minimum set of names.
+        util.checkArgument(options.familyName, 'When creating a new Font object, familyName is required.');
+        util.checkArgument(options.styleName, 'When creating a new Font object, styleName is required.');
+        util.checkArgument(options.unitsPerEm, 'When creating a new Font object, unitsPerEm is required.');
+        util.checkArgument(options.ascender, 'When creating a new Font object, ascender is required.');
+        util.checkArgument(options.descender, 'When creating a new Font object, descender is required.');
+        util.checkArgument(options.descender < 0, 'Descender should be negative (e.g. -512).');
+
+        // OS X will complain if the names are empty, so we put a single space everywhere by default.
+        this.names = {
+            fontFamily: {en: options.familyName || ' '},
+            fontSubfamily: {en: options.styleName || ' '},
+            fullName: {en: options.fullName || options.familyName + ' ' + options.styleName},
+            postScriptName: {en: options.postScriptName || options.familyName + options.styleName},
+            designer: {en: options.designer || ' '},
+            designerURL: {en: options.designerURL || ' '},
+            manufacturer: {en: options.manufacturer || ' '},
+            manufacturerURL: {en: options.manufacturerURL || ' '},
+            license: {en: options.license || ' '},
+            licenseURL: {en: options.licenseURL || ' '},
+            version: {en: options.version || 'Version 0.1'},
+            description: {en: options.description || ' '},
+            copyright: {en: options.copyright || ' '},
+            trademark: {en: options.trademark || ' '}
+        };
+        this.unitsPerEm = options.unitsPerEm || 1000;
+        this.ascender = options.ascender;
+        this.descender = options.descender;
+    }
+
+    this.supported = true; // Deprecated: parseBuffer will throw an error if font is not supported.
+    this.glyphs = new glyphset.GlyphSet(this, options.glyphs || []);
     this.encoding = new encoding.DefaultEncoding(this);
     this.tables = {};
 }
@@ -321,10 +764,10 @@ Font.prototype.charToGlyphIndex = function(s) {
 // the given character and a glyph; for complex scripts this might not be the case.
 Font.prototype.charToGlyph = function(c) {
     var glyphIndex = this.charToGlyphIndex(c);
-    var glyph = this.glyphs[glyphIndex];
+    var glyph = this.glyphs.get(glyphIndex);
     if (!glyph) {
         // .notdef
-        glyph = this.glyphs[0];
+        glyph = this.glyphs.get(0);
     }
 
     return glyph;
@@ -350,10 +793,10 @@ Font.prototype.nameToGlyphIndex = function(name) {
 
 Font.prototype.nameToGlyph = function(name) {
     var glyphIndex = this.nametoGlyphIndex(name);
-    var glyph = this.glyphs[glyphIndex];
+    var glyph = this.glyphs.get(glyphIndex);
     if (!glyph) {
         // .notdef
-        glyph = this.glyphs[0];
+        glyph = this.glyphs.get(0);
     }
 
     return glyph;
@@ -382,10 +825,6 @@ Font.prototype.getKerningValue = function(leftGlyph, rightGlyph) {
 // Helper function that invokes the given callback for each glyph in the given text.
 // The callback gets `(glyph, x, y, fontSize, options)`.
 Font.prototype.forEachGlyph = function(text, x, y, fontSize, options, callback) {
-    if (!this.supported) {
-        return;
-    }
-
     x = x !== undefined ? x : 0;
     y = y !== undefined ? y : 0;
     fontSize = fontSize !== undefined ? fontSize : 72;
@@ -425,6 +864,26 @@ Font.prototype.getPath = function(text, x, y, fontSize, options) {
     });
 
     return fullPath;
+};
+
+// Create an array of Path objects that represent the glyps of a given text.
+//
+// text - The text to create.
+// x - Horizontal position of the beginning of the text. (default: 0)
+// y - Vertical position of the *baseline* of the text. (default: 0)
+// fontSize - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`. (default: 72)
+// Options is an optional object that contains:
+// - kerning - Whether to take kerning information into account. (default: true)
+//
+// Returns an array of Path objects.
+Font.prototype.getPaths = function(text, x, y, fontSize, options) {
+    var glyphPaths = [];
+    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
+        var glyphPath = glyph.getPath(gX, gY, gFontSize);
+        glyphPaths.push(glyphPath);
+    });
+
+    return glyphPaths;
 };
 
 // Draw the text on the given drawing context.
@@ -474,6 +933,13 @@ Font.prototype.drawMetrics = function(ctx, text, x, y, fontSize, options) {
     });
 };
 
+Font.prototype.getEnglishName = function(name) {
+    var translations = this.names[name];
+    if (translations) {
+        return translations.en;
+    }
+};
+
 // Validate
 Font.prototype.validate = function() {
     var warnings = [];
@@ -485,16 +951,18 @@ Font.prototype.validate = function() {
         }
     }
 
-    function assertStringAttribute(attrName) {
-        assert(_this[attrName] && _this[attrName].trim().length > 0, 'No ' + attrName + ' specified.');
+    function assertNamePresent(name) {
+        var englishName = _this.getEnglishName(name);
+        assert(englishName && englishName.trim().length > 0,
+               'No English ' + name + ' specified.');
     }
 
     // Identification information
-    assertStringAttribute('familyName');
-    assertStringAttribute('weightName');
-    assertStringAttribute('manufacturer');
-    assertStringAttribute('copyright');
-    assertStringAttribute('version');
+    assertNamePresent('fontFamily');
+    assertNamePresent('weightName');
+    assertNamePresent('manufacturer');
+    assertNamePresent('copyright');
+    assertNamePresent('version');
 
     // Dimension information
     assert(this.unitsPerEm > 0, 'No unitsPerEm specified.');
@@ -507,6 +975,11 @@ Font.prototype.toTables = function() {
 };
 
 Font.prototype.toBuffer = function() {
+    console.warn('Font.toBuffer is deprecated. Use Font.toArrayBuffer instead.');
+    return this.toArrayBuffer();
+};
+
+Font.prototype.toArrayBuffer = function() {
     var sfntTable = this.toTables();
     var bytes = sfntTable.encode();
     var buffer = new ArrayBuffer(bytes.length);
@@ -520,33 +993,40 @@ Font.prototype.toBuffer = function() {
 
 // Initiate a download of the OpenType font.
 Font.prototype.download = function() {
-    var fileName = this.familyName.replace(/\s/g, '') + '-' + this.styleName + '.otf';
-    var buffer = this.toBuffer();
+    var familyName = this.getEnglishName('fontFamily');
+    var styleName = this.getEnglishName('fontSubfamily');
+    var fileName = familyName.replace(/\s/g, '') + '-' + styleName + '.otf';
+    var arrayBuffer = this.toArrayBuffer();
 
-    window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
-    window.requestFileSystem(window.TEMPORARY, buffer.byteLength, function(fs) {
-        fs.root.getFile(fileName, {create: true}, function(fileEntry) {
-            fileEntry.createWriter(function(writer) {
-                var dataView = new DataView(buffer);
-                var blob = new Blob([dataView], {type: 'font/opentype'});
-                writer.write(blob);
+    if (util.isBrowser()) {
+        window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
+        window.requestFileSystem(window.TEMPORARY, arrayBuffer.byteLength, function(fs) {
+            fs.root.getFile(fileName, {create: true}, function(fileEntry) {
+                fileEntry.createWriter(function(writer) {
+                    var dataView = new DataView(arrayBuffer);
+                    var blob = new Blob([dataView], {type: 'font/opentype'});
+                    writer.write(blob);
 
-                writer.addEventListener('writeend', function() {
-                    // Navigating to the file will download it.
-                    location.href = fileEntry.toURL();
-                }, false);
+                    writer.addEventListener('writeend', function() {
+                        // Navigating to the file will download it.
+                        location.href = fileEntry.toURL();
+                    }, false);
+                });
             });
+        },
+        function(err) {
+            throw err;
         });
-    },
-
-    function(err) {
-        throw err;
-    });
+    } else {
+        var fs = require('fs');
+        var buffer = util.arrayBufferToNodeBuffer(arrayBuffer);
+        fs.writeFileSync(fileName, buffer);
+    }
 };
 
 exports.Font = Font;
 
-},{"./encoding":3,"./path":8,"./tables/sfnt":23}],5:[function(require,module,exports){
+},{"./encoding":4,"./glyphset":7,"./path":10,"./tables/sfnt":27,"./util":29,"fs":undefined}],6:[function(require,module,exports){
 // The Glyph object
 
 'use strict';
@@ -555,24 +1035,71 @@ var check = require('./check');
 var draw = require('./draw');
 var path = require('./path');
 
+function getPathDefinition(glyph, path) {
+    var _path = path || { commands: [] };
+    return {
+        configurable: true,
+
+        get: function() {
+            if (typeof _path === 'function') {
+                _path = _path();
+            }
+
+            return _path;
+        },
+
+        set: function(p) {
+            _path = p;
+        }
+    };
+}
+
 // A Glyph is an individual mark that often corresponds to a character.
 // Some glyphs, such as ligatures, are a combination of many characters.
 // Glyphs are the basic building blocks of a font.
 //
 // The `Glyph` class contains utility methods for drawing the path and its points.
 function Glyph(options) {
-    this.font = options.font || null;
+    // By putting all the code on a prototype function (which is only declared once)
+    // we reduce the memory requirements for larger fonts by some 2%
+    this.bindConstructorValues(options);
+}
+
+Glyph.prototype.bindConstructorValues = function(options) {
     this.index = options.index || 0;
+
+    // These three values cannnot be deferred for memory optimization:
     this.name = options.name || null;
     this.unicode = options.unicode || undefined;
     this.unicodes = options.unicodes || options.unicode !== undefined ? [options.unicode] : [];
-    this.xMin = options.xMin || 0;
-    this.yMin = options.yMin || 0;
-    this.xMax = options.xMax || 0;
-    this.yMax = options.yMax || 0;
-    this.advanceWidth = options.advanceWidth || 0;
-    this.path = options.path || null;
-}
+
+    // But by binding these values only when necessary, we reduce can
+    // the memory requirements by almost 3% for larger fonts.
+    if (options.xMin) {
+        this.xMin = options.xMin;
+    }
+
+    if (options.yMin) {
+        this.yMin = options.yMin;
+    }
+
+    if (options.xMax) {
+        this.xMax = options.xMax;
+    }
+
+    if (options.yMax) {
+        this.yMax = options.yMax;
+    }
+
+    if (options.advanceWidth) {
+        this.advanceWidth = options.advanceWidth;
+    }
+
+    // The path for a glyph is the most memory intensive, and is bound as a value
+    // with a getter/setter to ensure we actually do path parsing only once the
+    // path is actually needed by anything.
+    Object.defineProperty(this, 'path', getPathDefinition(this, options.path));
+};
 
 Glyph.prototype.addUnicode = function(unicode) {
     if (this.unicodes.length === 0) {
@@ -591,7 +1118,7 @@ Glyph.prototype.getPath = function(x, y, fontSize) {
     x = x !== undefined ? x : 0;
     y = y !== undefined ? y : 0;
     fontSize = fontSize !== undefined ? fontSize : 72;
-    var scale = 1 / this.font.unitsPerEm * fontSize;
+    var scale = 1 / this.path.unitsPerEm * fontSize;
     var p = new path.Path();
     var commands = this.path.commands;
     for (var i = 0; i < commands.length; i += 1) {
@@ -668,6 +1195,23 @@ Glyph.prototype.getMetrics = function() {
         yMax: Math.max.apply(null, yCoords),
         leftSideBearing: 0
     };
+
+    if (!isFinite(metrics.xMin)) {
+        metrics.xMin = 0;
+    }
+
+    if (!isFinite(metrics.xMax)) {
+        metrics.xMax = this.advanceWidth;
+    }
+
+    if (!isFinite(metrics.yMin)) {
+        metrics.yMin = 0;
+    }
+
+    if (!isFinite(metrics.yMax)) {
+        metrics.yMax = 0;
+    }
+
     metrics.rightSideBearing = this.advanceWidth - metrics.leftSideBearing - (metrics.xMax - metrics.xMin);
     return metrics;
 };
@@ -706,7 +1250,7 @@ Glyph.prototype.drawPoints = function(ctx, x, y, fontSize) {
     x = x !== undefined ? x : 0;
     y = y !== undefined ? y : 0;
     fontSize = fontSize !== undefined ? fontSize : 24;
-    var scale = 1 / this.font.unitsPerEm * fontSize;
+    var scale = 1 / this.path.unitsPerEm * fontSize;
 
     var blueCircles = [];
     var redCircles = [];
@@ -746,7 +1290,7 @@ Glyph.prototype.drawMetrics = function(ctx, x, y, fontSize) {
     x = x !== undefined ? x : 0;
     y = y !== undefined ? y : 0;
     fontSize = fontSize !== undefined ? fontSize : 24;
-    scale = 1 / this.font.unitsPerEm * fontSize;
+    scale = 1 / this.path.unitsPerEm * fontSize;
     ctx.lineWidth = 1;
 
     // Draw the origin
@@ -754,44 +1298,136 @@ Glyph.prototype.drawMetrics = function(ctx, x, y, fontSize) {
     draw.line(ctx, x, -10000, x, 10000);
     draw.line(ctx, -10000, y, 10000, y);
 
+    // This code is here due to memory optimization: by not using
+    // defaults in the constructor, we save a notable amount of memory.
+    var xMin = this.xMin || 0;
+    var yMin = this.yMin || 0;
+    var xMax = this.xMax || 0;
+    var yMax = this.yMax || 0;
+    var advanceWidth = this.advanceWidth || 0;
+
     // Draw the glyph box
     ctx.strokeStyle = 'blue';
-    draw.line(ctx, x + (this.xMin * scale), -10000, x + (this.xMin * scale), 10000);
-    draw.line(ctx, x + (this.xMax * scale), -10000, x + (this.xMax * scale), 10000);
-    draw.line(ctx, -10000, y + (-this.yMin * scale), 10000, y + (-this.yMin * scale));
-    draw.line(ctx, -10000, y + (-this.yMax * scale), 10000, y + (-this.yMax * scale));
+    draw.line(ctx, x + (xMin * scale), -10000, x + (xMin * scale), 10000);
+    draw.line(ctx, x + (xMax * scale), -10000, x + (xMax * scale), 10000);
+    draw.line(ctx, -10000, y + (-yMin * scale), 10000, y + (-yMin * scale));
+    draw.line(ctx, -10000, y + (-yMax * scale), 10000, y + (-yMax * scale));
 
     // Draw the advance width
     ctx.strokeStyle = 'green';
-    draw.line(ctx, x + (this.advanceWidth * scale), -10000, x + (this.advanceWidth * scale), 10000);
+    draw.line(ctx, x + (advanceWidth * scale), -10000, x + (advanceWidth * scale), 10000);
 };
 
 exports.Glyph = Glyph;
 
-},{"./check":1,"./draw":2,"./path":8}],6:[function(require,module,exports){
-// opentype.js
-// https://github.com/nodebox/opentype.js
-// (c) 2014 Frederik De Bleser
-// opentype.js may be freely distributed under the MIT license.
-
-/* global ArrayBuffer, DataView, Uint8Array, XMLHttpRequest  */
+},{"./check":2,"./draw":3,"./path":10}],7:[function(require,module,exports){
+// The GlyphSet object
 
 'use strict';
+
+var _glyph = require('./glyph');
+
+// A GlyphSet represents all glyphs available in the font, but modelled using
+// a deferred glyph loader, for retrieving glyphs only once they are absolutely
+// necessary, to keep the memory footprint down.
+function GlyphSet(font, glyphs) {
+    this.font = font;
+    this.glyphs = {};
+    if (Array.isArray(glyphs)) {
+        for (var i = 0; i < glyphs.length; i++) {
+            this.glyphs[i] = glyphs[i];
+        }
+    }
+
+    this.length = (glyphs && glyphs.length) || 0;
+}
+
+GlyphSet.prototype.get = function(index) {
+    if (typeof this.glyphs[index] === 'function') {
+        this.glyphs[index] = this.glyphs[index]();
+    }
+
+    return this.glyphs[index];
+};
+
+GlyphSet.prototype.push = function(index, loader) {
+    this.glyphs[index] = loader;
+    this.length++;
+};
+
+function glyphLoader(font, index) {
+    return new _glyph.Glyph({index: index, font: font});
+}
+
+/**
+ * Generate a stub glyph that can be filled with all metadata *except*
+ * the "points" and "path" properties, which must be loaded only once
+ * the glyph's path is actually requested for text shaping.
+ */
+
+function ttfGlyphLoader(font, index, parseGlyph, data, position, buildPath) {
+    return function() {
+        var glyph = new _glyph.Glyph({index: index, font: font});
+
+        glyph.path = function() {
+            parseGlyph(glyph, data, position);
+            var path = buildPath(font.glyphs, glyph);
+            path.unitsPerEm = font.unitsPerEm;
+            return path;
+        };
+
+        return glyph;
+    };
+}
+
+function cffGlyphLoader(font, index, parseCFFCharstring, charstring) {
+    return function() {
+        var glyph = new _glyph.Glyph({index: index, font: font});
+
+        glyph.path = function() {
+            var path = parseCFFCharstring(font, glyph, charstring);
+            path.unitsPerEm = font.unitsPerEm;
+            return path;
+        };
+
+        return glyph;
+    };
+}
+
+exports.GlyphSet = GlyphSet;
+exports.glyphLoader = glyphLoader;
+exports.ttfGlyphLoader = ttfGlyphLoader;
+exports.cffGlyphLoader = cffGlyphLoader;
+
+},{"./glyph":6}],8:[function(require,module,exports){
+// opentype.js
+// https://github.com/nodebox/opentype.js
+// (c) 2015 Frederik De Bleser
+// opentype.js may be freely distributed under the MIT license.
+
+/* global DataView, Uint8Array, XMLHttpRequest  */
+
+'use strict';
+
+var inflate = require('tiny-inflate');
 
 var encoding = require('./encoding');
 var _font = require('./font');
 var glyph = require('./glyph');
 var parse = require('./parse');
 var path = require('./path');
+var util = require('./util');
 
 var cmap = require('./tables/cmap');
 var cff = require('./tables/cff');
+var fvar = require('./tables/fvar');
 var glyf = require('./tables/glyf');
 var gpos = require('./tables/gpos');
 var head = require('./tables/head');
 var hhea = require('./tables/hhea');
 var hmtx = require('./tables/hmtx');
 var kern = require('./tables/kern');
+var ltag = require('./tables/ltag');
 var loca = require('./tables/loca');
 var maxp = require('./tables/maxp');
 var _name = require('./tables/name');
@@ -800,17 +1436,6 @@ var post = require('./tables/post');
 
 // File loaders /////////////////////////////////////////////////////////
 
-// Convert a Node.js Buffer to an ArrayBuffer
-function toArrayBuffer(buffer) {
-    var arrayBuffer = new ArrayBuffer(buffer.length);
-    var data = new Uint8Array(arrayBuffer);
-    for (var i = 0; i < buffer.length; i += 1) {
-        data[i] = buffer[i];
-    }
-
-    return arrayBuffer;
-}
-
 function loadFromFile(path, callback) {
     var fs = require('fs');
     fs.readFile(path, function(err, buffer) {
@@ -818,7 +1443,7 @@ function loadFromFile(path, callback) {
             return callback(err.message);
         }
 
-        callback(null, toArrayBuffer(buffer));
+        callback(null, util.nodeBufferToArrayBuffer(buffer));
     });
 }
 
@@ -837,127 +1462,215 @@ function loadFromUrl(url, callback) {
     request.send();
 }
 
-// Public API ///////////////////////////////////////////////////////////
+// Table Directory Entries //////////////////////////////////////////////
 
-// Parse the OpenType file data (as an ArrayBuffer) and return a Font object.
-// If the file could not be parsed (most likely because it contains Postscript outlines)
-// we return an empty Font object with the `supported` flag set to `false`.
-function parseBuffer(buffer) {
-    var indexToLocFormat;
-    var hmtxOffset;
-    var glyfOffset;
-    var locaOffset;
-    var cffOffset;
-    var kernOffset;
-    var gposOffset;
-
-    // OpenType fonts use big endian byte ordering.
-    // We can't rely on typed array view types, because they operate with the endianness of the host computer.
-    // Instead we use DataViews where we can specify endianness.
-
-    var font = new _font.Font();
-    var data = new DataView(buffer, 0);
-
-    var version = parse.getFixed(data, 0);
-    if (version === 1.0) {
-        font.outlinesFormat = 'truetype';
-    } else {
-        version = parse.getTag(data, 0);
-        if (version === 'OTTO') {
-            font.outlinesFormat = 'cff';
-        } else {
-            throw new Error('Unsupported OpenType version ' + version);
-        }
-    }
-
-    var numTables = parse.getUShort(data, 4);
-
-    // Offset into the table records.
+function parseOpenTypeTableEntries(data, numTables) {
+    var tableEntries = [];
     var p = 12;
     for (var i = 0; i < numTables; i += 1) {
         var tag = parse.getTag(data, p);
         var offset = parse.getULong(data, p + 8);
-        switch (tag) {
-        case 'cmap':
-            font.tables.cmap = cmap.parse(data, offset);
-            font.encoding = new encoding.CmapEncoding(font.tables.cmap);
-            if (!font.encoding) {
-                font.supported = false;
-            }
+        tableEntries.push({tag: tag, offset: offset, compression: false});
+        p += 16;
+    }
 
+    return tableEntries;
+}
+
+function parseWOFFTableEntries(data, numTables) {
+    var tableEntries = [];
+    var p = 44; // offset to the first table directory entry.
+    for (var i = 0; i < numTables; i += 1) {
+        var tag = parse.getTag(data, p);
+        var offset = parse.getULong(data, p + 4);
+        var compLength = parse.getULong(data, p + 8);
+        var origLength = parse.getULong(data, p + 12);
+        var compression;
+        if (compLength < origLength) {
+            compression = 'WOFF';
+        } else {
+            compression = false;
+        }
+
+        tableEntries.push({tag: tag, offset: offset, compression: compression,
+            compressedLength: compLength, originalLength: origLength});
+        p += 20;
+    }
+
+    return tableEntries;
+}
+
+function uncompressTable(data, tableEntry) {
+    if (tableEntry.compression === 'WOFF') {
+        var inBuffer = new Uint8Array(data.buffer, tableEntry.offset + 2, tableEntry.compressedLength - 2);
+        var outBuffer = new Uint8Array(tableEntry.originalLength);
+        inflate(inBuffer, outBuffer);
+        if (outBuffer.byteLength !== tableEntry.originalLength) {
+            throw new Error('Decompression error: ' + tableEntry.tag + ' decompressed length doesn\'t match recorded length');
+        }
+
+        var view = new DataView(outBuffer.buffer, 0);
+        return {data: view, offset: 0};
+    } else {
+        return {data: data, offset: tableEntry.offset};
+    }
+}
+
+// Public API ///////////////////////////////////////////////////////////
+
+// Parse the OpenType file data (as an ArrayBuffer) and return a Font object.
+// Throws an error if the font could not be parsed.
+function parseBuffer(buffer) {
+    var indexToLocFormat;
+    var ltagTable;
+
+    // Since the constructor can also be called to create new fonts from scratch, we indicate this
+    // should be an empty font that we'll fill with our own data.
+    var font = new _font.Font({empty: true});
+
+    // OpenType fonts use big endian byte ordering.
+    // We can't rely on typed array view types, because they operate with the endianness of the host computer.
+    // Instead we use DataViews where we can specify endianness.
+    var data = new DataView(buffer, 0);
+    var numTables;
+    var tableEntries = [];
+    var signature = parse.getTag(data, 0);
+    if (signature === String.fromCharCode(0, 1, 0, 0)) {
+        font.outlinesFormat = 'truetype';
+        numTables = parse.getUShort(data, 4);
+        tableEntries = parseOpenTypeTableEntries(data, numTables);
+    } else if (signature === 'OTTO') {
+        font.outlinesFormat = 'cff';
+        numTables = parse.getUShort(data, 4);
+        tableEntries = parseOpenTypeTableEntries(data, numTables);
+    } else if (signature === 'wOFF') {
+        var flavor = parse.getTag(data, 4);
+        if (flavor === String.fromCharCode(0, 1, 0, 0)) {
+            font.outlinesFormat = 'truetype';
+        } else if (flavor === 'OTTO') {
+            font.outlinesFormat = 'cff';
+        } else {
+            throw new Error('Unsupported OpenType flavor ' + signature);
+        }
+
+        numTables = parse.getUShort(data, 12);
+        tableEntries = parseWOFFTableEntries(data, numTables);
+    } else {
+        throw new Error('Unsupported OpenType signature ' + signature);
+    }
+
+    var cffTableEntry;
+    var fvarTableEntry;
+    var glyfTableEntry;
+    var gposTableEntry;
+    var hmtxTableEntry;
+    var kernTableEntry;
+    var locaTableEntry;
+    var nameTableEntry;
+
+    for (var i = 0; i < numTables; i += 1) {
+        var tableEntry = tableEntries[i];
+        var table;
+        switch (tableEntry.tag) {
+        case 'cmap':
+            table = uncompressTable(data, tableEntry);
+            font.tables.cmap = cmap.parse(table.data, table.offset);
+            font.encoding = new encoding.CmapEncoding(font.tables.cmap);
+            break;
+        case 'fvar':
+            fvarTableEntry = tableEntry;
             break;
         case 'head':
-            font.tables.head = head.parse(data, offset);
+            table = uncompressTable(data, tableEntry);
+            font.tables.head = head.parse(table.data, table.offset);
             font.unitsPerEm = font.tables.head.unitsPerEm;
             indexToLocFormat = font.tables.head.indexToLocFormat;
             break;
         case 'hhea':
-            font.tables.hhea = hhea.parse(data, offset);
+            table = uncompressTable(data, tableEntry);
+            font.tables.hhea = hhea.parse(table.data, table.offset);
             font.ascender = font.tables.hhea.ascender;
             font.descender = font.tables.hhea.descender;
             font.numberOfHMetrics = font.tables.hhea.numberOfHMetrics;
             break;
         case 'hmtx':
-            hmtxOffset = offset;
+            hmtxTableEntry = tableEntry;
+            break;
+        case 'ltag':
+            table = uncompressTable(data, tableEntry);
+            ltagTable = ltag.parse(table.data, table.offset);
             break;
         case 'maxp':
-            font.tables.maxp = maxp.parse(data, offset);
+            table = uncompressTable(data, tableEntry);
+            font.tables.maxp = maxp.parse(table.data, table.offset);
             font.numGlyphs = font.tables.maxp.numGlyphs;
             break;
         case 'name':
-            font.tables.name = _name.parse(data, offset);
-            font.familyName = font.tables.name.fontFamily;
-            font.styleName = font.tables.name.fontSubfamily;
+            nameTableEntry = tableEntry;
             break;
         case 'OS/2':
-            font.tables.os2 = os2.parse(data, offset);
+            table = uncompressTable(data, tableEntry);
+            font.tables.os2 = os2.parse(table.data, table.offset);
             break;
         case 'post':
-            font.tables.post = post.parse(data, offset);
+            table = uncompressTable(data, tableEntry);
+            font.tables.post = post.parse(table.data, table.offset);
             font.glyphNames = new encoding.GlyphNames(font.tables.post);
             break;
         case 'glyf':
-            glyfOffset = offset;
+            glyfTableEntry = tableEntry;
             break;
         case 'loca':
-            locaOffset = offset;
+            locaTableEntry = tableEntry;
             break;
         case 'CFF ':
-            cffOffset = offset;
+            cffTableEntry = tableEntry;
             break;
         case 'kern':
-            kernOffset = offset;
+            kernTableEntry = tableEntry;
             break;
         case 'GPOS':
-            gposOffset = offset;
+            gposTableEntry = tableEntry;
             break;
         }
-        p += 16;
     }
 
-    if (glyfOffset && locaOffset) {
+    var nameTable = uncompressTable(data, nameTableEntry);
+    font.tables.name = _name.parse(nameTable.data, nameTable.offset, ltagTable);
+    font.names = font.tables.name;
+
+    if (glyfTableEntry && locaTableEntry) {
         var shortVersion = indexToLocFormat === 0;
-        var locaTable = loca.parse(data, locaOffset, font.numGlyphs, shortVersion);
-        font.glyphs = glyf.parse(data, glyfOffset, locaTable, font);
-        hmtx.parse(data, hmtxOffset, font.numberOfHMetrics, font.numGlyphs, font.glyphs);
-        encoding.addGlyphNames(font);
-    } else if (cffOffset) {
-        cff.parse(data, cffOffset, font);
-        encoding.addGlyphNames(font);
+        var locaTable = uncompressTable(data, locaTableEntry);
+        var locaOffsets = loca.parse(locaTable.data, locaTable.offset, font.numGlyphs, shortVersion);
+        var glyfTable = uncompressTable(data, glyfTableEntry);
+        font.glyphs = glyf.parse(glyfTable.data, glyfTable.offset, locaOffsets, font);
+    } else if (cffTableEntry) {
+        var cffTable = uncompressTable(data, cffTableEntry);
+        cff.parse(cffTable.data, cffTable.offset, font);
     } else {
-        font.supported = false;
+        throw new Error('Font doesn\'t contain TrueType or CFF outlines.');
     }
 
-    if (font.supported) {
-        if (kernOffset) {
-            font.kerningPairs = kern.parse(data, kernOffset);
-        } else {
-            font.kerningPairs = {};
-        }
+    var hmtxTable = uncompressTable(data, hmtxTableEntry);
+    hmtx.parse(hmtxTable.data, hmtxTable.offset, font.numberOfHMetrics, font.numGlyphs, font.glyphs);
+    encoding.addGlyphNames(font);
 
-        if (gposOffset) {
-            gpos.parse(data, gposOffset, font);
-        }
+    if (kernTableEntry) {
+        var kernTable = uncompressTable(data, kernTableEntry);
+        font.kerningPairs = kern.parse(kernTable.data, kernTable.offset);
+    } else {
+        font.kerningPairs = {};
+    }
+
+    if (gposTableEntry) {
+        var gposTable = uncompressTable(data, gposTableEntry);
+        gpos.parse(gposTable.data, gposTable.offset, font);
+    }
+
+    if (fvarTableEntry) {
+        var fvarTable = uncompressTable(data, fvarTableEntry);
+        font.tables.fvar = fvar.parse(fvarTable.data, fvarTable.offset, font.names);
     }
 
     return font;
@@ -978,12 +1691,16 @@ function load(url, callback) {
         }
 
         var font = parseBuffer(arrayBuffer);
-        if (!font.supported) {
-            return callback('Font is not supported (is this a Postscript font?)');
-        }
-
         return callback(null, font);
     });
+}
+
+// Syncronously load the font from a URL or file.
+// When done, return the font object or throw an error.
+function loadSync(url) {
+    var fs = require('fs');
+    var buffer = fs.readFileSync(url);
+    return parseBuffer(util.nodeBufferToArrayBuffer(buffer));
 }
 
 exports._parse = parse;
@@ -992,8 +1709,9 @@ exports.Glyph = glyph.Glyph;
 exports.Path = path.Path;
 exports.parse = parseBuffer;
 exports.load = load;
+exports.loadSync = loadSync;
 
-},{"./encoding":3,"./font":4,"./glyph":5,"./parse":7,"./path":8,"./tables/cff":10,"./tables/cmap":11,"./tables/glyf":12,"./tables/gpos":13,"./tables/head":14,"./tables/hhea":15,"./tables/hmtx":16,"./tables/kern":17,"./tables/loca":18,"./tables/maxp":19,"./tables/name":20,"./tables/os2":21,"./tables/post":22,"fs":undefined}],7:[function(require,module,exports){
+},{"./encoding":4,"./font":5,"./glyph":6,"./parse":9,"./path":10,"./tables/cff":12,"./tables/cmap":13,"./tables/fvar":14,"./tables/glyf":15,"./tables/gpos":16,"./tables/head":17,"./tables/hhea":18,"./tables/hmtx":19,"./tables/kern":20,"./tables/loca":21,"./tables/ltag":22,"./tables/maxp":23,"./tables/name":24,"./tables/os2":25,"./tables/post":26,"./util":29,"fs":undefined,"tiny-inflate":1}],9:[function(require,module,exports){
 // Parsing utility functions
 
 'use strict';
@@ -1207,7 +1925,7 @@ Parser.prototype.skip = function(type, amount) {
 
 exports.Parser = Parser;
 
-},{}],8:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 // Geometric objects
 
 'use strict';
@@ -1377,7 +2095,7 @@ Path.prototype.toSVG = function(decimalPlaces) {
 
 exports.Path = Path;
 
-},{}],9:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 // Table metadata
 
 'use strict';
@@ -1434,7 +2152,7 @@ Table.prototype.encode = function() {
 
 exports.Table = Table;
 
-},{"./check":1,"./types":24}],10:[function(require,module,exports){
+},{"./check":2,"./types":28}],12:[function(require,module,exports){
 // The `CFF` table contains the glyph outlines in PostScript format.
 // https://www.microsoft.com/typography/OTSPEC/cff.htm
 // http://download.microsoft.com/download/8/0/1/801a191c-029d-4af3-9642-555f6fe514ee/cff.pdf
@@ -1443,7 +2161,7 @@ exports.Table = Table;
 'use strict';
 
 var encoding = require('../encoding');
-var _glyph = require('../glyph');
+var glyphset = require('../glyphset');
 var parse = require('../parse');
 var path = require('../path');
 var table = require('../table');
@@ -1799,7 +2517,7 @@ function parseCFFEncoding(data, start, charset) {
 // Take in charstring code and return a Glyph object.
 // The encoding is described in the Type 2 Charstring Format
 // https://www.microsoft.com/typography/OTSPEC/charstr2.htm
-function parseCFFCharstring(code, font, index) {
+function parseCFFCharstring(font, glyph, code) {
     var c1x;
     var c1y;
     var c2x;
@@ -2003,7 +2721,7 @@ function parseCFFCharstring(code, font, index) {
                     p.curveTo(c3x, c3y, c4x, c4y, x, y);
                     break;
                 default:
-                    console.log('Glyph ' + index + ': unknown operator ' + 1200 + v);
+                    console.log('Glyph ' + glyph.index + ': unknown operator ' + 1200 + v);
                     stack.length = 0;
                 }
                 break;
@@ -2173,7 +2891,7 @@ function parseCFFCharstring(code, font, index) {
                 break;
             default:
                 if (v < 32) {
-                    console.log('Glyph ' + index + ': unknown operator ' + v);
+                    console.log('Glyph ' + glyph.index + ': unknown operator ' + v);
                 } else if (v < 247) {
                     stack.push(v - 139);
                 } else if (v < 251) {
@@ -2197,10 +2915,9 @@ function parseCFFCharstring(code, font, index) {
     }
 
     parse(code);
-    var glyph = new _glyph.Glyph({font: font, index: index});
-    glyph.path = p;
+
     glyph.advanceWidth = width;
-    return glyph;
+    return p;
 }
 
 // Subroutines are encoded using the negative half of the number space.
@@ -2264,10 +2981,10 @@ function parseCFFTable(data, start, font) {
     // Prefer the CMAP encoding to the CFF encoding.
     font.encoding = font.encoding || font.cffEncoding;
 
-    font.glyphs = [];
+    font.glyphs = new glyphset.GlyphSet(font);
     for (var i = 0; i < font.nGlyphs; i += 1) {
         var charString = charStringsIndex.objects[i];
-        font.glyphs.push(parseCFFCharstring(charString, font, i));
+        font.glyphs.push(i, glyphset.cffGlyphLoader(font, i, parseCFFCharstring, charString));
     }
 }
 
@@ -2455,8 +3172,9 @@ function makeCharStringsIndex(glyphs) {
     var t = new table.Table('CharStrings INDEX', [
         {name: 'charStrings', type: 'INDEX', value: []}
     ]);
+
     for (var i = 0; i < glyphs.length; i += 1) {
-        var glyph = glyphs[i];
+        var glyph = glyphs.get(i);
         var ops = glyphToOps(glyph);
         t.charStrings.push({name: glyph.name, type: 'CHARSTRING', value: ops});
     }
@@ -2472,14 +3190,6 @@ function makePrivateDict(attrs, strings) {
     return t;
 }
 
-function makePrivateDictIndex(privateDict) {
-    var t = new table.Table('Private DICT INDEX', [
-        {name: 'privateDicts', type: 'INDEX', value: []}
-    ]);
-    t.privateDicts = [{name: 'privateDict_0', type: 'TABLE', value: privateDict}];
-    return t;
-}
-
 function makeCFFTable(glyphs, options) {
     var t = new table.Table('CFF ', [
         {name: 'header', type: 'TABLE'},
@@ -2489,9 +3199,10 @@ function makeCFFTable(glyphs, options) {
         {name: 'globalSubrIndex', type: 'TABLE'},
         {name: 'charsets', type: 'TABLE'},
         {name: 'charStringsIndex', type: 'TABLE'},
-        {name: 'privateDictIndex', type: 'TABLE'}
+        {name: 'privateDict', type: 'TABLE'}
     ]);
 
+    var fontScale = 1 / options.unitsPerEm;
     // We use non-zero values for the offsets so that the DICT encodes them.
     // This is important because the size of the Top DICT plays a role in offset calculation,
     // and the size shouldn't change after we've written correct offsets.
@@ -2500,6 +3211,8 @@ function makeCFFTable(glyphs, options) {
         fullName: options.fullName,
         familyName: options.familyName,
         weight: options.weightName,
+        fontBBox: options.fontBBox || [0, 0, 0, 0],
+        fontMatrix: [fontScale, 0, 0, fontScale, 0, 0],
         charset: 999,
         encoding: 0,
         charStrings: 999,
@@ -2509,10 +3222,12 @@ function makeCFFTable(glyphs, options) {
     var privateAttrs = {};
 
     var glyphNames = [];
+    var glyph;
 
     // Skip first glyph (.notdef)
     for (var i = 1; i < glyphs.length; i += 1) {
-        glyphNames.push(glyphs[i].name);
+        glyph = glyphs.get(i);
+        glyphNames.push(glyph.name);
     }
 
     var strings = [];
@@ -2524,8 +3239,7 @@ function makeCFFTable(glyphs, options) {
     t.globalSubrIndex = makeGlobalSubrIndex();
     t.charsets = makeCharsets(glyphNames, strings);
     t.charStringsIndex = makeCharStringsIndex(glyphs);
-    var privateDict = makePrivateDict(privateAttrs, strings);
-    t.privateDictIndex = makePrivateDictIndex(privateDict);
+    t.privateDict = makePrivateDict(privateAttrs, strings);
 
     // Needs to come at the end, to encode all custom strings used in the font.
     t.stringIndex = makeStringIndex(strings);
@@ -2552,7 +3266,7 @@ function makeCFFTable(glyphs, options) {
 exports.parse = parseCFFTable;
 exports.make = makeCFFTable;
 
-},{"../encoding":3,"../glyph":5,"../parse":7,"../path":8,"../table":9}],11:[function(require,module,exports){
+},{"../encoding":4,"../glyphset":7,"../parse":9,"../path":10,"../table":11}],13:[function(require,module,exports){
 // The `cmap` table stores the mappings from characters to glyphs.
 // https://www.microsoft.com/typography/OTSPEC/cmap.htm
 
@@ -2682,7 +3396,7 @@ function makeCmapTable(glyphs) {
 
     t.segments = [];
     for (i = 0; i < glyphs.length; i += 1) {
-        var glyph = glyphs[i];
+        var glyph = glyphs.get(i);
         for (var j = 0; j < glyph.unicodes.length; j += 1) {
             addSegment(t, glyph.unicodes[j], i);
         }
@@ -2740,14 +3454,162 @@ function makeCmapTable(glyphs) {
 exports.parse = parseCmapTable;
 exports.make = makeCmapTable;
 
-},{"../check":1,"../parse":7,"../table":9}],12:[function(require,module,exports){
+},{"../check":2,"../parse":9,"../table":11}],14:[function(require,module,exports){
+// The `fvar` table stores font variation axes and instances.
+// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6fvar.html
+
+'use strict';
+
+var check = require('../check');
+var parse = require('../parse');
+var table = require('../table');
+
+function addName(name, names) {
+    var nameString = JSON.stringify(name);
+    var nameID = 256;
+    for (var nameKey in names) {
+        var n = parseInt(nameKey);
+        if (!n || n < 256) {
+            continue;
+        }
+
+        if (JSON.stringify(names[nameKey]) === nameString) {
+            return n;
+        }
+
+        if (nameID <= n) {
+            nameID = n + 1;
+        }
+    }
+
+    names[nameID] = name;
+    return nameID;
+}
+
+function makeFvarAxis(axis, names) {
+    var nameID = addName(axis.name, names);
+    return new table.Table('fvarAxis', [
+        {name: 'tag', type: 'TAG', value: axis.tag},
+        {name: 'minValue', type: 'FIXED', value: axis.minValue << 16},
+        {name: 'defaultValue', type: 'FIXED', value: axis.defaultValue << 16},
+        {name: 'maxValue', type: 'FIXED', value: axis.maxValue << 16},
+        {name: 'flags', type: 'USHORT', value: 0},
+        {name: 'nameID', type: 'USHORT', value: nameID}
+    ]);
+}
+
+function parseFvarAxis(data, start, names) {
+    var axis = {};
+    var p = new parse.Parser(data, start);
+    axis.tag = p.parseTag();
+    axis.minValue = p.parseFixed();
+    axis.defaultValue = p.parseFixed();
+    axis.maxValue = p.parseFixed();
+    p.skip('uShort', 1);  // reserved for flags; no values defined
+    axis.name = names[p.parseUShort()] || {};
+    return axis;
+}
+
+function makeFvarInstance(inst, axes, names) {
+    var nameID = addName(inst.name, names);
+    var fields = [
+        {name: 'nameID', type: 'USHORT', value: nameID},
+        {name: 'flags', type: 'USHORT', value: 0}
+    ];
+
+    for (var i = 0; i < axes.length; ++i) {
+        var axisTag = axes[i].tag;
+        fields.push({
+            name: 'axis ' + axisTag,
+            type: 'FIXED',
+            value: inst.coordinates[axisTag] << 16
+        });
+    }
+
+    return new table.Table('fvarInstance', fields);
+}
+
+function parseFvarInstance(data, start, axes, names) {
+    var inst = {};
+    var p = new parse.Parser(data, start);
+    inst.name = names[p.parseUShort()] || {};
+    p.skip('uShort', 1);  // reserved for flags; no values defined
+
+    inst.coordinates = {};
+    for (var i = 0; i < axes.length; ++i) {
+        inst.coordinates[axes[i].tag] = p.parseFixed();
+    }
+
+    return inst;
+}
+
+function makeFvarTable(fvar, names) {
+    var result = new table.Table('fvar', [
+        {name: 'version', type: 'ULONG', value: 0x10000},
+        {name: 'offsetToData', type: 'USHORT', value: 0},
+        {name: 'countSizePairs', type: 'USHORT', value: 2},
+        {name: 'axisCount', type: 'USHORT', value: fvar.axes.length},
+        {name: 'axisSize', type: 'USHORT', value: 20},
+        {name: 'instanceCount', type: 'USHORT', value: fvar.instances.length},
+        {name: 'instanceSize', type: 'USHORT', value: 4 + fvar.axes.length * 4}
+    ]);
+    result.offsetToData = result.sizeOf();
+
+    for (var i = 0; i < fvar.axes.length; i++) {
+        result.fields.push({
+            name: 'axis ' + i,
+            type: 'TABLE',
+            value: makeFvarAxis(fvar.axes[i], names)});
+    }
+
+    for (var j = 0; j < fvar.instances.length; j++) {
+        result.fields.push({
+            name: 'instance ' + j,
+            type: 'TABLE',
+            value: makeFvarInstance(fvar.instances[j], fvar.axes, names)
+        });
+    }
+
+    return result;
+}
+
+function parseFvarTable(data, start, names) {
+    var p = new parse.Parser(data, start);
+    var tableVersion = p.parseULong();
+    check.argument(tableVersion === 0x00010000, 'Unsupported fvar table version.');
+    var offsetToData = p.parseOffset16();
+    // Skip countSizePairs.
+    p.skip('uShort', 1);
+    var axisCount = p.parseUShort();
+    var axisSize = p.parseUShort();
+    var instanceCount = p.parseUShort();
+    var instanceSize = p.parseUShort();
+
+    var axes = [];
+    for (var i = 0; i < axisCount; i++) {
+        axes.push(parseFvarAxis(data, start + offsetToData + i * axisSize, names));
+    }
+
+    var instances = [];
+    var instanceStart = start + offsetToData + axisCount * axisSize;
+    for (var j = 0; j < instanceCount; j++) {
+        instances.push(parseFvarInstance(data, instanceStart + j * instanceSize, axes, names));
+    }
+
+    return {axes:axes, instances:instances};
+}
+
+exports.make = makeFvarTable;
+exports.parse = parseFvarTable;
+
+},{"../check":2,"../parse":9,"../table":11}],15:[function(require,module,exports){
 // The `glyf` table describes the glyphs in TrueType outline format.
 // http://www.microsoft.com/typography/otspec/glyf.htm
 
 'use strict';
 
 var check = require('../check');
-var _glyph = require('../glyph');
+var glyphset = require('../glyphset');
 var parse = require('../parse');
 var path = require('../path');
 
@@ -2778,12 +3640,8 @@ function parseGlyphCoordinate(p, flag, previousValue, shortVectorBitMask, sameBi
 }
 
 // Parse a TrueType glyph.
-function parseGlyph(data, start, index, font) {
-    //var p, glyph, flag, i, j, flags,
-    //    endPointIndices, numberOfCoordinates, repeatCount, points, point, px, py,
-    //    component, moreComponents;
+function parseGlyph(glyph, data, start) {
     var p = new parse.Parser(data, start);
-    var glyph = new _glyph.Glyph({font: font, index: index});
     glyph.numberOfContours = p.parseShort();
     glyph.xMin = p.parseShort();
     glyph.yMin = p.parseShort();
@@ -2903,8 +3761,6 @@ function parseGlyph(data, start, index, font) {
             moreComponents = !!(flags & 32);
         }
     }
-
-    return glyph;
 }
 
 // Transform an array of points and return a new array.
@@ -3011,35 +3867,37 @@ function getPath(points) {
     return p;
 }
 
+function buildPath(glyphs, glyph) {
+    if (glyph.isComposite) {
+        for (var j = 0; j < glyph.components.length; j += 1) {
+            var component = glyph.components[j];
+            var componentGlyph = glyphs.get(component.glyphIndex);
+            // Force the ttfGlyphLoader to parse the glyph.
+            componentGlyph.getPath();
+            if (componentGlyph.points) {
+                var transformedPoints = transformPoints(componentGlyph.points, component);
+                glyph.points = glyph.points.concat(transformedPoints);
+            }
+        }
+    }
+
+    return getPath(glyph.points);
+}
+
 // Parse all the glyphs according to the offsets from the `loca` table.
 function parseGlyfTable(data, start, loca, font) {
-    var glyphs = [];
+    var glyphs = new glyphset.GlyphSet(font);
     var i;
+
     // The last element of the loca table is invalid.
     for (i = 0; i < loca.length - 1; i += 1) {
         var offset = loca[i];
         var nextOffset = loca[i + 1];
         if (offset !== nextOffset) {
-            glyphs.push(parseGlyph(data, start + offset, i, font));
+            glyphs.push(i, glyphset.ttfGlyphLoader(font, i, parseGlyph, data, start + offset, buildPath));
         } else {
-            glyphs.push(new _glyph.Glyph({font: font, index: i}));
+            glyphs.push(i, glyphset.glyphLoader(font, i));
         }
-    }
-    // Go over the glyphs again, resolving the composite glyphs.
-    for (i = 0; i < glyphs.length; i += 1) {
-        var glyph = glyphs[i];
-        if (glyph.isComposite) {
-            for (var j = 0; j < glyph.components.length; j += 1) {
-                var component = glyph.components[j];
-                var componentGlyph = glyphs[component.glyphIndex];
-                if (componentGlyph.points) {
-                    var transformedPoints = transformPoints(componentGlyph.points, component);
-                    glyph.points = glyph.points.concat(transformedPoints);
-                }
-            }
-        }
-
-        glyph.path = getPath(glyph.points);
     }
 
     return glyphs;
@@ -3047,7 +3905,7 @@ function parseGlyfTable(data, start, loca, font) {
 
 exports.parse = parseGlyfTable;
 
-},{"../check":1,"../glyph":5,"../parse":7,"../path":8}],13:[function(require,module,exports){
+},{"../check":2,"../glyphset":7,"../parse":9,"../path":10}],16:[function(require,module,exports){
 // The `GPOS` table contains kerning pairs, among other things.
 // https://www.microsoft.com/typography/OTSPEC/gpos.htm
 
@@ -3288,7 +4146,7 @@ function parseGposTable(data, start, font) {
 
 exports.parse = parseGposTable;
 
-},{"../check":1,"../parse":7}],14:[function(require,module,exports){
+},{"../check":2,"../parse":9}],17:[function(require,module,exports){
 // The `head` table contains global information about the font.
 // https://www.microsoft.com/typography/OTSPEC/head.htm
 
@@ -3318,7 +4176,7 @@ function parseHeadTable(data, start) {
     head.macStyle = p.parseUShort();
     head.lowestRecPPEM = p.parseUShort();
     head.fontDirectionHint = p.parseShort();
-    head.indexToLocFormat = p.parseShort();     // 50
+    head.indexToLocFormat = p.parseShort();
     head.glyphDataFormat = p.parseShort();
     return head;
 }
@@ -3348,7 +4206,7 @@ function makeHeadTable(options) {
 exports.parse = parseHeadTable;
 exports.make = makeHeadTable;
 
-},{"../check":1,"../parse":7,"../table":9}],15:[function(require,module,exports){
+},{"../check":2,"../parse":9,"../table":11}],18:[function(require,module,exports){
 // The `hhea` table contains information for horizontal layout.
 // https://www.microsoft.com/typography/OTSPEC/hhea.htm
 
@@ -3403,7 +4261,7 @@ function makeHheaTable(options) {
 exports.parse = parseHheaTable;
 exports.make = makeHheaTable;
 
-},{"../parse":7,"../table":9}],16:[function(require,module,exports){
+},{"../parse":9,"../table":11}],19:[function(require,module,exports){
 // The `hmtx` table contains the horizontal metrics for all glyphs.
 // https://www.microsoft.com/typography/OTSPEC/hmtx.htm
 
@@ -3425,7 +4283,7 @@ function parseHmtxTable(data, start, numMetrics, numGlyphs, glyphs) {
             leftSideBearing = p.parseShort();
         }
 
-        var glyph = glyphs[i];
+        var glyph = glyphs.get(i);
         glyph.advanceWidth = advanceWidth;
         glyph.leftSideBearing = leftSideBearing;
     }
@@ -3434,7 +4292,7 @@ function parseHmtxTable(data, start, numMetrics, numGlyphs, glyphs) {
 function makeHmtxTable(glyphs) {
     var t = new table.Table('hmtx', []);
     for (var i = 0; i < glyphs.length; i += 1) {
-        var glyph = glyphs[i];
+        var glyph = glyphs.get(i);
         var advanceWidth = glyph.advanceWidth || 0;
         var leftSideBearing = glyph.leftSideBearing || 0;
         t.fields.push({name: 'advanceWidth_' + i, type: 'USHORT', value: advanceWidth});
@@ -3447,7 +4305,7 @@ function makeHmtxTable(glyphs) {
 exports.parse = parseHmtxTable;
 exports.make = makeHmtxTable;
 
-},{"../parse":7,"../table":9}],17:[function(require,module,exports){
+},{"../parse":9,"../table":11}],20:[function(require,module,exports){
 // The `kern` table contains kerning pairs.
 // Note that some fonts use the GPOS OpenType layout table to specify kerning.
 // https://www.microsoft.com/typography/OTSPEC/kern.htm
@@ -3484,7 +4342,7 @@ function parseKernTable(data, start) {
 
 exports.parse = parseKernTable;
 
-},{"../check":1,"../parse":7}],18:[function(require,module,exports){
+},{"../check":2,"../parse":9}],21:[function(require,module,exports){
 // The `loca` table stores the offsets to the locations of the glyphs in the font.
 // https://www.microsoft.com/typography/OTSPEC/loca.htm
 
@@ -3519,7 +4377,70 @@ function parseLocaTable(data, start, numGlyphs, shortVersion) {
 
 exports.parse = parseLocaTable;
 
-},{"../parse":7}],19:[function(require,module,exports){
+},{"../parse":9}],22:[function(require,module,exports){
+// The `ltag` table stores IETF BCP-47 language tags. It allows supporting
+// languages for which TrueType does not assign a numeric code.
+// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6ltag.html
+// http://www.w3.org/International/articles/language-tags/
+// http://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
+
+'use strict';
+
+var check = require('../check');
+var parse = require('../parse');
+var table = require('../table');
+
+function makeLtagTable(tags) {
+    var result = new table.Table('ltag', [
+        {name: 'version', type: 'ULONG', value: 1},
+        {name: 'flags', type: 'ULONG', value: 0},
+        {name: 'numTags', type: 'ULONG', value: tags.length}
+    ]);
+
+    var stringPool = '';
+    var stringPoolOffset = 12 + tags.length * 4;
+    for (var i = 0; i < tags.length; ++i) {
+        var pos = stringPool.indexOf(tags[i]);
+        if (pos < 0) {
+            pos = stringPool.length;
+            stringPool += tags[i];
+        }
+
+        result.fields.push({name: 'offset ' + i, type: 'USHORT', value: stringPoolOffset + pos});
+        result.fields.push({name: 'length ' + i, type: 'USHORT', value: tags[i].length});
+    }
+
+    result.fields.push({name: 'stringPool', type: 'CHARARRAY', value: stringPool});
+    return result;
+}
+
+function parseLtagTable(data, start) {
+    var p = new parse.Parser(data, start);
+    var tableVersion = p.parseULong();
+    check.argument(tableVersion === 1, 'Unsupported ltag table version.');
+    // The 'ltag' specification does not define any flags; skip the field.
+    p.skip('uLong', 1);
+    var numTags = p.parseULong();
+
+    var tags = [];
+    for (var i = 0; i < numTags; i++) {
+        var tag = '';
+        var offset = start + p.parseUShort();
+        var length = p.parseUShort();
+        for (var j = offset; j < offset + length; ++j) {
+            tag += String.fromCharCode(data.getInt8(j));
+        }
+
+        tags.push(tag);
+    }
+
+    return tags;
+}
+
+exports.make = makeLtagTable;
+exports.parse = parseLtagTable;
+
+},{"../check":2,"../parse":9,"../table":11}],23:[function(require,module,exports){
 // The `maxp` table establishes the memory requirements for the font.
 // We need it just to get the number of glyphs in the font.
 // https://www.microsoft.com/typography/OTSPEC/maxp.htm
@@ -3564,13 +4485,15 @@ function makeMaxpTable(numGlyphs) {
 exports.parse = parseMaxpTable;
 exports.make = makeMaxpTable;
 
-},{"../parse":7,"../table":9}],20:[function(require,module,exports){
+},{"../parse":9,"../table":11}],24:[function(require,module,exports){
 // The `name` naming table.
 // https://www.microsoft.com/typography/OTSPEC/name.htm
 
 'use strict';
 
-var encode = require('../types').encode;
+var types = require('../types');
+var decode = types.decode;
+var encode = types.encode;
 var parse = require('../parse');
 var table = require('../table');
 
@@ -3589,8 +4512,8 @@ var nameTableNames = [
     'description',            // 10
     'manufacturerURL',        // 11
     'designerURL',            // 12
-    'licence',                // 13
-    'licenceURL',             // 14
+    'license',                // 13
+    'licenseURL',             // 14
     'reserved',               // 15
     'preferredFamily',        // 16
     'preferredSubfamily',     // 17
@@ -3601,51 +4524,653 @@ var nameTableNames = [
     'wwsSubfamily'            // 22
 ];
 
-// Parse the naming `name` table
-// Only Windows Unicode English names are supported.
-// Format 1 additional fields are not supported
-function parseNameTable(data, start) {
+var macLanguages = {
+    0: 'en',
+    1: 'fr',
+    2: 'de',
+    3: 'it',
+    4: 'nl',
+    5: 'sv',
+    6: 'es',
+    7: 'da',
+    8: 'pt',
+    9: 'no',
+    10: 'he',
+    11: 'ja',
+    12: 'ar',
+    13: 'fi',
+    14: 'el',
+    15: 'is',
+    16: 'mt',
+    17: 'tr',
+    18: 'hr',
+    19: 'zh-Hant',
+    20: 'ur',
+    21: 'hi',
+    22: 'th',
+    23: 'ko',
+    24: 'lt',
+    25: 'pl',
+    26: 'hu',
+    27: 'es',
+    28: 'lv',
+    29: 'se',
+    30: 'fo',
+    31: 'fa',
+    32: 'ru',
+    33: 'zh',
+    34: 'nl-BE',
+    35: 'ga',
+    36: 'sq',
+    37: 'ro',
+    38: 'cz',
+    39: 'sk',
+    40: 'si',
+    41: 'yi',
+    42: 'sr',
+    43: 'mk',
+    44: 'bg',
+    45: 'uk',
+    46: 'be',
+    47: 'uz',
+    48: 'kk',
+    49: 'az-Cyrl',
+    50: 'az-Arab',
+    51: 'hy',
+    52: 'ka',
+    53: 'mo',
+    54: 'ky',
+    55: 'tg',
+    56: 'tk',
+    57: 'mn-CN',
+    58: 'mn',
+    59: 'ps',
+    60: 'ks',
+    61: 'ku',
+    62: 'sd',
+    63: 'bo',
+    64: 'ne',
+    65: 'sa',
+    66: 'mr',
+    67: 'bn',
+    68: 'as',
+    69: 'gu',
+    70: 'pa',
+    71: 'or',
+    72: 'ml',
+    73: 'kn',
+    74: 'ta',
+    75: 'te',
+    76: 'si',
+    77: 'my',
+    78: 'km',
+    79: 'lo',
+    80: 'vi',
+    81: 'id',
+    82: 'tl',
+    83: 'ms',
+    84: 'ms-Arab',
+    85: 'am',
+    86: 'ti',
+    87: 'om',
+    88: 'so',
+    89: 'sw',
+    90: 'rw',
+    91: 'rn',
+    92: 'ny',
+    93: 'mg',
+    94: 'eo',
+    128: 'cy',
+    129: 'eu',
+    130: 'ca',
+    131: 'la',
+    132: 'qu',
+    133: 'gn',
+    134: 'ay',
+    135: 'tt',
+    136: 'ug',
+    137: 'dz',
+    138: 'jv',
+    139: 'su',
+    140: 'gl',
+    141: 'af',
+    142: 'br',
+    143: 'iu',
+    144: 'gd',
+    145: 'gv',
+    146: 'ga',
+    147: 'to',
+    148: 'el-polyton',
+    149: 'kl',
+    150: 'az',
+    151: 'nn'
+};
+
+// MacOS language ID → MacOS script ID
+//
+// Note that the script ID is not sufficient to determine what encoding
+// to use in TrueType files. For some languages, MacOS used a modification
+// of a mainstream script. For example, an Icelandic name would be stored
+// with smRoman in the TrueType naming table, but the actual encoding
+// is a special Icelandic version of the normal Macintosh Roman encoding.
+// As another example, Inuktitut uses an 8-bit encoding for Canadian Aboriginal
+// Syllables but MacOS had run out of available script codes, so this was
+// done as a (pretty radical) "modification" of Ethiopic.
+//
+// http://unicode.org/Public/MAPPINGS/VENDORS/APPLE/Readme.txt
+var macLanguageToScript = {
+    0: 0,  // langEnglish → smRoman
+    1: 0,  // langFrench → smRoman
+    2: 0,  // langGerman → smRoman
+    3: 0,  // langItalian → smRoman
+    4: 0,  // langDutch → smRoman
+    5: 0,  // langSwedish → smRoman
+    6: 0,  // langSpanish → smRoman
+    7: 0,  // langDanish → smRoman
+    8: 0,  // langPortuguese → smRoman
+    9: 0,  // langNorwegian → smRoman
+    10: 5,  // langHebrew → smHebrew
+    11: 1,  // langJapanese → smJapanese
+    12: 4,  // langArabic → smArabic
+    13: 0,  // langFinnish → smRoman
+    14: 6,  // langGreek → smGreek
+    15: 0,  // langIcelandic → smRoman (modified)
+    16: 0,  // langMaltese → smRoman
+    17: 0,  // langTurkish → smRoman (modified)
+    18: 0,  // langCroatian → smRoman (modified)
+    19: 2,  // langTradChinese → smTradChinese
+    20: 4,  // langUrdu → smArabic
+    21: 9,  // langHindi → smDevanagari
+    22: 21,  // langThai → smThai
+    23: 3,  // langKorean → smKorean
+    24: 29,  // langLithuanian → smCentralEuroRoman
+    25: 29,  // langPolish → smCentralEuroRoman
+    26: 29,  // langHungarian → smCentralEuroRoman
+    27: 29,  // langEstonian → smCentralEuroRoman
+    28: 29,  // langLatvian → smCentralEuroRoman
+    29: 0,  // langSami → smRoman
+    30: 0,  // langFaroese → smRoman (modified)
+    31: 4,  // langFarsi → smArabic (modified)
+    32: 7,  // langRussian → smCyrillic
+    33: 25,  // langSimpChinese → smSimpChinese
+    34: 0,  // langFlemish → smRoman
+    35: 0,  // langIrishGaelic → smRoman (modified)
+    36: 0,  // langAlbanian → smRoman
+    37: 0,  // langRomanian → smRoman (modified)
+    38: 29,  // langCzech → smCentralEuroRoman
+    39: 29,  // langSlovak → smCentralEuroRoman
+    40: 0,  // langSlovenian → smRoman (modified)
+    41: 5,  // langYiddish → smHebrew
+    42: 7,  // langSerbian → smCyrillic
+    43: 7,  // langMacedonian → smCyrillic
+    44: 7,  // langBulgarian → smCyrillic
+    45: 7,  // langUkrainian → smCyrillic (modified)
+    46: 7,  // langByelorussian → smCyrillic
+    47: 7,  // langUzbek → smCyrillic
+    48: 7,  // langKazakh → smCyrillic
+    49: 7,  // langAzerbaijani → smCyrillic
+    50: 4,  // langAzerbaijanAr → smArabic
+    51: 24,  // langArmenian → smArmenian
+    52: 23,  // langGeorgian → smGeorgian
+    53: 7,  // langMoldavian → smCyrillic
+    54: 7,  // langKirghiz → smCyrillic
+    55: 7,  // langTajiki → smCyrillic
+    56: 7,  // langTurkmen → smCyrillic
+    57: 27,  // langMongolian → smMongolian
+    58: 7,  // langMongolianCyr → smCyrillic
+    59: 4,  // langPashto → smArabic
+    60: 4,  // langKurdish → smArabic
+    61: 4,  // langKashmiri → smArabic
+    62: 4,  // langSindhi → smArabic
+    63: 26,  // langTibetan → smTibetan
+    64: 9,  // langNepali → smDevanagari
+    65: 9,  // langSanskrit → smDevanagari
+    66: 9,  // langMarathi → smDevanagari
+    67: 13,  // langBengali → smBengali
+    68: 13,  // langAssamese → smBengali
+    69: 11,  // langGujarati → smGujarati
+    70: 10,  // langPunjabi → smGurmukhi
+    71: 12,  // langOriya → smOriya
+    72: 17,  // langMalayalam → smMalayalam
+    73: 16,  // langKannada → smKannada
+    74: 14,  // langTamil → smTamil
+    75: 15,  // langTelugu → smTelugu
+    76: 18,  // langSinhalese → smSinhalese
+    77: 19,  // langBurmese → smBurmese
+    78: 20,  // langKhmer → smKhmer
+    79: 22,  // langLao → smLao
+    80: 30,  // langVietnamese → smVietnamese
+    81: 0,  // langIndonesian → smRoman
+    82: 0,  // langTagalog → smRoman
+    83: 0,  // langMalayRoman → smRoman
+    84: 4,  // langMalayArabic → smArabic
+    85: 28,  // langAmharic → smEthiopic
+    86: 28,  // langTigrinya → smEthiopic
+    87: 28,  // langOromo → smEthiopic
+    88: 0,  // langSomali → smRoman
+    89: 0,  // langSwahili → smRoman
+    90: 0,  // langKinyarwanda → smRoman
+    91: 0,  // langRundi → smRoman
+    92: 0,  // langNyanja → smRoman
+    93: 0,  // langMalagasy → smRoman
+    94: 0,  // langEsperanto → smRoman
+    128: 0,  // langWelsh → smRoman (modified)
+    129: 0,  // langBasque → smRoman
+    130: 0,  // langCatalan → smRoman
+    131: 0,  // langLatin → smRoman
+    132: 0,  // langQuechua → smRoman
+    133: 0,  // langGuarani → smRoman
+    134: 0,  // langAymara → smRoman
+    135: 7,  // langTatar → smCyrillic
+    136: 4,  // langUighur → smArabic
+    137: 26,  // langDzongkha → smTibetan
+    138: 0,  // langJavaneseRom → smRoman
+    139: 0,  // langSundaneseRom → smRoman
+    140: 0,  // langGalician → smRoman
+    141: 0,  // langAfrikaans → smRoman
+    142: 0,  // langBreton → smRoman (modified)
+    143: 28,  // langInuktitut → smEthiopic (modified)
+    144: 0,  // langScottishGaelic → smRoman (modified)
+    145: 0,  // langManxGaelic → smRoman (modified)
+    146: 0,  // langIrishGaelicScript → smRoman (modified)
+    147: 0,  // langTongan → smRoman
+    148: 6,  // langGreekAncient → smRoman
+    149: 0,  // langGreenlandic → smRoman
+    150: 0,  // langAzerbaijanRoman → smRoman
+    151: 0   // langNynorsk → smRoman
+};
+
+// While Microsoft indicates a region/country for all its language
+// IDs, we omit the region code if it's equal to the "most likely
+// region subtag" according to Unicode CLDR. For scripts, we omit
+// the subtag if it is equal to the Suppress-Script entry in the
+// IANA language subtag registry for IETF BCP 47.
+//
+// For example, Microsoft states that its language code 0x041A is
+// Croatian in Croatia. We transform this to the BCP 47 language code 'hr'
+// and not 'hr-HR' because Croatia is the default country for Croatian,
+// according to Unicode CLDR. As another example, Microsoft states
+// that 0x101A is Croatian (Latin) in Bosnia-Herzegovina. We transform
+// this to 'hr-BA' and not 'hr-Latn-BA' because Latin is the default script
+// for the Croatian language, according to IANA.
+//
+// http://www.unicode.org/cldr/charts/latest/supplemental/likely_subtags.html
+// http://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
+var windowsLanguages = {
+    0x0436: 'af',
+    0x041C: 'sq',
+    0x0484: 'gsw',
+    0x045E: 'am',
+    0x1401: 'ar-DZ',
+    0x3C01: 'ar-BH',
+    0x0C01: 'ar',
+    0x0801: 'ar-IQ',
+    0x2C01: 'ar-JO',
+    0x3401: 'ar-KW',
+    0x3001: 'ar-LB',
+    0x1001: 'ar-LY',
+    0x1801: 'ary',
+    0x2001: 'ar-OM',
+    0x4001: 'ar-QA',
+    0x0401: 'ar-SA',
+    0x2801: 'ar-SY',
+    0x1C01: 'aeb',
+    0x3801: 'ar-AE',
+    0x2401: 'ar-YE',
+    0x042B: 'hy',
+    0x044D: 'as',
+    0x082C: 'az-Cyrl',
+    0x042C: 'az',
+    0x046D: 'ba',
+    0x042D: 'eu',
+    0x0423: 'be',
+    0x0845: 'bn',
+    0x0445: 'bn-IN',
+    0x201A: 'bs-Cyrl',
+    0x141A: 'bs',
+    0x047E: 'br',
+    0x0402: 'bg',
+    0x0403: 'ca',
+    0x0C04: 'zh-HK',
+    0x1404: 'zh-MO',
+    0x0804: 'zh',
+    0x1004: 'zh-SG',
+    0x0404: 'zh-TW',
+    0x0483: 'co',
+    0x041A: 'hr',
+    0x101A: 'hr-BA',
+    0x0405: 'cs',
+    0x0406: 'da',
+    0x048C: 'prs',
+    0x0465: 'dv',
+    0x0813: 'nl-BE',
+    0x0413: 'nl',
+    0x0C09: 'en-AU',
+    0x2809: 'en-BZ',
+    0x1009: 'en-CA',
+    0x2409: 'en-029',
+    0x4009: 'en-IN',
+    0x1809: 'en-IE',
+    0x2009: 'en-JM',
+    0x4409: 'en-MY',
+    0x1409: 'en-NZ',
+    0x3409: 'en-PH',
+    0x4809: 'en-SG',
+    0x1C09: 'en-ZA',
+    0x2C09: 'en-TT',
+    0x0809: 'en-GB',
+    0x0409: 'en',
+    0x3009: 'en-ZW',
+    0x0425: 'et',
+    0x0438: 'fo',
+    0x0464: 'fil',
+    0x040B: 'fi',
+    0x080C: 'fr-BE',
+    0x0C0C: 'fr-CA',
+    0x040C: 'fr',
+    0x140C: 'fr-LU',
+    0x180C: 'fr-MC',
+    0x100C: 'fr-CH',
+    0x0462: 'fy',
+    0x0456: 'gl',
+    0x0437: 'ka',
+    0x0C07: 'de-AT',
+    0x0407: 'de',
+    0x1407: 'de-LI',
+    0x1007: 'de-LU',
+    0x0807: 'de-CH',
+    0x0408: 'el',
+    0x046F: 'kl',
+    0x0447: 'gu',
+    0x0468: 'ha',
+    0x040D: 'he',
+    0x0439: 'hi',
+    0x040E: 'hu',
+    0x040F: 'is',
+    0x0470: 'ig',
+    0x0421: 'id',
+    0x045D: 'iu',
+    0x085D: 'iu-Latn',
+    0x083C: 'ga',
+    0x0434: 'xh',
+    0x0435: 'zu',
+    0x0410: 'it',
+    0x0810: 'it-CH',
+    0x0411: 'ja',
+    0x044B: 'kn',
+    0x043F: 'kk',
+    0x0453: 'km',
+    0x0486: 'quc',
+    0x0487: 'rw',
+    0x0441: 'sw',
+    0x0457: 'kok',
+    0x0412: 'ko',
+    0x0440: 'ky',
+    0x0454: 'lo',
+    0x0426: 'lv',
+    0x0427: 'lt',
+    0x082E: 'dsb',
+    0x046E: 'lb',
+    0x042F: 'mk',
+    0x083E: 'ms-BN',
+    0x043E: 'ms',
+    0x044C: 'ml',
+    0x043A: 'mt',
+    0x0481: 'mi',
+    0x047A: 'arn',
+    0x044E: 'mr',
+    0x047C: 'moh',
+    0x0450: 'mn',
+    0x0850: 'mn-CN',
+    0x0461: 'ne',
+    0x0414: 'nb',
+    0x0814: 'nn',
+    0x0482: 'oc',
+    0x0448: 'or',
+    0x0463: 'ps',
+    0x0415: 'pl',
+    0x0416: 'pt',
+    0x0816: 'pt-PT',
+    0x0446: 'pa',
+    0x046B: 'qu-BO',
+    0x086B: 'qu-EC',
+    0x0C6B: 'qu',
+    0x0418: 'ro',
+    0x0417: 'rm',
+    0x0419: 'ru',
+    0x243B: 'smn',
+    0x103B: 'smj-NO',
+    0x143B: 'smj',
+    0x0C3B: 'se-FI',
+    0x043B: 'se',
+    0x083B: 'se-SE',
+    0x203B: 'sms',
+    0x183B: 'sma-NO',
+    0x1C3B: 'sms',
+    0x044F: 'sa',
+    0x1C1A: 'sr-Cyrl-BA',
+    0x0C1A: 'sr',
+    0x181A: 'sr-Latn-BA',
+    0x081A: 'sr-Latn',
+    0x046C: 'nso',
+    0x0432: 'tn',
+    0x045B: 'si',
+    0x041B: 'sk',
+    0x0424: 'sl',
+    0x2C0A: 'es-AR',
+    0x400A: 'es-BO',
+    0x340A: 'es-CL',
+    0x240A: 'es-CO',
+    0x140A: 'es-CR',
+    0x1C0A: 'es-DO',
+    0x300A: 'es-EC',
+    0x440A: 'es-SV',
+    0x100A: 'es-GT',
+    0x480A: 'es-HN',
+    0x080A: 'es-MX',
+    0x4C0A: 'es-NI',
+    0x180A: 'es-PA',
+    0x3C0A: 'es-PY',
+    0x280A: 'es-PE',
+    0x500A: 'es-PR',
+
+    // Microsoft has defined two different language codes for
+    // “Spanish with modern sorting” and “Spanish with traditional
+    // sorting”. This makes sense for collation APIs, and it would be
+    // possible to express this in BCP 47 language tags via Unicode
+    // extensions (eg., es-u-co-trad is Spanish with traditional
+    // sorting). However, for storing names in fonts, the distinction
+    // does not make sense, so we give “es” in both cases.
+    0x0C0A: 'es',
+    0x040A: 'es',
+
+    0x540A: 'es-US',
+    0x380A: 'es-UY',
+    0x200A: 'es-VE',
+    0x081D: 'sv-FI',
+    0x041D: 'sv',
+    0x045A: 'syr',
+    0x0428: 'tg',
+    0x085F: 'tzm',
+    0x0449: 'ta',
+    0x0444: 'tt',
+    0x044A: 'te',
+    0x041E: 'th',
+    0x0451: 'bo',
+    0x041F: 'tr',
+    0x0442: 'tk',
+    0x0480: 'ug',
+    0x0422: 'uk',
+    0x042E: 'hsb',
+    0x0420: 'ur',
+    0x0843: 'uz-Cyrl',
+    0x0443: 'uz',
+    0x042A: 'vi',
+    0x0452: 'cy',
+    0x0488: 'wo',
+    0x0485: 'sah',
+    0x0478: 'ii',
+    0x046A: 'yo'
+};
+
+// Returns a IETF BCP 47 language code, for example 'zh-Hant'
+// for 'Chinese in the traditional script'.
+function getLanguageCode(platformID, languageID, ltag) {
+    switch (platformID) {
+    case 0:  // Unicode
+        if (languageID === 0xFFFF) {
+            return 'und';
+        } else if (ltag) {
+            return ltag[languageID];
+        }
+
+        break;
+
+    case 1:  // Macintosh
+        return macLanguages[languageID];
+
+    case 3:  // Windows
+        return windowsLanguages[languageID];
+    }
+
+    return undefined;
+}
+
+var utf16 = 'utf-16';
+
+// MacOS script ID → encoding. This table stores the default case,
+// which can be overridden by macLanguageEncodings.
+var macScriptEncodings = {
+    0: 'macintosh',           // smRoman
+    1: 'x-mac-japanese',      // smJapanese
+    2: 'x-mac-chinesetrad',   // smTradChinese
+    3: 'x-mac-korean',        // smKorean
+    6: 'x-mac-greek',         // smGreek
+    7: 'x-mac-cyrillic',      // smCyrillic
+    9: 'x-mac-devanagai',     // smDevanagari
+    10: 'x-mac-gurmukhi',     // smGurmukhi
+    11: 'x-mac-gujarati',     // smGujarati
+    12: 'x-mac-oriya',        // smOriya
+    13: 'x-mac-bengali',      // smBengali
+    14: 'x-mac-tamil',        // smTamil
+    15: 'x-mac-telugu',       // smTelugu
+    16: 'x-mac-kannada',      // smKannada
+    17: 'x-mac-malayalam',    // smMalayalam
+    18: 'x-mac-sinhalese',    // smSinhalese
+    19: 'x-mac-burmese',      // smBurmese
+    20: 'x-mac-khmer',        // smKhmer
+    21: 'x-mac-thai',         // smThai
+    22: 'x-mac-lao',          // smLao
+    23: 'x-mac-georgian',     // smGeorgian
+    24: 'x-mac-armenian',     // smArmenian
+    25: 'x-mac-chinesesimp',  // smSimpChinese
+    26: 'x-mac-tibetan',      // smTibetan
+    27: 'x-mac-mongolian',    // smMongolian
+    28: 'x-mac-ethiopic',     // smEthiopic
+    29: 'x-mac-ce',           // smCentralEuroRoman
+    30: 'x-mac-vietnamese',   // smVietnamese
+    31: 'x-mac-extarabic'     // smExtArabic
+};
+
+// MacOS language ID → encoding. This table stores the exceptional
+// cases, which override macScriptEncodings. For writing MacOS naming
+// tables, we need to emit a MacOS script ID. Therefore, we cannot
+// merge macScriptEncodings into macLanguageEncodings.
+//
+// http://unicode.org/Public/MAPPINGS/VENDORS/APPLE/Readme.txt
+var macLanguageEncodings = {
+    15: 'x-mac-icelandic',    // langIcelandic
+    17: 'x-mac-turkish',      // langTurkish
+    18: 'x-mac-croatian',     // langCroatian
+    24: 'x-mac-ce',           // langLithuanian
+    25: 'x-mac-ce',           // langPolish
+    26: 'x-mac-ce',           // langHungarian
+    27: 'x-mac-ce',           // langEstonian
+    28: 'x-mac-ce',           // langLatvian
+    30: 'x-mac-icelandic',    // langFaroese
+    37: 'x-mac-romanian',     // langRomanian
+    38: 'x-mac-ce',           // langCzech
+    39: 'x-mac-ce',           // langSlovak
+    40: 'x-mac-ce',           // langSlovenian
+    143: 'x-mac-inuit',       // langInuktitut
+    146: 'x-mac-gaelic'       // langIrishGaelicScript
+};
+
+function getEncoding(platformID, encodingID, languageID) {
+    switch (platformID) {
+    case 0:  // Unicode
+        return utf16;
+
+    case 1:  // Apple Macintosh
+        return macLanguageEncodings[languageID] || macScriptEncodings[encodingID];
+
+    case 3:  // Microsoft Windows
+        if (encodingID === 1 || encodingID === 10) {
+            return utf16;
+        }
+
+        break;
+    }
+
+    return undefined;
+}
+
+// Parse the naming `name` table.
+// FIXME: Format 1 additional fields are not supported yet.
+// ltag is the content of the `ltag' table, such as ['en', 'zh-Hans', 'de-CH-1904'].
+function parseNameTable(data, start, ltag) {
     var name = {};
     var p = new parse.Parser(data, start);
-    name.format = p.parseUShort();
+    var format = p.parseUShort();
     var count = p.parseUShort();
     var stringOffset = p.offset + p.parseUShort();
-    var unknownCount = 0;
     for (var i = 0; i < count; i++) {
         var platformID = p.parseUShort();
         var encodingID = p.parseUShort();
         var languageID = p.parseUShort();
         var nameID = p.parseUShort();
-        var property = nameTableNames[nameID];
+        var property = nameTableNames[nameID] || nameID;
         var byteLength = p.parseUShort();
         var offset = p.parseUShort();
-        // platformID - encodingID - languageID standard combinations :
-        // 1 - 0 - 0 : Macintosh, Roman, English
-        // 3 - 1 - 0x409 : Windows, Unicode BMP (UCS-2), en-US
-        if (platformID === 3 && encodingID === 1 && languageID === 0x409) {
-            var codePoints = [];
-            var length = byteLength / 2;
-            for (var j = 0; j < length; j++, offset += 2) {
-                codePoints[j] = parse.getShort(data, stringOffset + offset);
+        var language = getLanguageCode(platformID, languageID, ltag);
+        var encoding = getEncoding(platformID, encodingID, languageID);
+        if (encoding !== undefined && language !== undefined) {
+            var text;
+            if (encoding === utf16) {
+                text = decode.UTF16(data, stringOffset + offset, byteLength);
+            } else {
+                text = decode.MACSTRING(data, stringOffset + offset, byteLength, encoding);
             }
 
-            var str = String.fromCharCode.apply(null, codePoints);
-            if (property) {
-                name[property] = str;
-            }
-            else {
-                unknownCount++;
-                name['unknown' + unknownCount] = str;
+            if (text) {
+                var translations = name[property];
+                if (translations === undefined) {
+                    translations = name[property] = {};
+                }
+
+                translations[language] = text;
             }
         }
-
     }
 
-    if (name.format === 1) {
-        name.langTagCount = p.parseUShort();
+    var langTagCount = 0;
+    if (format === 1) {
+        // FIXME: Also handle Microsoft's 'name' table 1.
+        langTagCount = p.parseUShort();
     }
 
     return name;
+}
+
+// {23: 'foo'} → {'foo': 23}
+// ['bar', 'baz'] → {'bar': 0, 'baz': 1}
+function reverseDict(dict) {
+    var result = {};
+    for (var key in dict) {
+        result[dict[key]] = parseInt(key);
+    }
+
+    return result;
 }
 
 function makeNameRecord(platformID, encodingID, languageID, nameID, length, offset) {
@@ -3659,67 +5184,140 @@ function makeNameRecord(platformID, encodingID, languageID, nameID, length, offs
     ]);
 }
 
-function addMacintoshNameRecord(t, recordID, s, offset) {
-    // Macintosh, Roman, English
-    var stringBytes = encode.STRING(s);
-    t.records.push(makeNameRecord(1, 0, 0, recordID, stringBytes.length, offset));
-    t.strings.push(stringBytes);
-    offset += stringBytes.length;
+// Finds the position of needle in haystack, or -1 if not there.
+// Like String.indexOf(), but for arrays.
+function findSubArray(needle, haystack) {
+    var needleLength = needle.length;
+    var limit = haystack.length - needleLength + 1;
+
+    loop:
+    for (var pos = 0; pos < limit; pos++) {
+        for (; pos < limit; pos++) {
+            for (var k = 0; k < needleLength; k++) {
+                if (haystack[pos + k] !== needle[k]) {
+                    continue loop;
+                }
+            }
+
+            return pos;
+        }
+    }
+
+    return -1;
+}
+
+function addStringToPool(s, pool) {
+    var offset = findSubArray(s, pool);
+    if (offset < 0) {
+        offset = pool.length;
+        for (var i = 0, len = s.length; i < len; ++i) {
+            pool.push(s[i]);
+        }
+
+    }
+
     return offset;
 }
 
-function addWindowsNameRecord(t, recordID, s, offset) {
-    // Windows, Unicode BMP (UCS-2), US English
-    var utf16Bytes = encode.UTF16(s);
-    t.records.push(makeNameRecord(3, 1, 0x0409, recordID, utf16Bytes.length, offset));
-    t.strings.push(utf16Bytes);
-    offset += utf16Bytes.length;
-    return offset;
-}
+function makeNameTable(names, ltag) {
+    var nameID;
+    var nameIDs = [];
 
-function makeNameTable(options) {
+    var namesWithNumericKeys = {};
+    var nameTableIds = reverseDict(nameTableNames);
+    for (var key in names) {
+        var id = nameTableIds[key];
+        if (id === undefined) {
+            id = key;
+        }
+
+        nameID = parseInt(id);
+        namesWithNumericKeys[nameID] = names[key];
+        nameIDs.push(nameID);
+    }
+
+    var macLanguageIds = reverseDict(macLanguages);
+    var windowsLanguageIds = reverseDict(windowsLanguages);
+
+    var nameRecords = [];
+    var stringPool = [];
+
+    for (var i = 0; i < nameIDs.length; i++) {
+        nameID = nameIDs[i];
+        var translations = namesWithNumericKeys[nameID];
+        for (var lang in translations) {
+            var text = translations[lang];
+
+            // For MacOS, we try to emit the name in the form that was introduced
+            // in the initial version of the TrueType spec (in the late 1980s).
+            // However, this can fail for various reasons: the requested BCP 47
+            // language code might not have an old-style Mac equivalent;
+            // we might not have a codec for the needed character encoding;
+            // or the name might contain characters that cannot be expressed
+            // in the old-style Macintosh encoding. In case of failure, we emit
+            // the name in a more modern fashion (Unicode encoding with BCP 47
+            // language tags) that is recognized by MacOS 10.5, released in 2009.
+            // If fonts were only read by operating systems, we could simply
+            // emit all names in the modern form; this would be much easier.
+            // However, there are many applications and libraries that read
+            // 'name' tables directly, and these will usually only recognize
+            // the ancient form (silently skipping the unrecognized names).
+            var macPlatform = 1;  // Macintosh
+            var macLanguage = macLanguageIds[lang];
+            var macScript = macLanguageToScript[macLanguage];
+            var macEncoding = getEncoding(macPlatform, macScript, macLanguage);
+            var macName = encode.MACSTRING(text, macEncoding);
+            if (macName === undefined) {
+                macPlatform = 0;  // Unicode
+                macLanguage = ltag.indexOf(lang);
+                if (macLanguage < 0) {
+                    macLanguage = ltag.length;
+                    ltag.push(lang);
+                }
+
+                macScript = 4;  // Unicode 2.0 and later
+                macName = encode.UTF16(text);
+            }
+
+            var macNameOffset = addStringToPool(macName, stringPool);
+            nameRecords.push(makeNameRecord(macPlatform, macScript, macLanguage,
+                                            nameID, macName.length, macNameOffset));
+
+            var winLanguage = windowsLanguageIds[lang];
+            if (winLanguage !== undefined) {
+                var winName = encode.UTF16(text);
+                var winNameOffset = addStringToPool(winName, stringPool);
+                nameRecords.push(makeNameRecord(3, 1, winLanguage,
+                                                nameID, winName.length, winNameOffset));
+            }
+        }
+    }
+
+    nameRecords.sort(function(a, b) {
+        return ((a.platformID - b.platformID) ||
+                (a.encodingID - b.encodingID) ||
+                (a.languageID - b.languageID) ||
+                (a.nameID - b.nameID));
+    });
+
     var t = new table.Table('name', [
         {name: 'format', type: 'USHORT', value: 0},
-        {name: 'count', type: 'USHORT', value: 0},
-        {name: 'stringOffset', type: 'USHORT', value: 0}
+        {name: 'count', type: 'USHORT', value: nameRecords.length},
+        {name: 'stringOffset', type: 'USHORT', value: 6 + nameRecords.length * 12}
     ]);
-    t.records = [];
-    t.strings = [];
-    var offset = 0;
-    var i;
-    var s;
-    // Add Macintosh records first
-    for (i = 0; i < nameTableNames.length; i += 1) {
-        if (options[nameTableNames[i]] !== undefined) {
-            s = options[nameTableNames[i]];
-            offset = addMacintoshNameRecord(t, i, s, offset);
-        }
-    }
-    // Then add Windows records
-    for (i = 0; i < nameTableNames.length; i += 1) {
-        if (options[nameTableNames[i]] !== undefined) {
-            s = options[nameTableNames[i]];
-            offset = addWindowsNameRecord(t, i, s, offset);
-        }
+
+    for (var r = 0; r < nameRecords.length; r++) {
+        t.fields.push({name: 'record_' + r, type: 'TABLE', value: nameRecords[r]});
     }
 
-    t.count = t.records.length;
-    t.stringOffset = 6 + t.count * 12;
-    for (i = 0; i < t.records.length; i += 1) {
-        t.fields.push({name: 'record_' + i, type: 'TABLE', value: t.records[i]});
-    }
-
-    for (i = 0; i < t.strings.length; i += 1) {
-        t.fields.push({name: 'string_' + i, type: 'LITERAL', value: t.strings[i]});
-    }
-
+    t.fields.push({name: 'strings', type: 'LITERAL', value: stringPool});
     return t;
 }
 
 exports.parse = parseNameTable;
 exports.make = makeNameTable;
 
-},{"../parse":7,"../table":9,"../types":24}],21:[function(require,module,exports){
+},{"../parse":9,"../table":11,"../types":28}],25:[function(require,module,exports){
 // The `OS/2` table contains metrics required in OpenType fonts.
 // https://www.microsoft.com/typography/OTSPEC/os2.htm
 
@@ -3975,7 +5573,7 @@ exports.getUnicodeRange = getUnicodeRange;
 exports.parse = parseOS2Table;
 exports.make = makeOS2Table;
 
-},{"../parse":7,"../table":9}],22:[function(require,module,exports){
+},{"../parse":9,"../table":11}],26:[function(require,module,exports){
 // The `post` table stores additional PostScript information, such as glyph names.
 // https://www.microsoft.com/typography/OTSPEC/post.htm
 
@@ -4048,7 +5646,7 @@ function makePostTable() {
 exports.parse = parsePostTable;
 exports.make = makePostTable;
 
-},{"../encoding":3,"../parse":7,"../table":9}],23:[function(require,module,exports){
+},{"../encoding":4,"../parse":9,"../table":11}],27:[function(require,module,exports){
 // The `sfnt` wrapper provides organization for the tables in the font.
 // It is the top-level data structure in a font.
 // https://www.microsoft.com/typography/OTSPEC/otff.htm
@@ -4065,6 +5663,7 @@ var cff = require('./cff');
 var head = require('./head');
 var hhea = require('./hhea');
 var hmtx = require('./hmtx');
+var ltag = require('./ltag');
 var maxp = require('./maxp');
 var _name = require('./name');
 var os2 = require('./os2');
@@ -4160,7 +5759,7 @@ function metricsForChar(font, chars, notFoundMetrics) {
     for (var i = 0; i < chars.length; i += 1) {
         var glyphIndex = font.charToGlyphIndex(chars[i]);
         if (glyphIndex > 0) {
-            var glyph = font.glyphs[glyphIndex];
+            var glyph = font.glyphs.get(glyphIndex);
             return glyph.getMetrics();
         }
     }
@@ -4187,14 +5786,15 @@ function fontToSfntTable(font) {
     var advanceWidths = [];
     var leftSideBearings = [];
     var rightSideBearings = [];
-    var firstCharIndex = null;
+    var firstCharIndex;
     var lastCharIndex = 0;
     var ulUnicodeRange1 = 0;
     var ulUnicodeRange2 = 0;
     var ulUnicodeRange3 = 0;
     var ulUnicodeRange4 = 0;
+
     for (var i = 0; i < font.glyphs.length; i += 1) {
-        var glyph = font.glyphs[i];
+        var glyph = font.glyphs.get(i);
         var unicode = glyph.unicode | 0;
         if (firstCharIndex > unicode || firstCharIndex === null) {
             firstCharIndex = unicode;
@@ -4243,11 +5843,13 @@ function fontToSfntTable(font) {
     globals.descender = font.descender !== undefined ? font.descender : globals.yMin;
 
     var headTable = head.make({
+        flags: 3, // 00000011 (baseline for font at y=0; left sidebearing point at x=0)
         unitsPerEm: font.unitsPerEm,
         xMin: globals.xMin,
         yMin: globals.yMin,
         xMax: globals.xMax,
-        yMax: globals.yMax
+        yMax: globals.yMax,
+        lowestRecPPEM: 3
     });
 
     var hheaTable = hhea.make({
@@ -4272,6 +5874,7 @@ function fontToSfntTable(font) {
         ulUnicodeRange2: ulUnicodeRange2,
         ulUnicodeRange3: ulUnicodeRange3,
         ulUnicodeRange4: ulUnicodeRange4,
+        fsSelection: 64, // REGULAR
         // See http://typophile.com/node/13081 for more info on vertical metrics.
         // We get metrics for typical characters (such as "x" for xHeight).
         // We provide some fallback characters if characters are unavailable: their
@@ -4279,47 +5882,67 @@ function fontToSfntTable(font) {
         sTypoAscender: globals.ascender,
         sTypoDescender: globals.descender,
         sTypoLineGap: 0,
-        usWinAscent: globals.ascender,
-        usWinDescent: -globals.descender,
-        sxHeight: metricsForChar(font, 'xyvw', {yMax: 0}).yMax,
+        usWinAscent: globals.yMax,
+        usWinDescent: Math.abs(globals.yMin),
+        ulCodePageRange1: 1, // FIXME: hard-code Latin 1 support for now
+        sxHeight: metricsForChar(font, 'xyvw', {yMax: Math.round(globals.ascender / 2)}).yMax,
         sCapHeight: metricsForChar(font, 'HIKLEFJMNTZBDPRAGOQSUVWXY', globals).yMax,
+        usDefaultChar: font.hasChar(' ') ? 32 : 0, // Use space as the default character, if available.
         usBreakChar: font.hasChar(' ') ? 32 : 0 // Use space as the break character, if available.
     });
 
     var hmtxTable = hmtx.make(font.glyphs);
     var cmapTable = cmap.make(font.glyphs);
 
-    var fullName = font.familyName + ' ' + font.styleName;
-    var postScriptName = font.familyName.replace(/\s/g, '') + '-' + font.styleName;
-    var nameTable = _name.make({
-        copyright: font.copyright,
-        fontFamily: font.familyName,
-        fontSubfamily: font.styleName,
-        uniqueID: font.manufacturer + ':' + fullName,
-        fullName: fullName,
-        version: font.version,
-        postScriptName: postScriptName,
-        trademark: font.trademark,
-        manufacturer: font.manufacturer,
-        designer: font.designer,
-        description: font.description,
-        manufacturerURL: font.manufacturerURL,
-        designerURL: font.designerURL,
-        license: font.license,
-        licenseURL: font.licenseURL,
-        preferredFamily: font.familyName,
-        preferredSubfamily: font.styleName
-    });
+    var englishFamilyName = font.getEnglishName('fontFamily');
+    var englishStyleName = font.getEnglishName('fontSubfamily');
+    var englishFullName = englishFamilyName + ' ' + englishStyleName;
+    var postScriptName = font.getEnglishName('postScriptName');
+    if (!postScriptName) {
+        postScriptName = englishFamilyName.replace(/\s/g, '') + '-' + englishStyleName;
+    }
+
+    var names = {};
+    for (var n in font.names) {
+        names[n] = font.names[n];
+    }
+
+    if (!names.uniqueID) {
+        names.uniqueID = {en: font.getEnglishName('manufacturer') + ':' + englishFullName};
+    }
+
+    if (!names.postScriptName) {
+        names.postScriptName = {en: postScriptName};
+    }
+
+    if (!names.preferredFamily) {
+        names.preferredFamily = font.names.fontFamily;
+    }
+
+    if (!names.preferredSubfamily) {
+        names.preferredSubfamily = font.names.fontSubfamily;
+    }
+
+    var languageTags = [];
+    var nameTable = _name.make(names, languageTags);
+    var ltagTable = (languageTags.length > 0 ? ltag.make(languageTags) : undefined);
+
     var postTable = post.make();
     var cffTable = cff.make(font.glyphs, {
-        version: font.version,
-        fullName: fullName,
-        familyName: font.familyName,
-        weightName: font.styleName,
-        postScriptName: postScriptName
+        version: font.getEnglishName('version'),
+        fullName: englishFullName,
+        familyName: englishFamilyName,
+        weightName: englishStyleName,
+        postScriptName: postScriptName,
+        unitsPerEm: font.unitsPerEm,
+        fontBBox: [0, globals.yMin, globals.ascender, globals.advanceWidthMax]
     });
-    // Order the tables according to the the OpenType specification 1.4.
+
+    // The order does not matter because makeSfntTable() will sort them.
     var tables = [headTable, hheaTable, maxpTable, os2Table, nameTable, cmapTable, postTable, cffTable, hmtxTable];
+    if (ltagTable) {
+        tables.push(ltagTable);
+    }
 
     var sfntTable = makeSfntTable(tables);
 
@@ -4347,7 +5970,7 @@ exports.computeCheckSum = computeCheckSum;
 exports.make = makeSfntTable;
 exports.fontToTable = fontToSfntTable;
 
-},{"../check":1,"../table":9,"./cff":10,"./cmap":11,"./head":14,"./hhea":15,"./hmtx":16,"./maxp":19,"./name":20,"./os2":21,"./post":22}],24:[function(require,module,exports){
+},{"../check":2,"../table":11,"./cff":12,"./cmap":13,"./head":17,"./hhea":18,"./hmtx":19,"./ltag":22,"./maxp":23,"./name":24,"./os2":25,"./post":26}],28:[function(require,module,exports){
 // Data types used in the OpenType font file.
 // All OpenType fonts use Motorola-style byte ordering (Big Endian)
 
@@ -4386,7 +6009,7 @@ encode.CHAR = function(v) {
     return [v.charCodeAt(0)];
 };
 
-sizeOf.BYTE = constant(1);
+sizeOf.CHAR = constant(1);
 
 // Convert an ASCII string to a list of bytes.
 encode.CHARARRAY = function(v) {
@@ -4515,16 +6138,56 @@ encode.NUMBER16 = function(v) {
     return [28, (v >> 8) & 0xFF, v & 0xFF];
 };
 
-sizeOf.NUMBER16 = constant(2);
+sizeOf.NUMBER16 = constant(3);
 
-// Convert a signed number between -(2^31) and +(2^31-1) to a four-byte value.
+// Convert a signed number between -(2^31) and +(2^31-1) to a five-byte value.
 // This is useful if you want to be sure you always use four bytes,
 // at the expense of wasting a few bytes for smaller numbers.
 encode.NUMBER32 = function(v) {
     return [29, (v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 };
 
-sizeOf.NUMBER32 = constant(4);
+sizeOf.NUMBER32 = constant(5);
+
+encode.REAL = function(v) {
+    var value = v.toString();
+
+    // Some numbers use an epsilon to encode the value. (e.g. JavaScript will store 0.0000001 as 1e-7)
+    // This code converts it back to a number without the epsilon.
+    var m = /\.(\d*?)(?:9{5,20}|0{5,20})\d{0,2}(?:e(.+)|$)/.exec(value);
+    if (m) {
+        var epsilon = parseFloat('1e' + ((m[2] ? +m[2] : 0) + m[1].length));
+        value = (Math.round(v * epsilon) / epsilon).toString();
+    }
+
+    var nibbles = '';
+    var i;
+    var ii;
+    for (i = 0, ii = value.length; i < ii; i += 1) {
+        var c = value[i];
+        if (c === 'e') {
+            nibbles += value[++i] === '-' ? 'c' : 'b';
+        } else if (c === '.') {
+            nibbles += 'a';
+        } else if (c === '-') {
+            nibbles += 'e';
+        } else {
+            nibbles += c;
+        }
+    }
+
+    nibbles += (nibbles.length & 1) ? 'f' : 'ff';
+    var out = [30];
+    for (i = 0, ii = nibbles.length; i < ii; i += 2) {
+        out.push(parseInt(nibbles.substr(i, 2), 16));
+    }
+
+    return out;
+};
+
+sizeOf.REAL = function(v) {
+    return encode.REAL(v).length;
+};
 
 encode.NAME = encode.CHARARRAY;
 sizeOf.NAME = sizeOf.CHARARRAY;
@@ -4532,12 +6195,23 @@ sizeOf.NAME = sizeOf.CHARARRAY;
 encode.STRING = encode.CHARARRAY;
 sizeOf.STRING = sizeOf.CHARARRAY;
 
-// Convert a ASCII string to a list of UTF16 bytes.
+decode.UTF16 = function(data, offset, numBytes) {
+    var codePoints = [];
+    var numChars = numBytes / 2;
+    for (var j = 0; j < numChars; j++, offset += 2) {
+        codePoints[j] = data.getUint16(offset);
+    }
+
+    return String.fromCharCode.apply(null, codePoints);
+};
+
+// Convert a JavaScript string to UTF16-BE.
 encode.UTF16 = function(v) {
     var b = [];
     for (var i = 0; i < v.length; i += 1) {
-        b.push(0);
-        b.push(v.charCodeAt(i));
+        var codepoint = v.charCodeAt(i);
+        b.push((codepoint >> 8) & 0xFF);
+        b.push(codepoint & 0xFF);
     }
 
     return b;
@@ -4545,6 +6219,167 @@ encode.UTF16 = function(v) {
 
 sizeOf.UTF16 = function(v) {
     return v.length * 2;
+};
+
+// Data for converting old eight-bit Macintosh encodings to Unicode.
+// This representation is optimized for decoding; encoding is slower
+// and needs more memory. The assumption is that all opentype.js users
+// want to open fonts, but saving a font will be comperatively rare
+// so it can be more expensive. Keyed by IANA character set name.
+//
+// Python script for generating these strings:
+//
+//     s = u''.join([chr(c).decode('mac_greek') for c in range(128, 256)])
+//     print(s.encode('utf-8'))
+var eightBitMacEncodings = {
+    'x-mac-croatian':  // Python: 'mac_croatian'
+        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®Š™´¨≠ŽØ∞±≤≥∆µ∂∑∏š∫ªºΩžø' +
+        '¿¡¬√ƒ≈Ć«Č… ÀÃÕŒœĐ—“”‘’÷◊©⁄€‹›Æ»–·‚„‰ÂćÁčÈÍÎÏÌÓÔđÒÚÛÙıˆ˜¯πË˚¸Êæˇ',
+    'x-mac-cyrillic':  // Python: 'mac_cyrillic'
+        'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ†°Ґ£§•¶І®©™Ђђ≠Ѓѓ∞±≤≥іµґЈЄєЇїЉљЊњ' +
+        'јЅ¬√ƒ≈∆«»… ЋћЌќѕ–—“”‘’÷„ЎўЏџ№Ёёяабвгдежзийклмнопрстуфхцчшщъыьэю',
+    'x-mac-gaelic':
+        // http://unicode.org/Public/MAPPINGS/VENDORS/APPLE/GAELIC.TXT
+        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØḂ±≤≥ḃĊċḊḋḞḟĠġṀæø' +
+        'ṁṖṗɼƒſṠ«»… ÀÃÕŒœ–—“”‘’ṡẛÿŸṪ€‹›Ŷŷṫ·Ỳỳ⁊ÂÊÁËÈÍÎÏÌÓÔ♣ÒÚÛÙıÝýŴŵẄẅẀẁẂẃ',
+    'x-mac-greek':  // Python: 'mac_greek'
+        'Ä¹²É³ÖÜ΅àâä΄¨çéèêë£™îï•½‰ôö¦€ùûü†ΓΔΘΛΞΠß®©ΣΪ§≠°·Α±≤≥¥ΒΕΖΗΙΚΜΦΫΨΩ' +
+        'άΝ¬ΟΡ≈Τ«»… ΥΧΆΈœ–―“”‘’÷ΉΊΌΎέήίόΏύαβψδεφγηιξκλμνοπώρστθωςχυζϊϋΐΰ\u00AD',
+    'x-mac-icelandic':  // Python: 'mac_iceland'
+        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûüÝ°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø' +
+        '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€ÐðÞþý·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ',
+    'x-mac-inuit':
+        // http://unicode.org/Public/MAPPINGS/VENDORS/APPLE/INUIT.TXT
+        'ᐃᐄᐅᐆᐊᐋᐱᐲᐳᐴᐸᐹᑉᑎᑏᑐᑑᑕᑖᑦᑭᑮᑯᑰᑲᑳᒃᒋᒌᒍᒎᒐᒑ°ᒡᒥᒦ•¶ᒧ®©™ᒨᒪᒫᒻᓂᓃᓄᓅᓇᓈᓐᓯᓰᓱᓲᓴᓵᔅᓕᓖᓗ' +
+        'ᓘᓚᓛᓪᔨᔩᔪᔫᔭ… ᔮᔾᕕᕖᕗ–—“”‘’ᕘᕙᕚᕝᕆᕇᕈᕉᕋᕌᕐᕿᖀᖁᖂᖃᖄᖅᖏᖐᖑᖒᖓᖔᖕᙱᙲᙳᙴᙵᙶᖖᖠᖡᖢᖣᖤᖥᖦᕼŁł',
+    'x-mac-ce':  // Python: 'mac_latin2'
+        'ÄĀāÉĄÖÜáąČäčĆćéŹźĎíďĒēĖóėôöõúĚěü†°Ę£§•¶ß®©™ę¨≠ģĮįĪ≤≥īĶ∂∑łĻļĽľĹĺŅ' +
+        'ņŃ¬√ńŇ∆«»… ňŐÕőŌ–—“”‘’÷◊ōŔŕŘ‹›řŖŗŠ‚„šŚśÁŤťÍŽžŪÓÔūŮÚůŰűŲųÝýķŻŁżĢˇ',
+    macintosh:  // Python: 'mac_roman'
+        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø' +
+        '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€‹›ﬁﬂ‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ',
+    'x-mac-romanian':  // Python: 'mac_romanian'
+        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ĂȘ∞±≤≥¥µ∂∑∏π∫ªºΩăș' +
+        '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€‹›Țț‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ',
+    'x-mac-turkish':  // Python: 'mac_turkish'
+        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø' +
+        '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸĞğİıŞş‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙˆ˜¯˘˙˚¸˝˛ˇ'
+};
+
+// Decodes an old-style Macintosh string. Returns either a Unicode JavaScript
+// string, or 'undefined' if the encoding is unsupported. For example, we do
+// not support Chinese, Japanese or Korean because these would need large
+// mapping tables.
+decode.MACSTRING = function(dataView, offset, dataLength, encoding) {
+    var table = eightBitMacEncodings[encoding];
+    if (table === undefined) {
+        return undefined;
+    }
+
+    var result = '';
+    for (var i = 0; i < dataLength; i++) {
+        var c = dataView.getUint8(offset + i);
+        // In all eight-bit Mac encodings, the characters 0x00..0x7F are
+        // mapped to U+0000..U+007F; we only need to look up the others.
+        if (c <= 0x7F) {
+            result += String.fromCharCode(c);
+        } else {
+            result += table[c & 0x7F];
+        }
+    }
+
+    return result;
+};
+
+// Helper function for encode.MACSTRING. Returns a dictionary for mapping
+// Unicode character codes to their 8-bit MacOS equivalent. This table
+// is not exactly a super cheap data structure, but we do not care because
+// encoding Macintosh strings is only rarely needed in typical applications.
+var macEncodingTableCache = typeof WeakMap === 'function' && new WeakMap();
+var macEncodingCacheKeys;
+var getMacEncodingTable = function(encoding) {
+    // Since we use encoding as a cache key for WeakMap, it has to be
+    // a String object and not a literal. And at least on NodeJS 2.10.1,
+    // WeakMap requires that the same String instance is passed for cache hits.
+    if (!macEncodingCacheKeys) {
+        macEncodingCacheKeys = {};
+        for (var e in eightBitMacEncodings) {
+            /*jshint -W053 */  // Suppress "Do not use String as a constructor."
+            macEncodingCacheKeys[e] = new String(e);
+        }
+    }
+
+    var cacheKey = macEncodingCacheKeys[encoding];
+    if (cacheKey === undefined) {
+        return undefined;
+    }
+
+    // We can't do "if (cache.has(key)) {return cache.get(key)}" here:
+    // since garbage collection may run at any time, it could also kick in
+    // between the calls to cache.has() and cache.get(). In that case,
+    // we would return 'undefined' even though we do support the encoding.
+    if (macEncodingTableCache) {
+        var cachedTable = macEncodingTableCache.get(cacheKey);
+        if (cachedTable !== undefined) {
+            return cachedTable;
+        }
+    }
+
+    var decodingTable = eightBitMacEncodings[encoding];
+    if (decodingTable === undefined) {
+        return undefined;
+    }
+
+    var encodingTable = {};
+    for (var i = 0; i < decodingTable.length; i++) {
+        encodingTable[decodingTable.charCodeAt(i)] = i + 0x80;
+    }
+
+    if (macEncodingTableCache) {
+        macEncodingTableCache.set(cacheKey, encodingTable);
+    }
+
+    return encodingTable;
+};
+
+// Encodes an old-style Macintosh string. Returns a byte array upon success.
+// If the requested encoding is unsupported, or if the input string contains
+// a character that cannot be expressed in the encoding, the function returns
+// 'undefined'.
+encode.MACSTRING = function(str, encoding) {
+    var table = getMacEncodingTable(encoding);
+    if (table === undefined) {
+        return undefined;
+    }
+
+    var result = [];
+    for (var i = 0; i < str.length; i++) {
+        var c = str.charCodeAt(i);
+
+        // In all eight-bit Mac encodings, the characters 0x00..0x7F are
+        // mapped to U+0000..U+007F; we only need to look up the others.
+        if (c >= 0x80) {
+            c = table[c];
+            if (c === undefined) {
+                // str contains a Unicode character that cannot be encoded
+                // in the requested encoding.
+                return undefined;
+            }
+        }
+
+        result.push(c);
+    }
+
+    return result;
+};
+
+sizeOf.MACSTRING = function(str, encoding) {
+    var b = encode.MACSTRING(str, encoding);
+    if (b !== undefined) {
+        return b.length;
+    } else {
+        return 0;
+    }
 };
 
 // Convert a list of values to a CFF INDEX structure.
@@ -4636,9 +6471,13 @@ encode.OPERAND = function(v, type) {
             // We make it easy for ourselves and always encode offsets as
             // 4 bytes. This makes offset calculation for the top dict easier.
             d = d.concat(encode.NUMBER32(v));
-        } else {
-            // FIXME Add support for booleans
+        } else if (type === 'number') {
             d = d.concat(encode.NUMBER(v));
+        } else if (type === 'real') {
+            d = d.concat(encode.REAL(v));
+        } else {
+            throw new Error('Unknown operand type ' + type);
+            // FIXME Add support for booleans
         }
     }
 
@@ -4652,8 +6491,12 @@ sizeOf.OP = sizeOf.BYTE;
 var wmm = typeof WeakMap === 'function' && new WeakMap();
 // Convert a list of CharString operations to bytes.
 encode.CHARSTRING = function(ops) {
-    if (wmm && wmm.has(ops)) {
-        return wmm.get(ops);
+    // See encode.MACSTRING for why we don't do "if (wmm && wmm.has(ops))".
+    if (wmm) {
+        var cachedValue = wmm.get(ops);
+        if (cachedValue !== undefined) {
+            return cachedValue;
+        }
     }
 
     var d = [];
@@ -4684,6 +6527,12 @@ encode.OBJECT = function(v) {
     return encodingFunction(v.value);
 };
 
+sizeOf.OBJECT = function(v) {
+    var sizeOfFunction = sizeOf[v.type];
+    check.argument(sizeOfFunction !== undefined, 'No sizeOf function for type ' + v.type);
+    return sizeOfFunction(v.value);
+};
+
 // Convert a table object to bytes.
 // A table contains a list of fields containing the metadata (name, type and default value).
 // The table itself has the field values set as attributes.
@@ -4707,6 +6556,25 @@ encode.TABLE = function(table) {
     return d;
 };
 
+sizeOf.TABLE = function(table) {
+    var numBytes = 0;
+    var length = table.fields.length;
+
+    for (var i = 0; i < length; i += 1) {
+        var field = table.fields[i];
+        var sizeOfFunction = sizeOf[field.type];
+        check.argument(sizeOfFunction !== undefined, 'No sizeOf function for field type ' + field.type);
+        var value = table[field.name];
+        if (value === undefined) {
+            value = field.value;
+        }
+
+        numBytes += sizeOfFunction(value);
+    }
+
+    return numBytes;
+};
+
 // Merge in a list of bytes.
 encode.LITERAL = function(v) {
     return v;
@@ -4720,11 +6588,48 @@ exports.decode = decode;
 exports.encode = encode;
 exports.sizeOf = sizeOf;
 
-},{"./check":1}]},{},[6])(6)
+},{"./check":2}],29:[function(require,module,exports){
+'use strict';
+
+exports.isBrowser = function() {
+    return typeof window !== 'undefined';
+};
+
+exports.isNode = function() {
+    return typeof window === 'undefined';
+};
+
+exports.nodeBufferToArrayBuffer = function(buffer) {
+    var ab = new ArrayBuffer(buffer.length);
+    var view = new Uint8Array(ab);
+    for (var i = 0; i < buffer.length; ++i) {
+        view[i] = buffer[i];
+    }
+
+    return ab;
+};
+
+exports.arrayBufferToNodeBuffer = function(ab) {
+    var buffer = new Buffer(ab.byteLength);
+    var view = new Uint8Array(ab);
+    for (var i = 0; i < buffer.length; ++i) {
+        buffer[i] = view[i];
+    }
+
+    return buffer;
+};
+
+exports.checkArgument = function(expression, message) {
+    if (!expression) {
+        throw message;
+    }
+};
+
+},{}]},{},[8])(8)
 });
-},{}],2:[function(require,module,exports){
+},{}],3:[function(require,module,exports){
 /*!
- * Paper.js v0.9.22 - The Swiss Army Knife of Vector Graphics Scripting.
+ * Paper.js v0.9.25 - The Swiss Army Knife of Vector Graphics Scripting.
  * http://paperjs.org/
  *
  * Copyright (c) 2011 - 2014, Juerg Lehni & Jonathan Puckey
@@ -4734,7 +6639,7 @@ exports.sizeOf = sizeOf;
  *
  * All rights reserved.
  *
- * Date: Mon Mar 23 22:20:31 2015 +0100
+ * Date: Mon Dec 7 15:26:30 2015 +0100
  *
  ***
  *
@@ -4990,9 +6895,10 @@ Base.inject({
 
 	_set: function(props, exclude, dontCheck) {
 		if (props && (dontCheck || Base.isPlainObject(props))) {
-			var orig = props._filtering || props;
-			for (var key in orig) {
-				if (orig.hasOwnProperty(key) && !(exclude && exclude[key])) {
+			var keys = Object.keys(props._filtering || props);
+			for (var i = 0, l = keys.length; i < l; i++) {
+				var key = keys[i];
+				if (!(exclude && exclude[key])) {
 					var value = props[key];
 					if (value !== undefined)
 						this[key] = value;
@@ -5017,35 +6923,33 @@ Base.inject({
 		},
 
 		equals: function(obj1, obj2) {
-			function checkKeys(o1, o2) {
-				for (var i in o1)
-					if (o1.hasOwnProperty(i) && !o2.hasOwnProperty(i))
-						return false;
-				return true;
-			}
 			if (obj1 === obj2)
 				return true;
 			if (obj1 && obj1.equals)
 				return obj1.equals(obj2);
 			if (obj2 && obj2.equals)
 				return obj2.equals(obj1);
-			if (Array.isArray(obj1) && Array.isArray(obj2)) {
-				if (obj1.length !== obj2.length)
-					return false;
-				for (var i = 0, l = obj1.length; i < l; i++) {
-					if (!Base.equals(obj1[i], obj2[i]))
+			if (obj1 && obj2
+					&& typeof obj1 === 'object' && typeof obj2 === 'object') {
+				if (Array.isArray(obj1) && Array.isArray(obj2)) {
+					var length = obj1.length;
+					if (length !== obj2.length)
 						return false;
-				}
-				return true;
-			}
-			if (obj1 && typeof obj1 === 'object'
-					&& obj2 && typeof obj2 === 'object') {
-				if (!checkKeys(obj1, obj2) || !checkKeys(obj2, obj1))
-					return false;
-				for (var i in obj1) {
-					if (obj1.hasOwnProperty(i)
-							&& !Base.equals(obj1[i], obj2[i]))
+					while (length--) {
+						if (!Base.equals(obj1[length], obj2[length]))
+							return false;
+					}
+				} else {
+					var keys = Object.keys(obj1),
+						length = keys.length;
+					if (length !== Object.keys(obj2).length)
 						return false;
+					while (length--) {
+						var key = keys[length];
+						if (!(obj2.hasOwnProperty(key)
+								&& Base.equals(obj1[key], obj2[key])))
+							return false;
+					}
 				}
 				return true;
 			}
@@ -5174,10 +7078,12 @@ Base.inject({
 					res._compact = true;
 			} else if (Base.isPlainObject(obj)) {
 				res = {};
-				for (var i in obj)
-					if (obj.hasOwnProperty(i))
-						res[i] = Base.serialize(obj[i], options, compact,
-								dictionary);
+				var keys = Object.keys(obj);
+				for (var i = 0, l = keys.length; i < l; i++) {
+					var key = keys[i];
+					res[key] = Base.serialize(obj[key], options, compact,
+							dictionary);
+				}
 			} else if (typeof obj === 'number') {
 				res = options.formatter.number(obj, options.precision);
 			} else {
@@ -5188,24 +7094,23 @@ Base.inject({
 					: res;
 		},
 
-		deserialize: function(json, create, _data) {
+		deserialize: function(json, create, _data, _isDictionary) {
 			var res = json,
 				isRoot = !_data;
 			_data = _data || {};
 			if (Array.isArray(json)) {
 				var type = json[0],
 					isDictionary = type === 'dictionary';
-				if (!isDictionary) {
-					if (_data.dictionary && json.length == 1 && /^#/.test(type))
-						return _data.dictionary[type];
-					type = Base.exports[type];
-				}
+				if (json.length == 1 && /^#/.test(type))
+					return _data.dictionary[type];
+				type = Base.exports[type];
 				res = [];
+				if (_isDictionary)
+					_data.dictionary = res;
 				for (var i = type ? 1 : 0, l = json.length; i < l; i++)
-					res.push(Base.deserialize(json[i], create, _data));
-				if (isDictionary) {
-					_data.dictionary = res[0];
-				} else if (type) {
+					res.push(Base.deserialize(json[i], create, _data,
+							isDictionary));
+				if (type) {
 					var args = res;
 					if (create) {
 						res = create(type, args);
@@ -5216,6 +7121,8 @@ Base.inject({
 				}
 			} else if (Base.isPlainObject(json)) {
 				res = {};
+				if (_isDictionary)
+					_data.dictionary = res;
 				for (var key in json)
 					res[key] = Base.deserialize(json[key], create, _data);
 			}
@@ -5301,15 +7208,14 @@ var Emitter = {
 				this.on(key, value);
 			}, this);
 		} else {
-			var entry = this._eventTypes[type];
-			if (entry) {
-				var handlers = this._callbacks = this._callbacks || {};
-				handlers = handlers[type] = handlers[type] || [];
-				if (handlers.indexOf(func) === -1) {
-					handlers.push(func);
-					if (entry.install && handlers.length == 1)
-						entry.install.call(this, type);
-				}
+			var types = this._eventTypes,
+				entry = types && types[type],
+				handlers = this._callbacks = this._callbacks || {};
+			handlers = handlers[type] = handlers[type] || [];
+			if (handlers.indexOf(func) === -1) {
+				handlers.push(func);
+				if (entry && entry.install && handlers.length === 1)
+					entry.install.call(this, type);
 			}
 		}
 		return this;
@@ -5322,13 +7228,14 @@ var Emitter = {
 			}, this);
 			return;
 		}
-		var entry = this._eventTypes[type],
+		var types = this._eventTypes,
+			entry = types && types[type],
 			handlers = this._callbacks && this._callbacks[type],
 			index;
-		if (entry && handlers) {
+		if (handlers) {
 			if (!func || (index = handlers.indexOf(func)) !== -1
 					&& handlers.length === 1) {
-				if (entry.uninstall)
+				if (entry && entry.uninstall)
 					entry.uninstall.call(this, type);
 				delete this._callbacks[type];
 			} else if (index !== -1) {
@@ -5350,10 +7257,11 @@ var Emitter = {
 		if (!handlers)
 			return false;
 		var args = [].slice.call(arguments, 1);
+		handlers = handlers.slice();
 		for (var i = 0, l = handlers.length; i < l; i++) {
-			if (handlers[i].apply(this, args) === false
-					&& event && event.stop) {
-				event.stop();
+			if (handlers[i].apply(this, args) === false) {
+				if (event && event.stop)
+					event.stop();
 				break;
 			}
 		}
@@ -5373,8 +7281,9 @@ var Emitter = {
 			key = install ? 'install' : 'uninstall';
 		for (var type in handlers) {
 			if (handlers[type].length > 0) {
-				var entry = this._eventTypes[type],
-					func = entry[key];
+				var types = this._eventTypes,
+					entry = types && types[type],
+					func = entry && entry[key];
 				if (func)
 					func.call(this, type);
 			}
@@ -5442,8 +7351,15 @@ var PaperScope = Base.extend({
 		}
 
 		if (!this.browser) {
-			var browser = proto.browser = {};
-			navigator.userAgent.toLowerCase().replace(
+			var agent = navigator.userAgent.toLowerCase(),
+				platform = (/(win)/.exec(agent)
+						|| /(mac)/.exec(agent)
+						|| /(linux)/.exec(agent)
+						|| [])[0],
+				browser = proto.browser = { platform: platform };
+			if (platform)
+				browser[platform] = true;
+			agent.replace(
 				/(opera|chrome|safari|webkit|firefox|msie|trident|atom)\/?\s*([.\d]+)(?:.*version\/([.\d]+))?(?:.*rv\:([.\d]+))?/g,
 				function(all, n, v1, v2, rv) {
 					if (!browser.chrome) {
@@ -5466,7 +7382,7 @@ var PaperScope = Base.extend({
 		}
 	},
 
-	version: '0.9.22',
+	version: "0.9.25",
 
 	getView: function() {
 		return this.project && this.project.getView();
@@ -5579,7 +7495,7 @@ var PaperScopeItem = Base.extend(Emitter, {
 
 var Formatter = Base.extend({
 	initialize: function(precision) {
-		this.precision = precision || 5;
+		this.precision = Base.pick(precision, 5);
 		this.multiplier = Math.pow(10, this.precision);
 	},
 
@@ -5649,18 +7565,26 @@ var Numerical = new function() {
 	var abs = Math.abs,
 		sqrt = Math.sqrt,
 		pow = Math.pow,
-		TOLERANCE = 1e-6,
 		EPSILON = 1e-12,
 		MACHINE_EPSILON = 1.12e-16;
 
+	function clip(value, min, max) {
+		return value < min ? min : value > max ? max : value;
+	}
+
 	return {
-		TOLERANCE: TOLERANCE,
+		TOLERANCE: 1e-6,
 		EPSILON: EPSILON,
 		MACHINE_EPSILON: MACHINE_EPSILON,
+		CURVETIME_EPSILON: 4e-7,
+		GEOMETRIC_EPSILON: 2e-7,
+		WINDING_EPSILON: 2e-7,
+		TRIGONOMETRIC_EPSILON: 1e-7,
+		CLIPPING_EPSILON: 1e-7,
 		KAPPA: 4 * (sqrt(2) - 1) / 3,
 
 		isZero: function(val) {
-			return abs(val) <= EPSILON;
+			return val >= -EPSILON && val <= EPSILON;
 		},
 
 		integrate: function(f, a, b, n) {
@@ -5698,23 +7622,18 @@ var Numerical = new function() {
 
 		solveQuadratic: function(a, b, c, roots, min, max) {
 			var count = 0,
+				eMin = min - EPSILON,
+				eMax = max + EPSILON,
 				x1, x2 = Infinity,
 				B = b,
 				D;
-			b /= 2;
+			b /= -2;
 			D = b * b - a * c;
-			if (abs(D) < MACHINE_EPSILON) {
-				var pow = Math.pow,
-					gmC = pow(abs(a*b*c), 1/3);
+			if (D !== 0 && abs(D) < MACHINE_EPSILON) {
+				var gmC = pow(abs(a * b * c), 1 / 3);
 				if (gmC < 1e-8) {
-					/*
-					 * we multiply with a factor to normalize the
-					 * coefficients. The factor is just the nearest exponent
-					 * of 10, big enough to raise all the coefficients to
-					 * nearly [-1, +1] range.
-					 */
-					var mult = pow(10, abs(
-						Math.floor(Math.log(gmC) * Math.LOG10E)));
+					var mult = pow(10,
+							abs(Math.floor(Math.log(gmC) * Math.LOG10E)));
 					if (!isFinite(mult))
 						mult = 0;
 					a *= mult;
@@ -5723,40 +7642,38 @@ var Numerical = new function() {
 					D = b * b - a * c;
 				}
 			}
-			if (abs(a) < MACHINE_EPSILON) {
-				if (abs(B) < MACHINE_EPSILON)
-					return abs(c) < MACHINE_EPSILON ? -1 : 0;
+			if (abs(a) < EPSILON) {
+				if (abs(B) < EPSILON)
+					return abs(c) < EPSILON ? -1 : 0;
 				x1 = -c / B;
-			} else {
-				if (D >= -MACHINE_EPSILON) {
-					D = D < 0 ? 0 : D;
-					var R = sqrt(D);
-					if (b >= MACHINE_EPSILON && b <= MACHINE_EPSILON) {
-						x1 = abs(a) >= abs(c) ? R / a : -c / R;
-						x2 = -x1;
-					} else {
-						var q = -(b + (b < 0 ? -1 : 1) * R);
-						x1 = q / a;
-						x2 = c / q;
-					}
+			} else if (D >= -MACHINE_EPSILON) {
+				var Q = D < 0 ? 0 : sqrt(D),
+					R = b + (b < 0 ? -Q : Q);
+				if (R === 0) {
+					x1 = c / a;
+					x2 = -x1;
+				} else {
+					x1 = R / a;
+					x2 = c / R;
 				}
 			}
-			if (isFinite(x1) && (min == null || x1 >= min && x1 <= max))
-				roots[count++] = x1;
+			if (isFinite(x1) && (min == null || x1 > eMin && x1 < eMax))
+				roots[count++] = min == null ? x1 : clip(x1, min, max);
 			if (x2 !== x1
-					&& isFinite(x2) && (min == null || x2 >= min && x2 <= max))
-				roots[count++] = x2;
+					&& isFinite(x2) && (min == null || x2 > eMin && x2 < eMax))
+				roots[count++] = min == null ? x2 : clip(x2, min, max);
 			return count;
 		},
 
 		solveCubic: function(a, b, c, d, roots, min, max) {
-			var x, b1, c2, count = 0;
-			if (a === 0) {
+			var count = 0,
+				x, b1, c2;
+			if (abs(a) < EPSILON) {
 				a = b;
 				b1 = c;
 				c2 = d;
 				x = Infinity;
-			} else if (d === 0) {
+			} else if (abs(d) < EPSILON) {
 				b1 = b;
 				c2 = c;
 				x = 0;
@@ -5764,10 +7681,10 @@ var Numerical = new function() {
 				var ec = 1 + MACHINE_EPSILON,
 					x0, q, qd, t, r, s, tmp;
 				x = -(b / a) / 3;
-				tmp = a * x,
-				b1 = tmp + b,
-				c2 = b1 * x + c,
-				qd = (tmp + b1) * x + c2,
+				tmp = a * x;
+				b1 = tmp + b;
+				c2 = b1 * x + c;
+				qd = (tmp + b1) * x + c2;
 				q = c2 * x + d;
 				t = q /a;
 				r = pow(abs(t), 1/3);
@@ -5778,10 +7695,10 @@ var Numerical = new function() {
 				if (x0 !== x) {
 					do {
 						x = x0;
-						tmp = a * x,
-						b1 = tmp + b,
-						c2 = b1 * x + c,
-						qd = (tmp + b1) * x + c2,
+						tmp = a * x;
+						b1 = tmp + b;
+						c2 = b1 * x + c;
+						qd = (tmp + b1) * x + c2;
 						q = c2 * x + d;
 						x0 = qd === 0 ? x : x - q / qd / ec;
 						if (x0 === x) {
@@ -5797,11 +7714,28 @@ var Numerical = new function() {
 			}
 			var count = Numerical.solveQuadratic(a, b1, c2, roots, min, max);
 			if (isFinite(x) && (count === 0 || x !== roots[count - 1])
-					&& (min == null || x >= min && x <= max))
-				roots[count++] = x;
+					&& (min == null || x > min - EPSILON && x < max + EPSILON))
+				roots[count++] = min == null ? x : clip(x, min, max);
 			return count;
 		}
 	};
+};
+
+var UID = {
+	_id: 1,
+	_pools: {},
+
+	get: function(ctor) {
+		if (ctor) {
+			var name = ctor._class,
+				pool = this._pools[name];
+			if (!pool)
+				pool = this._pools[name] = { _id: 1 };
+			return pool._id++;
+		} else {
+			return this._id++;
+		}
+	}
 };
 
 var Point = Base.extend({
@@ -5968,11 +7902,11 @@ var Point = Base.extend({
 			return this.clone();
 		angle = angle * Math.PI / 180;
 		var point = center ? this.subtract(center) : this,
-			s = Math.sin(angle),
-			c = Math.cos(angle);
+			sin = Math.sin(angle),
+			cos = Math.cos(angle);
 		point = new Point(
-			point.x * c - point.y * s,
-			point.x * s + point.y * c
+			point.x * cos - point.y * sin,
+			point.x * sin + point.y * cos
 		);
 		return center ? point.add(center) : point;
 	},
@@ -6014,16 +7948,22 @@ var Point = Base.extend({
 		return Rectangle.read(arguments).contains(this);
 	},
 
-	isClose: function(point, tolerance) {
+	isClose: function() {
+		var point = Point.read(arguments),
+			tolerance = Base.read(arguments);
 		return this.getDistance(point) < tolerance;
 	},
 
-	isColinear: function(point) {
-		return Math.abs(this.cross(point)) < 1e-12;
+	isCollinear: function() {
+		var point = Point.read(arguments);
+		return Point.isCollinear(this.x, this.y, point.x, point.y);
 	},
 
-	isOrthogonal: function(point) {
-		return Math.abs(this.dot(point)) < 1e-12;
+	isColinear: '#isCollinear',
+
+	isOrthogonal: function() {
+		var point = Point.read(arguments);
+		return Point.isOrthogonal(this.x, this.y, point.x, point.y);
 	},
 
 	isZero: function() {
@@ -6045,16 +7985,12 @@ var Point = Base.extend({
 	},
 
 	project: function() {
-		var point = Point.read(arguments);
-		if (point.isZero()) {
-			return new Point(0, 0);
-		} else {
-			var scale = this.dot(point) / point.dot(point);
-			return new Point(
-				point.x * scale,
-				point.y * scale
-			);
-		}
+		var point = Point.read(arguments),
+			scale = point.isZero() ? 0 : this.dot(point) / point.dot(point);
+		return new Point(
+			point.x * scale,
+			point.y * scale
+		);
 	},
 
 	statics: {
@@ -6078,6 +8014,18 @@ var Point = Base.extend({
 
 		random: function() {
 			return new Point(Math.random(), Math.random());
+		},
+
+		isCollinear: function(x1, y1, x2, y2) {
+			return Math.abs(x1 * y2 - y1 * x2)
+					<= Math.sqrt((x1 * x1 + y1 * y1) * (x2 * x2 + y2 * y2))
+						* 1e-7;
+		},
+
+		isOrthogonal: function(x1, y1, x2, y2) {
+			return Math.abs(x1 * x2 + y1 * y2)
+					<= Math.sqrt((x1 * x1 + y1 * y1) * (x2 * x2 + y2 * y2))
+						* 1e-7;
 		}
 	}
 }, Base.each(['round', 'ceil', 'floor', 'abs'], function(name) {
@@ -6629,7 +8577,8 @@ var LinkedRectangle = Rectangle.extend({
 			this._owner[this._setter](this);
 		return this;
 	}
-}, new function() {
+},
+new function() {
 	var proto = Rectangle.prototype;
 
 	return Base.each(['x', 'y', 'width', 'height'], function(key) {
@@ -6962,7 +8911,7 @@ var Matrix = Base.extend({
 	_transformBounds: function(bounds, dest, _dontNotify) {
 		var coords = this._transformCorners(bounds),
 			min = coords.slice(0, 2),
-			max = coords.slice();
+			max = min.slice();
 		for (var i = 2; i < 8; i++) {
 			var val = coords[i],
 				j = i & 1;
@@ -7124,10 +9073,10 @@ var Line = Base.extend({
 				true, isInfinite);
 	},
 
-	getSide: function(point) {
+	getSide: function(point, isInfinite) {
 		return Line.getSide(
 				this._px, this._py, this._vx, this._vy,
-				point.x, point.y, true);
+				point.x, point.y, true, isInfinite);
 	},
 
 	getDistance: function(point) {
@@ -7136,29 +9085,45 @@ var Line = Base.extend({
 				point.x, point.y, true));
 	},
 
+	isCollinear: function(line) {
+		return Point.isCollinear(this._vx, this._vy, line._vx, line._vy);
+	},
+
+	isOrthogonal: function(line) {
+		return Point.isOrthogonal(this._vx, this._vy, line._vx, line._vy);
+	},
+
 	statics: {
-		intersect: function(apx, apy, avx, avy, bpx, bpy, bvx, bvy, asVector,
+		intersect: function(p1x, p1y, v1x, v1y, p2x, p2y, v2x, v2y, asVector,
 				isInfinite) {
 			if (!asVector) {
-				avx -= apx;
-				avy -= apy;
-				bvx -= bpx;
-				bvy -= bpy;
+				v1x -= p1x;
+				v1y -= p1y;
+				v2x -= p2x;
+				v2y -= p2y;
 			}
-			var cross = avx * bvy - avy * bvx;
+			var cross = v1x * v2y - v1y * v2x;
 			if (!Numerical.isZero(cross)) {
-				var dx = apx - bpx,
-					dy = apy - bpy,
-					ta = (bvx * dy - bvy * dx) / cross,
-					tb = (avx * dy - avy * dx) / cross;
-				if (isInfinite || 0 <= ta && ta <= 1 && 0 <= tb && tb <= 1)
+				var dx = p1x - p2x,
+					dy = p1y - p2y,
+					u1 = (v2x * dy - v2y * dx) / cross,
+					u2 = (v1x * dy - v1y * dx) / cross,
+					epsilon = 1e-12,
+					uMin = -epsilon,
+					uMax = 1 + epsilon;
+				if (isInfinite
+						|| uMin < u1 && u1 < uMax && uMin < u2 && u2 < uMax) {
+					if (!isInfinite) {
+						u1 = u1 <= 0 ? 0 : u1 >= 1 ? 1 : u1;
+					}
 					return new Point(
-								apx + ta * avx,
-								apy + ta * avy);
+							p1x + u1 * v1x,
+							p1y + u1 * v1y);
+				}
 			}
 		},
 
-		getSide: function(px, py, vx, vy, x, y, asVector) {
+		getSide: function(px, py, vx, vy, x, y, asVector, isInfinite) {
 			if (!asVector) {
 				vx -= px;
 				vy -= py;
@@ -7166,15 +9131,10 @@ var Line = Base.extend({
 			var v2x = x - px,
 				v2y = y - py,
 				ccw = v2x * vy - v2y * vx;
-			if (ccw === 0) {
-				ccw = v2x * vx + v2y * vy;
-				if (ccw > 0) {
-					v2x -= vx;
-					v2y -= vy;
-					ccw = v2x * vx + v2y * vy;
-					if (ccw < 0)
-						ccw = 0;
-				}
+			if (ccw === 0 && !isInfinite) {
+				ccw = (v2x * vx + v2x * vx) / (vx * vx + vy * vy);
+				if (ccw >= 0 && ccw <= 1)
+					ccw = 0;
 			}
 			return ccw < 0 ? -1 : ccw > 0 ? 1 : 0;
 		},
@@ -7184,11 +9144,9 @@ var Line = Base.extend({
 				vx -= px;
 				vy -= py;
 			}
-			return Numerical.isZero(vx)
-					? vy >= 0 ? px - x : x - px
-					: Numerical.isZero(vy)
-						? vx >= 0 ? y - py : py - y
-						: (vx * (y - py) - vy * (x - px)) / Math.sqrt(vx * vx + vy * vy);
+			return vx === 0 ? vy > 0 ? x - px : px - x
+				 : vy === 0 ? vx < 0 ? y - py : py - y
+				 : ((x-px) * vy - (y-py) * vx) / Math.sqrt(vx * vx + vy * vy);
 		}
 	}
 });
@@ -7372,7 +9330,7 @@ var Symbol = Base.extend({
 	_class: 'Symbol',
 
 	initialize: function Symbol(item, dontCenter) {
-		this._id = Symbol._id = (Symbol._id || 0) + 1;
+		this._id = UID.get();
 		this.project = paper.project;
 		this.project.symbols.push(this);
 		if (item)
@@ -7469,7 +9427,7 @@ var Item = Base.extend(Emitter, {
 			matrix = this._matrix = new Matrix(),
 			project = hasProps && props.project || paper.project;
 		if (!internal)
-			this._id = Item._id = (Item._id || 0) + 1;
+			this._id = UID.get();
 		this._applyMatrix = this._canApplyMatrix && paper.settings.applyMatrix;
 		if (point)
 			matrix.translate(point);
@@ -7485,74 +9443,37 @@ var Item = Base.extend(Emitter, {
 			}
 		}
 		if (hasProps && props !== Item.NO_INSERT)
-			this._set(props, { insert: true, parent: true }, true);
+			this._set(props, { insert: true, project: true, parent: true },
+					true);
 		return hasProps;
 	},
 
-	_events: new function() {
-
-		var mouseFlags = {
-			mousedown: {
-				mousedown: 1,
-				mousedrag: 1,
-				click: 1,
-				doubleclick: 1
-			},
-			mouseup: {
-				mouseup: 1,
-				mousedrag: 1,
-				click: 1,
-				doubleclick: 1
-			},
-			mousemove: {
-				mousedrag: 1,
-				mousemove: 1,
-				mouseenter: 1,
-				mouseleave: 1
-			}
-		};
-
-		var mouseEvent = {
-			install: function(type) {
-				var counters = this.getView()._eventCounters;
-				if (counters) {
-					for (var key in mouseFlags) {
-						counters[key] = (counters[key] || 0)
-								+ (mouseFlags[key][type] || 0);
-					}
-				}
-			},
-			uninstall: function(type) {
-				var counters = this.getView()._eventCounters;
-				if (counters) {
-					for (var key in mouseFlags)
-						counters[key] -= mouseFlags[key][type] || 0;
-				}
-			}
-		};
-
-		return Base.each(['onMouseDown', 'onMouseUp', 'onMouseDrag', 'onClick',
+	_events: Base.each(['onMouseDown', 'onMouseUp', 'onMouseDrag', 'onClick',
 			'onDoubleClick', 'onMouseMove', 'onMouseEnter', 'onMouseLeave'],
-			function(name) {
-				this[name] = mouseEvent;
-			}, {
-				onFrame: {
-					install: function() {
-						this._animateItem(true);
-					},
-					uninstall: function() {
-						this._animateItem(false);
-					}
+		function(name) {
+			this[name] = {
+				install: function(type) {
+					this.getView()._installEvent(type);
 				},
 
-				onLoad: {}
-			}
-		);
-	},
+				uninstall: function(type) {
+					this.getView()._uninstallEvent(type);
+				}
+			};
+		}, {
+			onFrame: {
+				install: function() {
+					this.getView()._animateItem(this, true);
+				},
 
-	_animateItem: function(animate) {
-		this.getView()._animateItem(this, animate);
-	},
+				uninstall: function() {
+					this.getView()._animateItem(this, false);
+				}
+			},
+
+			onLoad: {}
+		}
+	),
 
 	_serialize: function(options, dictionary) {
 		var props = {},
@@ -7780,14 +9701,11 @@ var Item = Base.extend(Emitter, {
 	},
 
 	setPivot: function() {
-		this._pivot = Point.read(arguments);
+		this._pivot = Point.read(arguments, 0, { clone: true, readNull: true });
 		this._position = undefined;
 	},
 
 	_pivot: null,
-
-	getRegistration: '#getPivot',
-	setRegistration: '#setPivot'
 }, Base.each(['bounds', 'strokeBounds', 'handleBounds', 'roughBounds',
 		'internalBounds', 'internalRoughBounds'],
 	function(key) {
@@ -7812,8 +9730,9 @@ var Item = Base.extend(Emitter, {
 
 	_getBounds: function(getter, matrix, cacheItem) {
 		var children = this._children;
-		if (!children || children.length == 0)
+		if (!children || children.length === 0)
 			return new Rectangle();
+		Item._updateBoundsCache(this, cacheItem);
 		var x1 = Infinity,
 			x2 = -x1,
 			y1 = x1,
@@ -7842,8 +9761,8 @@ var Item = Base.extend(Emitter, {
 		matrix.translate(center);
 		if (rect.width != bounds.width || rect.height != bounds.height) {
 			matrix.scale(
-					bounds.width != 0 ? rect.width / bounds.width : 1,
-					bounds.height != 0 ? rect.height / bounds.height : 1);
+					bounds.width !== 0 ? rect.width / bounds.width : 1,
+					bounds.height !== 0 ? rect.height / bounds.height : 1);
 		}
 		center = bounds.getCenter();
 		matrix.translate(-center.x, -center.y);
@@ -7854,18 +9773,7 @@ var Item = Base.extend(Emitter, {
 		matrix = matrix && matrix.orNullIfIdentity();
 		var _matrix = internalGetter ? null : this._matrix.orNullIfIdentity(),
 			cache = (!matrix || matrix.equals(_matrix)) && getter;
-		var cacheParent = this._parent || this._parentSymbol;
-		if (cacheParent) {
-			var id = cacheItem._id,
-				ref = cacheParent._boundsCache = cacheParent._boundsCache || {
-					ids: {},
-					list: []
-				};
-			if (!ref.ids[id]) {
-				ref.list.push(cacheItem);
-				ref.ids[id] = cacheItem;
-			}
-		}
+		Item._updateBoundsCache(this._parent || this._parentSymbol, cacheItem);
 		if (cache && this._bounds && this._bounds[cache])
 			return this._bounds[cache].clone();
 		var bounds = this._getBounds(internalGetter || getter,
@@ -7880,11 +9788,25 @@ var Item = Base.extend(Emitter, {
 	},
 
 	statics: {
+		_updateBoundsCache: function(parent, item) {
+			if (parent) {
+				var id = item._id,
+					ref = parent._boundsCache = parent._boundsCache || {
+						ids: {},
+						list: []
+					};
+				if (!ref.ids[id]) {
+					ref.list.push(item);
+					ref.ids[id] = item;
+				}
+			}
+		},
+
 		_clearBoundsCache: function(item) {
 			var cache = item._boundsCache;
 			if (cache) {
 				item._bounds = item._position = item._boundsCache = undefined;
-				for (var i = 0, list = cache.list, l = list.length; i < l; i++) {
+				for (var i = 0, list = cache.list, l = list.length; i < l; i++){
 					var other = list[i];
 					if (other !== item) {
 						other._bounds = other._position = undefined;
@@ -7940,8 +9862,9 @@ var Item = Base.extend(Emitter, {
 		return this._matrix;
 	},
 
-	setMatrix: function(matrix) {
-		this._matrix.initialize(matrix);
+	setMatrix: function() {
+		var matrix = this._matrix;
+		matrix.initialize.apply(matrix, arguments);
 		if (this._applyMatrix) {
 			this.transform(null, true);
 		} else {
@@ -8074,24 +9997,27 @@ var Item = Base.extend(Emitter, {
 		return this._clone(new this.constructor(Item.NO_INSERT), insert);
 	},
 
-	_clone: function(copy, insert) {
-		copy.setStyle(this._style);
-		if (this._children) {
-			for (var i = 0, l = this._children.length; i < l; i++)
-				copy.addChild(this._children[i].clone(false), true);
-		}
-		if (insert || insert === undefined)
-			copy.insertAbove(this);
+	_clone: function(copy, insert, includeMatrix) {
 		var keys = ['_locked', '_visible', '_blendMode', '_opacity',
-				'_clipMask', '_guide', '_applyMatrix'];
+				'_clipMask', '_guide'],
+			children = this._children;
+		copy.setStyle(this._style);
+		for (var i = 0, l = children && children.length; i < l; i++) {
+			copy.addChild(children[i].clone(false), true);
+		}
 		for (var i = 0, l = keys.length; i < l; i++) {
 			var key = keys[i];
 			if (this.hasOwnProperty(key))
 				copy[key] = this[key];
 		}
-		copy._matrix.initialize(this._matrix);
-		copy._data = this._data ? Base.clone(this._data) : null;
+		if (includeMatrix !== false)
+			copy._matrix.initialize(this._matrix);
+		copy.setApplyMatrix(this._applyMatrix);
+		copy.setPivot(this._pivot);
 		copy.setSelected(this._selected);
+		copy._data = this._data ? Base.clone(this._data) : null;
+		if (insert || insert === undefined)
+			copy.insertAbove(this);
 		if (this._name)
 			copy.setName(this._name, true);
 		return copy;
@@ -8107,15 +10033,17 @@ var Item = Base.extend(Emitter, {
 			topLeft = bounds.getTopLeft().floor(),
 			bottomRight = bounds.getBottomRight().ceil(),
 			size = new Size(bottomRight.subtract(topLeft)),
-			canvas = CanvasProvider.getCanvas(size.multiply(scale)),
-			ctx = canvas.getContext('2d'),
-			matrix = new Matrix().scale(scale).translate(topLeft.negate());
-		ctx.save();
-		matrix.applyToContext(ctx);
-		this.draw(ctx, new Base({ matrices: [matrix] }));
-		ctx.restore();
-		var raster = new Raster(Item.NO_INSERT);
-		raster.setCanvas(canvas);
+			raster = new Raster(Item.NO_INSERT);
+		if (!size.isZero()) {
+			var canvas = CanvasProvider.getCanvas(size.multiply(scale)),
+				ctx = canvas.getContext('2d'),
+				matrix = new Matrix().scale(scale).translate(topLeft.negate());
+			ctx.save();
+			matrix.applyToContext(ctx);
+			this.draw(ctx, new Base({ matrices: [matrix] }));
+			ctx.restore();
+			raster.setCanvas(canvas);
+		}
 		raster.transform(new Matrix().translate(topLeft.add(size.divide(2)))
 				.scale(1 / scale));
 		raster.insertAbove(this);
@@ -8153,8 +10081,8 @@ var Item = Base.extend(Emitter, {
 	intersects: function(item, _matrix) {
 		if (!(item instanceof Item))
 			return false;
-		return this._asPathItem().getIntersections(item._asPathItem(),
-				_matrix || item._matrix).length > 0;
+		return this._asPathItem().getIntersections(item._asPathItem(), null,
+				_matrix || item._matrix, true).length > 0;
 	},
 
 	hitTest: function() {
@@ -8177,7 +10105,7 @@ var Item = Base.extend(Emitter, {
 			tolerancePadding = options._tolerancePadding = new Size(
 						Path._getPenPadding(1, totalMatrix.inverted())
 					).multiply(
-						Math.max(options.tolerance, 0.000001)
+						Math.max(options.tolerance, 1e-6)
 					);
 		point = matrix._inverseTransform(point);
 
@@ -8251,11 +10179,14 @@ var Item = Base.extend(Emitter, {
 			}
 			return true;
 		}
-		if (typeof name === 'object') {
+		var type = typeof name;
+		if (type === 'object') {
 			for (var key in name) {
 				if (name.hasOwnProperty(key) && !this.matches(key, name[key]))
 					return false;
 			}
+		} else if (type === 'function') {
+			return name(this);
 		} else {
 			var value = /^(empty|editable)$/.test(name)
 					? this['is' + Base.capitalize(name)]()
@@ -8293,15 +10224,17 @@ var Item = Base.extend(Emitter, {
 	statics: {
 		_getItems: function _getItems(children, match, matrix, param,
 				firstOnly) {
-			if (!param) {
+			if (!param && typeof match === 'object') {
 				var overlapping = match.overlapping,
 					inside = match.inside,
 					bounds = overlapping || inside,
-					rect =	bounds && Rectangle.read([bounds]);
+					rect = bounds && Rectangle.read([bounds]);
 				param = {
 					items: [],
-					inside: rect,
-					overlapping: overlapping && new Path.Rectangle({
+					inside: !!inside,
+					overlapping: !!overlapping,
+					rect: rect,
+					path: overlapping && new Path.Rectangle({
 						rectangle: rect,
 						insert: false
 					})
@@ -8310,20 +10243,20 @@ var Item = Base.extend(Emitter, {
 					match = Base.set({}, match,
 							{ inside: true, overlapping: true });
 			}
-			var items = param.items,
-				inside = param.inside,
-				overlapping = param.overlapping;
-			matrix = inside && (matrix || new Matrix());
+			var items = param && param.items,
+				rect = param && param.rect;
+			matrix = rect && (matrix || new Matrix());
 			for (var i = 0, l = children && children.length; i < l; i++) {
 				var child = children[i],
 					childMatrix = matrix && matrix.chain(child._matrix),
 					add = true;
-				if (inside) {
+				if (rect) {
 					var bounds = child.getBounds(childMatrix);
-					if (!inside.intersects(bounds))
+					if (!rect.intersects(bounds))
 						continue;
-					if (!(inside && inside.contains(bounds)) && !(overlapping
-							&& overlapping.intersects(child, childMatrix)))
+					if (!(param.inside && rect.contains(bounds))
+							&& !(param.overlapping && (bounds.contains(rect)
+								|| param.path.intersects(child, childMatrix))))
 						add = false;
 				}
 				if (add && child.matches(match)) {
@@ -8599,6 +10532,10 @@ var Item = Base.extend(Emitter, {
 		return item ? item.isDescendant(this) : false;
 	},
 
+	isSibling: function(item) {
+		return this._parent === item._parent;
+	},
+
 	isGroupedWith: function(item) {
 		var parent = this._parent;
 		while (parent) {
@@ -8800,7 +10737,7 @@ var Item = Base.extend(Emitter, {
 					|| param.clip
 					|| (nativeBlend || normalBlend && opacity < 1)
 						&& this._canComposite(),
-			pixelRatio = param.pixelRatio,
+			pixelRatio = param.pixelRatio || 1,
 			mainCtx, itemOffset, prevOffset;
 		if (!direct) {
 			var bounds = this.getStrokeBounds(getViewMatrix(globalMatrix));
@@ -8874,7 +10811,7 @@ var Item = Base.extend(Emitter, {
 			if (this._drawSelected)
 				this._drawSelected(ctx, mx, selectedItems);
 			if (this._boundsSelected) {
-				var half = size / 2;
+				var half = size / 2,
 					coords = mx._transformCorners(this.getInternalBounds());
 				ctx.beginPath();
 				for (var i = 0; i < 8; i++)
@@ -9156,16 +11093,14 @@ var Shape = Item.extend({
 	},
 
 	toPath: function(insert) {
-		var path = new Path[Base.capitalize(this._type)]({
+		var path = this._clone(new Path[Base.capitalize(this._type)]({
 			center: new Point(),
 			size: this._size,
 			radius: this._radius,
 			insert: false
-		});
-		path.setStyle(this._style);
-		path.transform(this._matrix);
-		if (insert || insert === undefined)
-			path.insertAbove(this);
+		}), insert);
+		if (paper.settings.applyMatrix)
+			path.setApplyMatrix(true);
 		return path;
 	},
 
@@ -9189,7 +11124,7 @@ var Shape = Item.extend({
 					size = this._size,
 					width = size.width,
 					height = size.height;
-				if (untransformed && type === 'rect' && rx === 0 && ry === 0) {
+				if (untransformed && type === 'rectangle' && rx === 0 && ry === 0) {
 					ctx.rect(-width / 2, -height / 2, width, height);
 				} else {
 					var x = width / 2,
@@ -9255,7 +11190,6 @@ var Shape = Item.extend({
 	}
 },
 new function() {
-
 	function getCornerCenter(that, point, expand) {
 		var radius = that._radius;
 		if (!radius.isZero()) {
@@ -9381,6 +11315,7 @@ var Raster = Item.extend({
 	_boundsGetter: 'getBounds',
 	_boundsSelected: true,
 	_serializeFields: {
+		crossOrigin: null,
 		source: null
 	},
 
@@ -9414,6 +11349,7 @@ var Raster = Item.extend({
 			copyCanvas.getContext('2d').drawImage(canvas, 0, 0);
 			copy.setImage(copyCanvas);
 		}
+		copy._crossOrigin = this._crossOrigin;
 		return this._clone(copy, insert);
 	},
 
@@ -9533,6 +11469,7 @@ var Raster = Item.extend({
 
 	setSource: function(src) {
 		var that = this,
+			crossOrigin = this._crossOrigin,
 			image;
 
 		function loaded() {
@@ -9545,18 +11482,27 @@ var Raster = Item.extend({
 			}
 		}
 
-			image = document.getElementById(src) || new Image();
-
+		image = document.getElementById(src) || new Image();
+		if (crossOrigin)
+			image.crossOrigin = crossOrigin;
 		if (image.naturalWidth && image.naturalHeight) {
 			setTimeout(loaded, 0);
 		} else {
-			DomEvent.add(image, {
-				load: loaded
-			});
+			DomEvent.add(image, { load: loaded });
 			if (!image.src)
 				image.src = src;
 		}
 		this.setImage(image);
+	},
+
+	getCrossOrigin: function() {
+		return this._image && this._image.crossOrigin || this._crossOrigin || '';
+	},
+
+	setCrossOrigin: function(crossOrigin) {
+		this._crossOrigin = crossOrigin;
+		if (this._image)
+			this._image.crossOrigin = crossOrigin;
 	},
 
 	getElement: function() {
@@ -9588,7 +11534,7 @@ var Raster = Item.extend({
 		if (/^data:/.test(src))
 			return src;
 		var canvas = this.getCanvas();
-		return canvas ? canvas.toDataURL() : null;
+		return canvas ? canvas.toDataURL.apply(canvas, arguments) : null;
 	},
 
 	drawImage: function(image ) {
@@ -9819,7 +11765,7 @@ var Segment = Base.extend({
 			point, handleIn, handleOut;
 		if (count === 0) {
 		} else if (count === 1) {
-			if (arg0.point) {
+			if ('point' in arg0) {
 				point = arg0.point;
 				handleIn = arg0.handleIn;
 				handleOut = arg0.handleOut;
@@ -9843,8 +11789,9 @@ var Segment = Base.extend({
 	},
 
 	_serialize: function(options) {
-		return Base.serialize(this.isLinear() ? this._point
-				: [this._point, this._handleIn, this._handleOut],
+		return Base.serialize(this.hasHandles()
+				? [this._point, this._handleIn, this._handleOut]
+				: this._point,
 				options, true);
 	},
 
@@ -9894,52 +11841,13 @@ var Segment = Base.extend({
 		this._handleOut.set(point.x, point.y);
 	},
 
-	isLinear: function() {
-		return this._handleIn.isZero() && this._handleOut.isZero();
+	hasHandles: function() {
+		return !this._handleIn.isZero() || !this._handleOut.isZero();
 	},
 
-	setLinear: function(linear) {
-		if (linear) {
-			this._handleIn.set(0, 0);
-			this._handleOut.set(0, 0);
-		} else {
-		}
-	},
-
-	isColinear: function(segment) {
-		var next1 = this.getNext(),
-			next2 = segment.getNext();
-		return this._handleOut.isZero() && next1._handleIn.isZero()
-				&& segment._handleOut.isZero() && next2._handleIn.isZero()
-				&& next1._point.subtract(this._point).isColinear(
-					next2._point.subtract(segment._point));
-	},
-
-	isOrthogonal: function() {
-		var prev = this.getPrevious(),
-			next = this.getNext();
-		return prev._handleOut.isZero() && this._handleIn.isZero()
-			&& this._handleOut.isZero() && next._handleIn.isZero()
-			&& this._point.subtract(prev._point).isOrthogonal(
-					next._point.subtract(this._point));
-	},
-
-	isArc: function() {
-		var next = this.getNext(),
-			handle1 = this._handleOut,
-			handle2 = next._handleIn,
-			kappa = 0.5522847498307936;
-		if (handle1.isOrthogonal(handle2)) {
-			var from = this._point,
-				to = next._point,
-				corner = new Line(from, handle1, true).intersect(
-						new Line(to, handle2, true), true);
-			return corner && Numerical.isZero(handle1.getLength() /
-					corner.subtract(from).getLength() - kappa)
-				&& Numerical.isZero(handle2.getLength() /
-					corner.subtract(to).getLength() - kappa);
-		}
-		return false;
+	clearHandles: function() {
+		this._handleIn.set(0, 0);
+		this._handleOut.set(0, 0);
 	},
 
 	_selectionState: 0,
@@ -10014,7 +11922,25 @@ var Segment = Base.extend({
 				|| this._path._closed && segments[segments.length - 1]) || null;
 	},
 
+	isFirst: function() {
+		return this._index === 0;
+	},
+
+	isLast: function() {
+		var path = this._path;
+		return path && this._index === path._segments.length - 1 || false;
+	},
+
 	reverse: function() {
+		var handleIn = this._handleIn,
+			handleOut = this._handleOut,
+			inX = handleIn._x,
+			inY = handleIn._y;
+		handleIn.set(handleOut._x, handleOut._y);
+		handleOut.set(inX, inY);
+	},
+
+	reversed: function() {
 		return new Segment(this._point, this._handleOut, this._handleIn);
 	},
 
@@ -10191,40 +12117,86 @@ var Curve = Base.extend({
 	_class: 'Curve',
 
 	initialize: function Curve(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
-		var count = arguments.length;
+		var count = arguments.length,
+			seg1, seg2,
+			point1, point2,
+			handle1, handle2;
 		if (count === 3) {
 			this._path = arg0;
-			this._segment1 = arg1;
-			this._segment2 = arg2;
+			seg1 = arg1;
+			seg2 = arg2;
 		} else if (count === 0) {
-			this._segment1 = new Segment();
-			this._segment2 = new Segment();
+			seg1 = new Segment();
+			seg2 = new Segment();
 		} else if (count === 1) {
-			this._segment1 = new Segment(arg0.segment1);
-			this._segment2 = new Segment(arg0.segment2);
-		} else if (count === 2) {
-			this._segment1 = new Segment(arg0);
-			this._segment2 = new Segment(arg1);
-		} else {
-			var point1, handle1, handle2, point2;
-			if (count === 4) {
-				point1 = arg0;
-				handle1 = arg1;
-				handle2 = arg2;
-				point2 = arg3;
-			} else if (count === 8) {
-				point1 = [arg0, arg1];
-				point2 = [arg6, arg7];
-				handle1 = [arg2 - arg0, arg3 - arg1];
-				handle2 = [arg4 - arg6, arg5 - arg7];
+			if ('segment1' in arg0) {
+				seg1 = new Segment(arg0.segment1);
+				seg2 = new Segment(arg0.segment2);
+			} else if ('point1' in arg0) {
+				point1 = arg0.point1;
+				handle1 = arg0.handle1;
+				handle2 = arg0.handle2;
+				point2 = arg0.point2;
+			} else if (Array.isArray(arg0)) {
+				point1 = [arg0[0], arg0[1]];
+				point2 = [arg0[6], arg0[7]];
+				handle1 = [arg0[2] - arg0[0], arg0[3] - arg0[1]];
+				handle2 = [arg0[4] - arg0[6], arg0[5] - arg0[7]];
 			}
-			this._segment1 = new Segment(point1, null, handle1);
-			this._segment2 = new Segment(point2, handle2, null);
+		} else if (count === 2) {
+			seg1 = new Segment(arg0);
+			seg2 = new Segment(arg1);
+		} else if (count === 4) {
+			point1 = arg0;
+			handle1 = arg1;
+			handle2 = arg2;
+			point2 = arg3;
+		} else if (count === 8) {
+			point1 = [arg0, arg1];
+			point2 = [arg6, arg7];
+			handle1 = [arg2 - arg0, arg3 - arg1];
+			handle2 = [arg4 - arg6, arg5 - arg7];
 		}
+		this._segment1 = seg1 || new Segment(point1, null, handle1);
+		this._segment2 = seg2 || new Segment(point2, handle2, null);
+	},
+
+	_serialize: function(options) {
+		return Base.serialize(this.hasHandles()
+				? [this.getPoint1(), this.getHandle1(), this.getHandle2(),
+					this.getPoint2()]
+				: [this.getPoint1(), this.getPoint2()],
+				options, true);
 	},
 
 	_changed: function() {
 		this._length = this._bounds = undefined;
+	},
+
+	clone: function() {
+		return new Curve(this._segment1, this._segment2);
+	},
+
+	toString: function() {
+		var parts = [ 'point1: ' + this._segment1._point ];
+		if (!this._segment1._handleOut.isZero())
+			parts.push('handle1: ' + this._segment1._handleOut);
+		if (!this._segment2._handleIn.isZero())
+			parts.push('handle2: ' + this._segment2._handleIn);
+		parts.push('point2: ' + this._segment2._point);
+		return '{ ' + parts.join(', ') + ' }';
+	},
+
+	remove: function() {
+		var removed = false;
+		if (this._path) {
+			var segment2 = this._segment2,
+				handleOut = segment2._handleOut;
+			removed = segment2.remove();
+			if (removed)
+				this._segment1._handleOut.set(handleOut.x, handleOut.y);
+		}
+		return removed;
 	},
 
 	getPoint1: function() {
@@ -10291,6 +12263,16 @@ var Curve = Base.extend({
 				|| this._path._closed && curves[curves.length - 1]) || null;
 	},
 
+	isFirst: function() {
+		return this._segment1._index === 0;
+	},
+
+	isLast: function() {
+		var path = this._path;
+		return path && this._segment1._index === path._curves.length - 1
+				|| false;
+	},
+
 	isSelected: function() {
 		return this.getPoint1().isSelected()
 				&& this.getHandle2().isSelected()
@@ -10318,16 +12300,17 @@ var Curve = Base.extend({
 	},
 
 	getLength: function() {
-		if (this._length == null) {
-			this._length = this.isLinear()
-				? this._segment2._point.getDistance(this._segment1._point)
-				: Curve.getLength(this.getValues(), 0, 1);
-		}
+		if (this._length == null)
+			this._length = Curve.getLength(this.getValues(), 0, 1);
 		return this._length;
 	},
 
 	getArea: function() {
 		return Curve.getArea(this.getValues());
+	},
+
+	getLine: function() {
+		return new Line(this._segment1._point, this._segment2._point);
 	},
 
 	getPart: function(from, to) {
@@ -10338,14 +12321,10 @@ var Curve = Base.extend({
 		return Curve.getLength(this.getValues(), from, to);
 	},
 
-	isLinear: function() {
-		return this._segment1._handleOut.isZero()
-				&& this._segment2._handleIn.isZero();
-	},
-
 	getIntersections: function(curve) {
-		return Curve.filterIntersections(Curve.getIntersections(
-				this.getValues(), curve.getValues(), this, curve, []));
+		return Curve._getIntersections(this.getValues(),
+				curve && curve !== this ? curve.getValues() : null,
+				this, curve, [], {});
 	},
 
 	_getParameter: function(offset, isParameter) {
@@ -10358,39 +12337,35 @@ var Curve = Base.extend({
 						: this.getParameterAt(offset, 0);
 	},
 
-	divide: function(offset, isParameter, ignoreLinear) {
+	divide: function(offset, isParameter, _setHandles) {
 		var parameter = this._getParameter(offset, isParameter),
-			tolerance = 0.000001,
+			tMin = 4e-7,
+			tMax = 1 - tMin,
 			res = null;
-		if (parameter > tolerance && parameter < 1 - tolerance) {
+		if (parameter >= tMin && parameter <= tMax) {
 			var parts = Curve.subdivide(this.getValues(), parameter),
-				isLinear = ignoreLinear ? false : this.isLinear(),
 				left = parts[0],
-				right = parts[1];
-
-			if (!isLinear) {
-				this._segment1._handleOut.set(left[2] - left[0],
+				right = parts[1],
+				setHandles = _setHandles || this.hasHandles(),
+				segment1 = this._segment1,
+				segment2 = this._segment2,
+				path = this._path;
+			if (setHandles) {
+				segment1._handleOut.set(left[2] - left[0],
 						left[3] - left[1]);
-				this._segment2._handleIn.set(right[4] - right[6],
+				segment2._handleIn.set(right[4] - right[6],
 						right[5] - right[7]);
 			}
-
 			var x = left[6], y = left[7],
 				segment = new Segment(new Point(x, y),
-						!isLinear && new Point(left[4] - x, left[5] - y),
-						!isLinear && new Point(right[2] - x, right[3] - y));
-
-			if (this._path) {
-				if (this._segment1._index > 0 && this._segment2._index === 0) {
-					this._path.add(segment);
-				} else {
-					this._path.insert(this._segment2._index, segment);
-				}
-				res = this;
+						setHandles && new Point(left[4] - x, left[5] - y),
+						setHandles && new Point(right[2] - x, right[3] - y));
+			if (path) {
+				path.insert(segment1._index + 1, segment);
+				res = this.getNext();
 			} else {
-				var end = this._segment2;
 				this._segment2 = segment;
-				res = new Curve(segment, end);
+				res = new Curve(segment, segment2);
 			}
 		}
 		return res;
@@ -10403,34 +12378,13 @@ var Curve = Base.extend({
 			: null;
 	},
 
-	reverse: function() {
-		return new Curve(this._segment2.reverse(), this._segment1.reverse());
+	reversed: function() {
+		return new Curve(this._segment2.reversed(), this._segment1.reversed());
 	},
 
-	remove: function() {
-		var removed = false;
-		if (this._path) {
-			var segment2 = this._segment2,
-				handleOut = segment2._handleOut;
-			removed = segment2.remove();
-			if (removed)
-				this._segment1._handleOut.set(handleOut.x, handleOut.y);
-		}
-		return removed;
-	},
-
-	clone: function() {
-		return new Curve(this._segment1, this._segment2);
-	},
-
-	toString: function() {
-		var parts = [ 'point1: ' + this._segment1._point ];
-		if (!this._segment1._handleOut.isZero())
-			parts.push('handle1: ' + this._segment1._handleOut);
-		if (!this._segment2._handleIn.isZero())
-			parts.push('handle2: ' + this._segment2._handleIn);
-		parts.push('point2: ' + this._segment2._point);
-		return '{ ' + parts.join(', ') + ' }';
+	clearHandles: function() {
+		this._segment1._handleOut.set(0, 0);
+		this._segment2._handleIn.set(0, 0);
 	},
 
 statics: {
@@ -10448,54 +12402,6 @@ statics: {
 		if (matrix)
 			matrix._transformCoordinates(values, values, 4);
 		return values;
-	},
-
-	evaluate: function(v, t, type) {
-		var p1x = v[0], p1y = v[1],
-			c1x = v[2], c1y = v[3],
-			c2x = v[4], c2y = v[5],
-			p2x = v[6], p2y = v[7],
-			tolerance = 0.000001,
-			x, y;
-
-		if (type === 0 && (t < tolerance || t > 1 - tolerance)) {
-			var isZero = t < tolerance;
-			x = isZero ? p1x : p2x;
-			y = isZero ? p1y : p2y;
-		} else {
-			var cx = 3 * (c1x - p1x),
-				bx = 3 * (c2x - c1x) - cx,
-				ax = p2x - p1x - cx - bx,
-
-				cy = 3 * (c1y - p1y),
-				by = 3 * (c2y - c1y) - cy,
-				ay = p2y - p1y - cy - by;
-			if (type === 0) {
-				x = ((ax * t + bx) * t + cx) * t + p1x;
-				y = ((ay * t + by) * t + cy) * t + p1y;
-			} else {
-				if (t < tolerance && c1x === p1x && c1y === p1y
-						|| t > 1 - tolerance && c2x === p2x && c2y === p2y) {
-					x = c2x - c1x;
-					y = c2y - c1y;
-				} else if (t < tolerance) {
-					x = cx;
-					y = cy;
-				} else if (t > 1 - tolerance) {
-					x = 3 * (p2x - c2x);
-					y = 3 * (p2y - c2y);
-				} else {
-					x = (3 * ax * t + 2 * bx) * t + cx;
-					y = (3 * ay * t + 2 * by) * t + cy;
-				}
-				if (type === 3) {
-					var x2 = 6 * ax * t + 2 * bx,
-						y2 = 6 * ay * t + 2 * by;
-					return (x * y2 - y * x2) / Math.pow(x * x + y * y, 3 / 2);
-				}
-			}
-		}
-		return type === 2 ? new Point(y, -x) : new Point(x, y);
 	},
 
 	subdivide: function(v, t) {
@@ -10525,53 +12431,96 @@ statics: {
 			p2 = v[coord + 6],
 			c = 3 * (c1 - p1),
 			b = 3 * (c2 - c1) - c,
-			a = p2 - p1 - c - b,
-			isZero = Numerical.isZero;
-		if (isZero(a) && isZero(b))
-			a = b = 0;
+			a = p2 - p1 - c - b;
 		return Numerical.solveCubic(a, b, c, p1 - val, roots, min, max);
 	},
 
-	getParameterOf: function(v, x, y) {
-		var tolerance = 0.000001;
-		if (Math.abs(v[0] - x) < tolerance && Math.abs(v[1] - y) < tolerance)
-			return 0;
-		if (Math.abs(v[6] - x) < tolerance && Math.abs(v[7] - y) < tolerance)
-			return 1;
-		var txs = [],
-			tys = [],
-			sx = Curve.solveCubic(v, 0, x, txs, 0, 1),
-			sy = Curve.solveCubic(v, 1, y, tys, 0, 1),
-			tx, ty;
-		for (var cx = 0;  sx == -1 || cx < sx;) {
-			if (sx == -1 || (tx = txs[cx++]) >= 0 && tx <= 1) {
-				for (var cy = 0; sy == -1 || cy < sy;) {
-					if (sy == -1 || (ty = tys[cy++]) >= 0 && ty <= 1) {
-						if (sx == -1) tx = ty;
-						else if (sy == -1) ty = tx;
-						if (Math.abs(tx - ty) < tolerance)
-							return (tx + ty) * 0.5;
-					}
-				}
-				if (sx == -1)
-					break;
+	getParameterOf: function(v, point) {
+		var p1 = new Point(v[0], v[1]),
+			p2 = new Point(v[6], v[7]),
+			epsilon = 1e-12,
+			t = point.isClose(p1, epsilon) ? 0
+			  : point.isClose(p2, epsilon) ? 1
+			  : null;
+		if (t !== null)
+			return t;
+		var coords = [point.x, point.y],
+			roots = [],
+			geomEpsilon = 2e-7;
+		for (var c = 0; c < 2; c++) {
+			var count = Curve.solveCubic(v, c, coords[c], roots, 0, 1);
+			for (var i = 0; i < count; i++) {
+				t = roots[i];
+				if (point.isClose(Curve.getPoint(v, t), geomEpsilon))
+					return t;
 			}
 		}
-		return null;
+		return point.isClose(p1, geomEpsilon) ? 0
+			 : point.isClose(p2, geomEpsilon) ? 1
+			 : null;
+	},
+
+	getNearestParameter: function(v, point) {
+		if (Curve.isStraight(v)) {
+			var p1x = v[0], p1y = v[1],
+				p2x = v[6], p2y = v[7],
+				vx = p2x - p1x, vy = p2y - p1y,
+				det = vx * vx + vy * vy;
+			if (det === 0)
+				return 0;
+			var u = ((point.x - p1x) * vx + (point.y - p1y) * vy) / det;
+			return u < 1e-12 ? 0
+				 : u > 0.999999999999 ? 1
+				 : Curve.getParameterOf(v,
+					new Point(p1x + u * vx, p1y + u * vy));
+		}
+
+		var count = 100,
+			minDist = Infinity,
+			minT = 0;
+
+		function refine(t) {
+			if (t >= 0 && t <= 1) {
+				var dist = point.getDistance(Curve.getPoint(v, t), true);
+				if (dist < minDist) {
+					minDist = dist;
+					minT = t;
+					return true;
+				}
+			}
+		}
+
+		for (var i = 0; i <= count; i++)
+			refine(i / count);
+
+		var step = 1 / (count * 2);
+		while (step > 4e-7) {
+			if (!refine(minT - step) && !refine(minT + step))
+				step /= 2;
+		}
+		return minT;
 	},
 
 	getPart: function(v, from, to) {
+		var flip = from > to;
+		if (flip) {
+			var tmp = from;
+			from = to;
+			to = tmp;
+		}
 		if (from > 0)
 			v = Curve.subdivide(v, from)[1];
 		if (to < 1)
 			v = Curve.subdivide(v, (to - from) / (1 - from))[0];
-		return v;
+		return flip
+				? [v[6], v[7], v[4], v[5], v[2], v[3], v[0], v[1]]
+				: v;
 	},
 
-	isLinear: function(v) {
+	hasHandles: function(v) {
 		var isZero = Numerical.isZero;
-		return isZero(v[0] - v[2]) && isZero(v[1] - v[3])
-				&& isZero(v[4] - v[6]) && isZero(v[5] - v[7]);
+		return !(isZero(v[0] - v[2]) && isZero(v[1] - v[3])
+				&& isZero(v[4] - v[6]) && isZero(v[5] - v[7]));
 	},
 
 	isFlatEnough: function(v, tolerance) {
@@ -10589,21 +12538,14 @@ statics: {
 
 	getArea: function(v) {
 		var p1x = v[0], p1y = v[1],
-			c1x = v[2], c1y = v[3],
-			c2x = v[4], c2y = v[5],
-			p2x = v[6], p2y = v[7];
-		return (  3.0 * c1y * p1x - 1.5 * c1y * c2x
-				- 1.5 * c1y * p2x - 3.0 * p1y * c1x
-				- 1.5 * p1y * c2x - 0.5 * p1y * p2x
-				+ 1.5 * c2y * p1x + 1.5 * c2y * c1x
-				- 3.0 * c2y * p2x + 0.5 * p2y * p1x
-				+ 1.5 * p2y * c1x + 3.0 * p2y * c2x) / 10;
-	},
-
-	getEdgeSum: function(v) {
-		return	  (v[0] - v[2]) * (v[3] + v[1])
-				+ (v[2] - v[4]) * (v[5] + v[3])
-				+ (v[4] - v[6]) * (v[7] + v[5]);
+			p2x = v[6], p2y = v[7],
+			h1x = (v[2] + p1x) / 2,
+			h1y = (v[3] + p1y) / 2,
+			h2x = (v[4] + v[6]) / 2,
+			h2y = (v[5] + v[7]) / 2;
+		return 6 * ((p1x - h1x) * (h1y + p1y)
+				  + (h1x - h2x) * (h2y + h1y)
+				  + (h2x - p2x) * (p2y + h2y)) / 10;
 	},
 
 	getBounds: function(v) {
@@ -10629,7 +12571,7 @@ statics: {
 			b = 2 * (v0 + v2) - 4 * v1,
 			c = v1 - v0,
 			count = Numerical.solveQuadratic(a, b, c, roots),
-			tMin = 0.000001,
+			tMin = 4e-7,
 			tMax = 1 - tMin;
 		add(v3, 0);
 		for (var i = 0; i < count; i++) {
@@ -10643,33 +12585,81 @@ statics: {
 					padding);
 		}
 	}
-}}, Base.each(['getBounds', 'getStrokeBounds', 'getHandleBounds', 'getRoughBounds'],
+}}, Base.each(
+	['getBounds', 'getStrokeBounds', 'getHandleBounds', 'getRoughBounds'],
 	function(name) {
 		this[name] = function() {
 			if (!this._bounds)
 				this._bounds = {};
 			var bounds = this._bounds[name];
 			if (!bounds) {
-				bounds = this._bounds[name] = Path[name]([this._segment1,
-						this._segment2], false, this._path.getStyle());
+				var path = this._path;
+				bounds = this._bounds[name] = Path[name](
+						[this._segment1, this._segment2], false,
+						path && path.getStyle());
 			}
 			return bounds.clone();
 		};
 	},
 {
 
-}), Base.each(['getPoint', 'getTangent', 'getNormal', 'getCurvature'],
-	function(name, index) {
-		this[name + 'At'] = function(offset, isParameter) {
-			var values = this.getValues();
-			return Curve.evaluate(values, isParameter
-					? offset : Curve.getParameterAt(values, offset, 0), index);
-		};
-		this[name] = function(parameter) {
-			return Curve.evaluate(this.getValues(), parameter, index);
-		};
+}), Base.each({
+	isStraight: function(l, h1, h2) {
+		if (h1.isZero() && h2.isZero()) {
+			return true;
+		} else if (l.isZero()) {
+			return false;
+		} else if (h1.isCollinear(l) && h2.isCollinear(l)) {
+			var div = l.dot(l),
+				p1 = l.dot(h1) / div,
+				p2 = l.dot(h2) / div;
+			return p1 >= 0 && p1 <= 1 && p2 <= 0 && p2 >= -1;
+		}
+		return false;
 	},
-{
+
+	isLinear: function(l, h1, h2) {
+		var third = l.divide(3);
+		return h1.equals(third) && h2.negate().equals(third);
+	}
+}, function(test, name) {
+	this[name] = function() {
+		var seg1 = this._segment1,
+			seg2 = this._segment2;
+		return test(seg2._point.subtract(seg1._point),
+				seg1._handleOut, seg2._handleIn);
+	};
+
+	this.statics[name] = function(v) {
+		var p1x = v[0], p1y = v[1],
+			p2x = v[6], p2y = v[7];
+		return test(new Point(p2x - p1x, p2y - p1y),
+				new Point(v[2] - p1x, v[3] - p1y),
+				new Point(v[4] - p2x, v[5] - p2y));
+	};
+}, {
+	statics: {},
+
+	hasHandles: function() {
+		return !this._segment1._handleOut.isZero()
+				|| !this._segment2._handleIn.isZero();
+	},
+
+	isCollinear: function(curve) {
+		return curve && this.isStraight() && curve.isStraight()
+				&& this.getLine().isCollinear(curve.getLine());
+	},
+
+	isHorizontal: function() {
+		return this.isStraight() && Math.abs(this.getTangentAt(0.5, true).y)
+				< 1e-7;
+	},
+
+	isVertical: function() {
+		return this.isStraight() && Math.abs(this.getTangentAt(0.5, true).x)
+				< 1e-7;
+	}
+}), {
 	beans: false,
 
 	getParameterAt: function(offset, start) {
@@ -10677,14 +12667,14 @@ statics: {
 	},
 
 	getParameterOf: function() {
-		var point = Point.read(arguments);
-		return Curve.getParameterOf(this.getValues(), point.x, point.y);
+		return Curve.getParameterOf(this.getValues(), Point.read(arguments));
 	},
 
 	getLocationAt: function(offset, isParameter) {
-		if (!isParameter)
-			offset = this.getParameterAt(offset);
-		return offset >= 0 && offset <= 1 && new CurveLocation(this, offset);
+		var t = isParameter ? offset : this.getParameterAt(offset);
+		return t != null && t >= 0 && t <= 1
+				? new CurveLocation(this, t)
+				: null;
 	},
 
 	getLocationOf: function() {
@@ -10700,40 +12690,32 @@ statics: {
 	getNearestLocation: function() {
 		var point = Point.read(arguments),
 			values = this.getValues(),
-			count = 100,
-			minDist = Infinity,
-			minT = 0;
-
-		function refine(t) {
-			if (t >= 0 && t <= 1) {
-				var dist = point.getDistance(
-						Curve.evaluate(values, t, 0), true);
-				if (dist < minDist) {
-					minDist = dist;
-					minT = t;
-					return true;
-				}
-			}
-		}
-
-		for (var i = 0; i <= count; i++)
-			refine(i / count);
-
-		var step = 1 / (count * 2);
-		while (step > 0.000001) {
-			if (!refine(minT - step) && !refine(minT + step))
-				step /= 2;
-		}
-		var pt = Curve.evaluate(values, minT, 0);
-		return new CurveLocation(this, minT, pt, null, null, null,
-				point.getDistance(pt));
+			t = Curve.getNearestParameter(values, point),
+			pt = Curve.getPoint(values, t);
+		return new CurveLocation(this, t, pt, null, point.getDistance(pt));
 	},
 
 	getNearestPoint: function() {
 		return this.getNearestLocation.apply(this, arguments).getPoint();
 	}
 
-}),
+},
+new function() {
+	var methods = ['getPoint', 'getTangent', 'getNormal', 'getWeightedTangent',
+		'getWeightedNormal', 'getCurvature'];
+	return Base.each(methods,
+	function(name) {
+		this[name + 'At'] = function(offset, isParameter) {
+			var values = this.getValues();
+			return Curve[name](values, isParameter ? offset
+					: Curve.getParameterAt(values, offset, 0));
+		};
+	}, {
+		statics: {
+			evaluateMethods: methods
+		}
+	});
+},
 new function() {
 
 	function getLengthIntegrand(v) {
@@ -10761,18 +12743,74 @@ new function() {
 		return Math.max(2, Math.min(16, Math.ceil(Math.abs(b - a) * 32)));
 	}
 
-	return {
-		statics: true,
+	function evaluate(v, t, type, normalized) {
+		if (t == null || t < 0 || t > 1)
+			return null;
+		var p1x = v[0], p1y = v[1],
+			c1x = v[2], c1y = v[3],
+			c2x = v[4], c2y = v[5],
+			p2x = v[6], p2y = v[7],
+			tMin = 4e-7,
+			tMax = 1 - tMin,
+			x, y;
+
+		if (type === 0 && (t < tMin || t > tMax)) {
+			var isZero = t < tMin;
+			x = isZero ? p1x : p2x;
+			y = isZero ? p1y : p2y;
+		} else {
+			var cx = 3 * (c1x - p1x),
+				bx = 3 * (c2x - c1x) - cx,
+				ax = p2x - p1x - cx - bx,
+
+				cy = 3 * (c1y - p1y),
+				by = 3 * (c2y - c1y) - cy,
+				ay = p2y - p1y - cy - by;
+			if (type === 0) {
+				x = ((ax * t + bx) * t + cx) * t + p1x;
+				y = ((ay * t + by) * t + cy) * t + p1y;
+			} else {
+				if (t < tMin) {
+					x = cx;
+					y = cy;
+				} else if (t > tMax) {
+					x = 3 * (p2x - c2x);
+					y = 3 * (p2y - c2y);
+				} else {
+					x = (3 * ax * t + 2 * bx) * t + cx;
+					y = (3 * ay * t + 2 * by) * t + cy;
+				}
+				if (normalized) {
+					if (x === 0 && y === 0 && (t < tMin || t > tMax)) {
+						x = c2x - c1x;
+						y = c2y - c1y;
+					}
+					var len = Math.sqrt(x * x + y * y);
+					if (len) {
+						x /= len;
+						y /= len;
+					}
+				}
+				if (type === 3) {
+					var x2 = 6 * ax * t + 2 * bx,
+						y2 = 6 * ay * t + 2 * by,
+						d = Math.pow(x * x + y * y, 3 / 2);
+					x = d !== 0 ? (x * y2 - y * x2) / d : 0;
+					y = 0;
+				}
+			}
+		}
+		return type === 2 ? new Point(y, -x) : new Point(x, y);
+	}
+
+	return { statics: {
 
 		getLength: function(v, a, b) {
 			if (a === undefined)
 				a = 0;
 			if (b === undefined)
 				b = 1;
-			var isZero = Numerical.isZero;
-			if (a === 0 && b === 1
-					&& isZero(v[0] - v[2]) && isZero(v[1] - v[3])
-					&& isZero(v[6] - v[4]) && isZero(v[7] - v[5])) {
+			if (a === 0 && b === 1 && Curve.isStraight(v)) {
 				var dx = v[6] - v[0],
 					dy = v[7] - v[1];
 				return Math.sqrt(dx * dx + dy * dy);
@@ -10783,17 +12821,21 @@ new function() {
 
 		getParameterAt: function(v, offset, start) {
 			if (start === undefined)
-				start = offset < 0 ? 1 : 0
+				start = offset < 0 ? 1 : 0;
 			if (offset === 0)
 				return start;
-			var forward = offset > 0,
+			var abs = Math.abs,
+				forward = offset > 0,
 				a = forward ? start : 0,
 				b = forward ? 1 : start,
 				ds = getLengthIntegrand(v),
 				rangeLength = Numerical.integrate(ds, a, b,
 						getIterations(a, b));
-			if (Math.abs(offset) >= rangeLength)
+			if (abs(offset - rangeLength) < 1e-12) {
 				return forward ? b : a;
+			} else if (abs(offset) > rangeLength) {
+				return null;
+			}
 			var guess = offset / rangeLength,
 				length = 0;
 			function f(t) {
@@ -10802,27 +12844,82 @@ new function() {
 				start = t;
 				return length - offset;
 			}
-			return Numerical.findRoot(f, ds, start + guess, a, b, 16,
-					0.000001);
+			return Numerical.findRoot(f, ds, start + guess, a, b, 32,
+					1e-12);
+		},
+
+		getPoint: function(v, t) {
+			return evaluate(v, t, 0, false);
+		},
+
+		getTangent: function(v, t) {
+			return evaluate(v, t, 1, true);
+		},
+
+		getWeightedTangent: function(v, t) {
+			return evaluate(v, t, 1, false);
+		},
+
+		getNormal: function(v, t) {
+			return evaluate(v, t, 2, true);
+		},
+
+		getWeightedNormal: function(v, t) {
+			return evaluate(v, t, 2, false);
+		},
+
+		getCurvature: function(v, t) {
+			return evaluate(v, t, 3, false).x;
 		}
-	};
-}, new function() {
-	function addLocation(locations, include, curve1, t1, point1, curve2, t2,
-			point2) {
-		var loc = new CurveLocation(curve1, t1, point1, curve2, t2, point2);
-		if (!include || include(loc))
-			locations.push(loc);
+	}};
+},
+new function() {
+
+	function addLocation(locations, param, v1, c1, t1, p1, v2, c2, t2, p2,
+			overlap) {
+		var startConnected = param.startConnected,
+			endConnected = param.endConnected,
+			tMin = 4e-7,
+			tMax = 1 - tMin;
+		if (t1 == null)
+			t1 = Curve.getParameterOf(v1, p1);
+		if (t1 !== null && t1 >= (startConnected ? tMin : 0) &&
+			t1 <= (endConnected ? tMax : 1)) {
+			if (t2 == null)
+				t2 = Curve.getParameterOf(v2, p2);
+			if (t2 !== null && t2 >= (endConnected ? tMin : 0) &&
+				t2 <= (startConnected ? tMax : 1)) {
+				var renormalize = param.renormalize;
+				if (renormalize) {
+					var res = renormalize(t1, t2);
+					t1 = res[0];
+					t2 = res[1];
+				}
+				var loc1 = new CurveLocation(c1, t1,
+						p1 || Curve.getPoint(v1, t1), overlap),
+					loc2 = new CurveLocation(c2, t2,
+						p2 || Curve.getPoint(v2, t2), overlap),
+					flip = loc1.getPath() === loc2.getPath()
+						&& loc1.getIndex() > loc2.getIndex(),
+					loc = flip ? loc2 : loc1,
+					include = param.include;
+				loc1._intersection = loc2;
+				loc2._intersection = loc1;
+				if (!include || include(loc)) {
+					CurveLocation.insert(locations, loc, true);
+				}
+			}
+		}
 	}
 
-	function addCurveIntersections(v1, v2, curve1, curve2, locations, include,
+	function addCurveIntersections(v1, v2, c1, c2, locations, param,
 			tMin, tMax, uMin, uMax, oldTDiff, reverse, recursion) {
-		if (recursion > 32)
+		if (++recursion >= 24)
 			return;
 		var q0x = v2[0], q0y = v2[1], q3x = v2[6], q3y = v2[7],
-			tolerance = 0.000001,
 			getSignedDistance = Line.getSignedDistance,
-			d1 = getSignedDistance(q0x, q0y, q3x, q3y, v2[2], v2[3]) || 0,
-			d2 = getSignedDistance(q0x, q0y, q3x, q3y, v2[4], v2[5]) || 0,
+			d1 = getSignedDistance(q0x, q0y, q3x, q3y, v2[2], v2[3]),
+			d2 = getSignedDistance(q0x, q0y, q3x, q3y, v2[4], v2[5]),
 			factor = d1 * d2 > 0 ? 3 / 4 : 4 / 9,
 			dMin = factor * Math.min(0, d1, d2),
 			dMax = factor * Math.max(0, d1, d2),
@@ -10830,61 +12927,51 @@ new function() {
 			dp1 = getSignedDistance(q0x, q0y, q3x, q3y, v1[2], v1[3]),
 			dp2 = getSignedDistance(q0x, q0y, q3x, q3y, v1[4], v1[5]),
 			dp3 = getSignedDistance(q0x, q0y, q3x, q3y, v1[6], v1[7]),
-			tMinNew, tMaxNew, tDiff;
-		if (q0x === q3x && uMax - uMin <= tolerance && recursion > 3) {
-			tMaxNew = tMinNew = (tMax + tMin) / 2;
-			tDiff = 0;
-		} else {
-			var hull = getConvexHull(dp0, dp1, dp2, dp3),
-				top = hull[0],
-				bottom = hull[1],
-				tMinClip, tMaxClip;
-			tMinClip = clipConvexHull(top, bottom, dMin, dMax);
-			top.reverse();
-			bottom.reverse();
-			tMaxClip = clipConvexHull(top, bottom, dMin, dMax);
-			if (tMinClip == null || tMaxClip == null)
-				return;
-			v1 = Curve.getPart(v1, tMinClip, tMaxClip);
-			tDiff = tMaxClip - tMinClip;
-			tMinNew = tMax * tMinClip + tMin * (1 - tMinClip);
-			tMaxNew = tMax * tMaxClip + tMin * (1 - tMaxClip);
-		}
+			hull = getConvexHull(dp0, dp1, dp2, dp3),
+			top = hull[0],
+			bottom = hull[1],
+			tMinClip,
+			tMaxClip;
+		if ((tMinClip = clipConvexHull(top, bottom, dMin, dMax)) == null ||
+			(tMaxClip = clipConvexHull(top.reverse(), bottom.reverse(),
+				dMin, dMax)) == null)
+			return;
+		v1 = Curve.getPart(v1, tMinClip, tMaxClip);
+		var tDiff = tMaxClip - tMinClip,
+			tMinNew = tMin + (tMax - tMin) * tMinClip,
+			tMaxNew = tMin + (tMax - tMin) * tMaxClip;
 		if (oldTDiff > 0.5 && tDiff > 0.5) {
 			if (tMaxNew - tMinNew > uMax - uMin) {
 				var parts = Curve.subdivide(v1, 0.5),
 					t = tMinNew + (tMaxNew - tMinNew) / 2;
 				addCurveIntersections(
-					v2, parts[0], curve2, curve1, locations, include,
-					uMin, uMax, tMinNew, t, tDiff, !reverse, ++recursion);
+					v2, parts[0], c2, c1, locations, param,
+					uMin, uMax, tMinNew, t, tDiff, !reverse, recursion);
 				addCurveIntersections(
-					v2, parts[1], curve2, curve1, locations, include,
+					v2, parts[1], c2, c1, locations, param,
 					uMin, uMax, t, tMaxNew, tDiff, !reverse, recursion);
 			} else {
 				var parts = Curve.subdivide(v2, 0.5),
 					t = uMin + (uMax - uMin) / 2;
 				addCurveIntersections(
-					parts[0], v1, curve2, curve1, locations, include,
-					uMin, t, tMinNew, tMaxNew, tDiff, !reverse, ++recursion);
+					parts[0], v1, c2, c1, locations, param,
+					uMin, t, tMinNew, tMaxNew, tDiff, !reverse, recursion);
 				addCurveIntersections(
-					parts[1], v1, curve2, curve1, locations, include,
+					parts[1], v1, c2, c1, locations, param,
 					t, uMax, tMinNew, tMaxNew, tDiff, !reverse, recursion);
 			}
-		} else if (Math.max(uMax - uMin, tMaxNew - tMinNew) < tolerance) {
+		} else if (Math.max(uMax - uMin, tMaxNew - tMinNew)
+				< 1e-7) {
 			var t1 = tMinNew + (tMaxNew - tMinNew) / 2,
 				t2 = uMin + (uMax - uMin) / 2;
-			if (reverse) {
-				addLocation(locations, include,
-						curve2, t2, Curve.evaluate(v2, t2, 0),
-						curve1, t1, Curve.evaluate(v1, t1, 0));
-			} else {
-				addLocation(locations, include,
-						curve1, t1, Curve.evaluate(v1, t1, 0),
-						curve2, t2, Curve.evaluate(v2, t2, 0));
-			}
-		} else if (tDiff > 0) {
-			addCurveIntersections(v2, v1, curve2, curve1, locations, include,
-					uMin, uMax, tMinNew, tMaxNew, tDiff, !reverse, ++recursion);
+			v1 = c1.getValues();
+			v2 = c2.getValues();
+			addLocation(locations, param,
+				reverse ? v2 : v1, reverse ? c2 : c1, reverse ? t2 : t1, null,
+				reverse ? v1 : v2, reverse ? c1 : c2, reverse ? t1 : t2, null);
+		} else if (tDiff > 1e-12) {
+			addCurveIntersections(v2, v1, c2, c1, locations, param,
+					uMin, uMax, tMinNew, tMaxNew, tDiff, !reverse, recursion);
 		}
 	}
 
@@ -10893,32 +12980,21 @@ new function() {
 			p1 = [ 1 / 3, dq1 ],
 			p2 = [ 2 / 3, dq2 ],
 			p3 = [ 1, dq3 ],
-			getSignedDistance = Line.getSignedDistance,
-			dist1 = getSignedDistance(0, dq0, 1, dq3, 1 / 3, dq1),
-			dist2 = getSignedDistance(0, dq0, 1, dq3, 2 / 3, dq2),
-			flip = false,
+			dist1 = dq1 - (2 * dq0 + dq3) / 3,
+			dist2 = dq2 - (dq0 + 2 * dq3) / 3,
 			hull;
 		if (dist1 * dist2 < 0) {
 			hull = [[p0, p1, p3], [p0, p2, p3]];
-			flip = dist1 < 0;
 		} else {
-			var pmax, cross = 0,
-				distZero = dist1 === 0 || dist2 === 0;
-			if (Math.abs(dist1) > Math.abs(dist2)) {
-				pmax = p1;
-				cross = (dq3 - dq2 - (dq3 - dq0) / 3)
-						* (2 * (dq3 - dq2) - dq3 + dq1) / 3;
-			} else {
-				pmax = p2;
-				cross = (dq1 - dq0 + (dq0 - dq3) / 3)
-						* (-2 * (dq0 - dq1) + dq0 - dq2) / 3;
-			}
-			hull = cross < 0 || distZero
-					? [[p0, pmax, p3], [p0, p3]]
-					: [[p0, p1, p2, p3], [p0, p3]];
-			flip = dist1 ? dist1 < 0 : dist2 < 0;
+			var distRatio = dist1 / dist2;
+			hull = [
+				distRatio >= 2 ? [p0, p1, p3]
+				: distRatio <= 0.5 ? [p0, p2, p3]
+				: [p0, p1, p2, p3],
+				[p0, p3]
+			];
 		}
-		return flip ? hull.reverse() : hull;
+		return (dist1 || dist2) < 0 ? hull.reverse() : hull;
 	}
 
 	function clipConvexHull(hullTop, hullBottom, dMin, dMax) {
@@ -10937,17 +13013,18 @@ new function() {
 		for (var i = 1, l = part.length; i < l; i++) {
 			var qx = part[i][0],
 				qy = part[i][1];
-			if (top ? qy >= threshold : qy <= threshold)
-				return px + (threshold - py) * (qx - px) / (qy - py);
+			if (top ? qy >= threshold : qy <= threshold) {
+				return qy === threshold ? qx
+						: px + (threshold - py) * (qx - px) / (qy - py);
+			}
 			px = qx;
 			py = qy;
 		}
 		return null;
 	}
 
-	function addCurveLineIntersections(v1, v2, curve1, curve2, locations,
-			include) {
-		var flip = Curve.isLinear(v1),
+	function addCurveLineIntersections(v1, v2, c1, c2, locations, param) {
+		var flip = Curve.isStraight(v1),
 			vc = flip ? v2 : v1,
 			vl = flip ? v1 : v2,
 			lx1 = vl[0], ly1 = vl[1],
@@ -10957,113 +13034,221 @@ new function() {
 			angle = Math.atan2(-ldy, ldx),
 			sin = Math.sin(angle),
 			cos = Math.cos(angle),
-			rlx2 = ldx * cos - ldy * sin,
-			rvl = [0, 0, 0, 0, rlx2, 0, rlx2, 0],
 			rvc = [];
 		for(var i = 0; i < 8; i += 2) {
 			var x = vc[i] - lx1,
 				y = vc[i + 1] - ly1;
 			rvc.push(
 				x * cos - y * sin,
-				y * cos + x * sin);
+				x * sin + y * cos);
 		}
 		var roots = [],
 			count = Curve.solveCubic(rvc, 1, 0, roots, 0, 1);
 		for (var i = 0; i < count; i++) {
 			var tc = roots[i],
-				x = Curve.evaluate(rvc, tc, 0).x;
-			if (x >= 0 && x <= rlx2) {
-				var tl = Curve.getParameterOf(rvl, x, 0),
+				pc = Curve.getPoint(vc, tc),
+				tl = Curve.getParameterOf(vl, pc);
+			if (tl !== null) {
+				var pl = Curve.getPoint(vl, tl),
 					t1 = flip ? tl : tc,
 					t2 = flip ? tc : tl;
-				addLocation(locations, include,
-						curve1, t1, Curve.evaluate(v1, t1, 0),
-						curve2, t2, Curve.evaluate(v2, t2, 0));
+				if (!param.endConnected || t2 > Numerical.CURVETIME_EPSILON) {
+					addLocation(locations, param,
+							v1, c1, t1, flip ? pl : pc,
+							v2, c2, t2, flip ? pc : pl);
+				}
 			}
 		}
 	}
 
-	function addLineIntersection(v1, v2, curve1, curve2, locations, include) {
-		var point = Line.intersect(
+	function addLineIntersection(v1, v2, c1, c2, locations, param) {
+		var pt = Line.intersect(
 				v1[0], v1[1], v1[6], v1[7],
 				v2[0], v2[1], v2[6], v2[7]);
-		if (point) {
-			var x = point.x,
-				y = point.y;
-			addLocation(locations, include,
-					curve1, Curve.getParameterOf(v1, x, y), point,
-					curve2, Curve.getParameterOf(v2, x, y), point);
+		if (pt) {
+			addLocation(locations, param, v1, c1, null, pt, v2, c2, null, pt);
 		}
 	}
 
 	return { statics: {
-		getIntersections: function(v1, v2, c1, c2, locations, include) {
-			var linear1 = Curve.isLinear(v1),
-				linear2 = Curve.isLinear(v2),
-				c1p1 = c1.getPoint1(),
-				c1p2 = c1.getPoint2(),
-				c2p1 = c2.getPoint1(),
-				c2p2 = c2.getPoint2(),
-				tolerance = 0.000001;
-			if (c1p1.isClose(c2p1, tolerance))
-				addLocation(locations, include, c1, 0, c1p1, c2, 0, c1p1);
-			if (c1p1.isClose(c2p2, tolerance))
-				addLocation(locations, include, c1, 0, c1p1, c2, 1, c1p1);
-			(linear1 && linear2
+		_getIntersections: function(v1, v2, c1, c2, locations, param) {
+			if (!v2) {
+				return Curve._getSelfIntersection(v1, c1, locations, param);
+			}
+			var c1p1x = v1[0], c1p1y = v1[1],
+				c1p2x = v1[6], c1p2y = v1[7],
+				c2p1x = v2[0], c2p1y = v2[1],
+				c2p2x = v2[6], c2p2y = v2[7],
+				c1s1x = (3 * v1[2] + c1p1x) / 4,
+				c1s1y = (3 * v1[3] + c1p1y) / 4,
+				c1s2x = (3 * v1[4] + c1p2x) / 4,
+				c1s2y = (3 * v1[5] + c1p2y) / 4,
+				c2s1x = (3 * v2[2] + c2p1x) / 4,
+				c2s1y = (3 * v2[3] + c2p1y) / 4,
+				c2s2x = (3 * v2[4] + c2p2x) / 4,
+				c2s2y = (3 * v2[5] + c2p2y) / 4,
+				min = Math.min,
+				max = Math.max;
+			if (!(	max(c1p1x, c1s1x, c1s2x, c1p2x) >=
+					min(c2p1x, c2s1x, c2s2x, c2p2x) &&
+					min(c1p1x, c1s1x, c1s2x, c1p2x) <=
+					max(c2p1x, c2s1x, c2s2x, c2p2x) &&
+					max(c1p1y, c1s1y, c1s2y, c1p2y) >=
+					min(c2p1y, c2s1y, c2s2y, c2p2y) &&
+					min(c1p1y, c1s1y, c1s2y, c1p2y) <=
+					max(c2p1y, c2s1y, c2s2y, c2p2y)))
+				return locations;
+			if (!param.startConnected && !param.endConnected) {
+				var overlaps = Curve.getOverlaps(v1, v2);
+				if (overlaps) {
+					for (var i = 0; i < 2; i++) {
+						var overlap = overlaps[i];
+						addLocation(locations, param,
+							v1, c1, overlap[0], null,
+							v2, c2, overlap[1], null, true);
+					}
+					return locations;
+				}
+			}
+
+			var straight1 = Curve.isStraight(v1),
+				straight2 = Curve.isStraight(v2),
+				straight = straight1 && straight2,
+				epsilon = 1e-12,
+				before = locations.length;
+			(straight
 				? addLineIntersection
-				: linear1 || linear2
+				: straight1 || straight2
 					? addCurveLineIntersections
 					: addCurveIntersections)(
-						v1, v2, c1, c2, locations, include,
+						v1, v2, c1, c2, locations, param,
 						0, 1, 0, 1, 0, false, 0);
-			if (c1p2.isClose(c2p1, tolerance))
-				addLocation(locations, include, c1, 1, c1p2, c2, 0, c1p2);
-			if (c1p2.isClose(c2p2, tolerance))
-				addLocation(locations, include, c1, 1, c1p2, c2, 1, c1p2);
+			if (straight && locations.length > before)
+				return locations;
+			var c1p1 = new Point(c1p1x, c1p1y),
+				c1p2 = new Point(c1p2x, c1p2y),
+				c2p1 = new Point(c2p1x, c2p1y),
+				c2p2 = new Point(c2p2x, c2p2y);
+			if (c1p1.isClose(c2p1, epsilon))
+				addLocation(locations, param, v1, c1, 0, c1p1, v2, c2, 0, c2p1);
+			if (!param.startConnected && c1p1.isClose(c2p2, epsilon))
+				addLocation(locations, param, v1, c1, 0, c1p1, v2, c2, 1, c2p2);
+			if (!param.endConnected && c1p2.isClose(c2p1, epsilon))
+				addLocation(locations, param, v1, c1, 1, c1p2, v2, c2, 0, c2p1);
+			if (c1p2.isClose(c2p2, epsilon))
+				addLocation(locations, param, v1, c1, 1, c1p2, v2, c2, 1, c2p2);
 			return locations;
 		},
 
-		filterIntersections: function(locations, _expand) {
-			var last = locations.length - 1,
-				tMax = 1 - 0.000001;
-			for (var i = last; i >= 0; i--) {
-				var loc = locations[i],
-					next = loc._curve.getNext(),
-					next2 = loc._curve2.getNext();
-				if (next && loc._parameter >= tMax) {
-					loc._parameter = 0;
-					loc._curve = next;
-				}
-				if (next2 && loc._parameter2 >= tMax) {
-					loc._parameter2 = 0;
-					loc._curve2 = next2;
-				}
+		_getSelfIntersection: function(v1, c1, locations, param) {
+			var p1x = v1[0], p1y = v1[1],
+				h1x = v1[2], h1y = v1[3],
+				h2x = v1[4], h2y = v1[5],
+				p2x = v1[6], p2y = v1[7];
+			var line = new Line(p1x, p1y, p2x, p2y, false),
+				side1 = line.getSide(new Point(h1x, h1y), true),
+				side2 = line.getSide(new Point(h2x, h2y), true);
+			if (side1 === side2) {
+				var edgeSum = (p1x - h2x) * (h1y - p2y)
+							+ (h1x - p2x) * (h2y - p1y);
+				if (edgeSum * side1 > 0)
+					return locations;
 			}
-
-			function compare(loc1, loc2) {
-				var path1 = loc1.getPath(),
-					path2 = loc2.getPath();
-				return path1 === path2
-						? (loc1.getIndex() + loc1.getParameter())
-								- (loc2.getIndex() + loc2.getParameter())
-						: path1._id - path2._id;
-			}
-
-			if (last > 0) {
-				locations.sort(compare);
-				for (var i = last; i > 0; i--) {
-					if (locations[i].equals(locations[i - 1])) {
-						locations.splice(i, 1);
-						last--;
+			var ax = p2x - 3 * h2x + 3 * h1x - p1x,
+				bx = h2x - 2 * h1x + p1x,
+				cx = h1x - p1x,
+				ay = p2y - 3 * h2y + 3 * h1y - p1y,
+				by = h2y - 2 * h1y + p1y,
+				cy = h1y - p1y,
+				ac = ay * cx - ax * cy,
+				ab = ay * bx - ax * by,
+				bc = by * cx - bx * cy;
+			if (ac * ac - 4 * ab * bc < 0) {
+				var roots = [],
+					tSplit,
+					count = Numerical.solveCubic(
+							ax * ax	 + ay * ay,
+							3 * (ax * bx + ay * by),
+							2 * (bx * bx + by * by) + ax * cx + ay * cy,
+							bx * cx + by * cy,
+							roots, 0, 1);
+				if (count > 0) {
+					for (var i = 0, maxCurvature = 0; i < count; i++) {
+						var curvature = Math.abs(
+								c1.getCurvatureAt(roots[i], true));
+						if (curvature > maxCurvature) {
+							maxCurvature = curvature;
+							tSplit = roots[i];
+						}
 					}
+					var parts = Curve.subdivide(v1, tSplit);
+					param.endConnected = true;
+					param.renormalize = function(t1, t2) {
+						return [t1 * tSplit, t2 * (1 - tSplit) + tSplit];
+					};
+					Curve._getIntersections(parts[0], parts[1], c1, c1,
+							locations, param);
 				}
-			}
-			if (_expand) {
-				for (var i = last; i >= 0; i--)
-					locations.push(locations[i].getIntersection());
-				locations.sort(compare);
 			}
 			return locations;
+		},
+
+		getOverlaps: function(v1, v2) {
+			var abs = Math.abs,
+				timeEpsilon = 4e-7,
+				geomEpsilon = 2e-7,
+				straight1 = Curve.isStraight(v1),
+				straight2 = Curve.isStraight(v2),
+				straight =	straight1 && straight2;
+
+			function getLineLengthSquared(v) {
+				var x = v[6] - v[0],
+					y = v[7] - v[1];
+				return x * x + y * y;
+			}
+
+			if (straight) {
+				var flip = getLineLengthSquared(v1) < getLineLengthSquared(v2),
+					l1 = flip ? v2 : v1,
+					l2 = flip ? v1 : v2,
+					line = new Line(l1[0], l1[1], l1[6], l1[7]);
+				if (line.getDistance(new Point(l2[0], l2[1])) > geomEpsilon ||
+					line.getDistance(new Point(l2[6], l2[7])) > geomEpsilon)
+					return null;
+			} else if (straight1 ^ straight2) {
+				return null;
+			}
+
+			var v = [v1, v2],
+				pairs = [];
+			for (var i = 0, t1 = 0;
+					i < 2 && pairs.length < 2;
+					i += t1 === 0 ? 0 : 1, t1 = t1 ^ 1) {
+				var t2 = Curve.getParameterOf(v[i ^ 1], new Point(
+						v[i][t1 === 0 ? 0 : 6],
+						v[i][t1 === 0 ? 1 : 7]));
+				if (t2 != null) {
+					var pair = i === 0 ? [t1, t2] : [t2, t1];
+					if (pairs.length === 0 ||
+						abs(pair[0] - pairs[0][0]) > timeEpsilon &&
+						abs(pair[1] - pairs[0][1]) > timeEpsilon)
+						pairs.push(pair);
+				}
+				if (i === 1 && pairs.length === 0)
+					break;
+			}
+			if (pairs.length !== 2) {
+				pairs = null;
+			} else if (!straight) {
+				var o1 = Curve.getPart(v1, pairs[0][0], pairs[1][0]),
+					o2 = Curve.getPart(v2, pairs[0][1], pairs[1][1]);
+				if (abs(o2[2] - o1[2]) > geomEpsilon ||
+					abs(o2[3] - o1[3]) > geomEpsilon ||
+					abs(o2[4] - o1[4]) > geomEpsilon ||
+					abs(o2[5] - o1[5]) > geomEpsilon)
+					pairs = null;
+			}
+			return pairs;
 		}
 	}};
 });
@@ -11072,58 +13257,82 @@ var CurveLocation = Base.extend({
 	_class: 'CurveLocation',
 	beans: true,
 
-	initialize: function CurveLocation(curve, parameter, point, _curve2,
-			_parameter2, _point2, _distance) {
-		this._id = CurveLocation._id = (CurveLocation._id || 0) + 1;
-		this._curve = curve;
-		this._segment1 = curve._segment1;
-		this._segment2 = curve._segment2;
+	initialize: function CurveLocation(curve, parameter, point,
+			_overlap, _distance) {
+		if (parameter > 0.9999996) {
+			var next = curve.getNext();
+			if (next) {
+				parameter = 0;
+				curve = next;
+			}
+		}
+		this._id = UID.get(CurveLocation);
+		this._setCurve(curve);
 		this._parameter = parameter;
-		this._point = point;
-		this._curve2 = _curve2;
-		this._parameter2 = _parameter2;
-		this._point2 = _point2;
+		this._point = point || curve.getPointAt(parameter, true);
+		this._overlap = _overlap;
 		this._distance = _distance;
+		this._intersection = this._next = this._prev = null;
 	},
 
-	getSegment: function(_preferFirst) {
-		if (!this._segment) {
-			var curve = this.getCurve(),
-				parameter = this.getParameter();
-			if (parameter === 1) {
-				this._segment = curve._segment2;
-			} else if (parameter === 0 || _preferFirst) {
-				this._segment = curve._segment1;
-			} else if (parameter == null) {
-				return null;
-			} else {
-				this._segment = curve.getPartLength(0, parameter)
+	_setCurve: function(curve) {
+		var path = curve._path;
+		this._version = path ? path._version : 0;
+		this._curve = curve;
+		this._segment = null;
+		this._segment1 = curve._segment1;
+		this._segment2 = curve._segment2;
+	},
+
+	_setSegment: function(segment) {
+		this._setCurve(segment.getCurve());
+		this._segment = segment;
+		this._parameter = segment === this._segment1 ? 0 : 1;
+		this._point = segment._point.clone();
+	},
+
+	getSegment: function() {
+		var curve = this.getCurve(),
+			segment = this._segment;
+		if (!segment) {
+			var parameter = this.getParameter();
+			if (parameter === 0) {
+				segment = curve._segment1;
+			} else if (parameter === 1) {
+				segment = curve._segment2;
+			} else if (parameter != null) {
+				segment = curve.getPartLength(0, parameter)
 					< curve.getPartLength(parameter, 1)
 						? curve._segment1
 						: curve._segment2;
 			}
+			this._segment = segment;
 		}
-		return this._segment;
+		return segment;
 	},
 
-	getCurve: function(_uncached) {
-		if (!this._curve || _uncached) {
-			this._curve = this._segment1.getCurve();
-			if (this._curve.getParameterOf(this._point) == null)
-				this._curve = this._segment2.getPrevious().getCurve();
+	getCurve: function() {
+		var curve = this._curve,
+			path = curve && curve._path,
+			that = this;
+		if (path && path._version !== this._version) {
+			curve = this._parameter = this._curve = this._offset = null;
 		}
-		return this._curve;
-	},
 
-	getIntersection: function() {
-		var intersection = this._intersection;
-		if (!intersection && this._curve2) {
-			var param = this._parameter2;
-			this._intersection = intersection = new CurveLocation(
-					this._curve2, param, this._point2 || this._point, this);
-			intersection._intersection = this;
+		function trySegment(segment) {
+			var curve = segment && segment.getCurve();
+			if (curve && (that._parameter = curve.getParameterOf(that._point))
+					!= null) {
+				that._setCurve(curve);
+				that._segment = segment;
+				return curve;
+			}
 		}
-		return intersection;
+
+		return curve
+			|| trySegment(this._segment)
+			|| trySegment(this._segment1)
+			|| trySegment(this._segment2.getPrevious());
 	},
 
 	getPath: function() {
@@ -11136,9 +13345,32 @@ var CurveLocation = Base.extend({
 		return curve && curve.getIndex();
 	},
 
+	getParameter: function() {
+		var curve = this.getCurve(),
+			parameter = this._parameter;
+		return curve && parameter == null
+			? this._parameter = curve.getParameterOf(this._point)
+			: parameter;
+	},
+
+	getPoint: function() {
+		return this._point;
+	},
+
 	getOffset: function() {
-		var path = this.getPath();
-		return path ? path._getOffset(this) : this.getCurveOffset();
+		var offset = this._offset;
+		if (offset == null) {
+			offset = 0;
+			var path = this.getPath(),
+				index = this.getIndex();
+			if (path && index != null) {
+				var curves = path.getCurves();
+				for (var i = 0; i < index; i++)
+					offset += curves[i].getLength();
+			}
+			this._offset = offset += this.getCurveOffset();
+		}
+		return offset;
 	},
 
 	getCurveOffset: function() {
@@ -11147,20 +13379,8 @@ var CurveLocation = Base.extend({
 		return parameter != null && curve && curve.getPartLength(0, parameter);
 	},
 
-	getParameter: function(_uncached) {
-		if ((this._parameter == null || _uncached) && this._point) {
-			var curve = this.getCurve(_uncached);
-			this._parameter = curve && curve.getParameterOf(this._point);
-		}
-		return this._parameter;
-	},
-
-	getPoint: function(_uncached) {
-		if ((!this._point || _uncached) && this._parameter != null) {
-			var curve = this.getCurve(_uncached);
-			this._point = curve && curve.getPointAt(this._parameter, true);
-		}
-		return this._point;
+	getIntersection: function() {
+		return this._intersection;
 	},
 
 	getDistance: function() {
@@ -11168,25 +13388,44 @@ var CurveLocation = Base.extend({
 	},
 
 	divide: function() {
-		var curve = this.getCurve(true);
-		return curve && curve.divide(this.getParameter(true), true);
+		var curve = this.getCurve(),
+			res = null;
+		if (curve) {
+			res = curve.divide(this.getParameter(), true);
+			if (res)
+				this._setSegment(res._segment1);
+		}
+		return res;
 	},
 
 	split: function() {
-		var curve = this.getCurve(true);
-		return curve && curve.split(this.getParameter(true), true);
+		var curve = this.getCurve();
+		return curve ? curve.split(this.getParameter(), true) : null;
 	},
 
-	equals: function(loc) {
-		var abs = Math.abs,
-			tolerance = 0.000001;
-		return this === loc
-				|| loc
-					&& this._curve === loc._curve
-					&& this._curve2 === loc._curve2
-					&& abs(this._parameter - loc._parameter) <= tolerance
-					&& abs(this._parameter2 - loc._parameter2) <= tolerance
-				|| false;
+	equals: function(loc, _ignoreOther) {
+		var res = this === loc,
+			epsilon = 2e-7;
+		if (!res && loc instanceof CurveLocation
+				&& this.getPath() === loc.getPath()
+				&& this.getPoint().isClose(loc.getPoint(), epsilon)) {
+			var c1 = this.getCurve(),
+				c2 = loc.getCurve(),
+				abs = Math.abs,
+				diff = abs(
+					((c1.isLast() && c2.isFirst() ? -1 : c1.getIndex())
+							+ this.getParameter()) -
+					((c2.isLast() && c1.isFirst() ? -1 : c2.getIndex())
+							+ loc.getParameter()));
+			res = (diff < 4e-7
+				|| ((diff = abs(this.getOffset() - loc.getOffset())) < epsilon
+					|| abs(this.getPath().getLength() - diff) < epsilon))
+				&& (_ignoreOther
+					|| (!this._intersection && !loc._intersection
+						|| this._intersection && this._intersection.equals(
+								loc._intersection, true)));
+		}
+		return res;
 	},
 
 	toString: function() {
@@ -11204,15 +13443,123 @@ var CurveLocation = Base.extend({
 		if (this._distance != null)
 			parts.push('distance: ' + f.number(this._distance));
 		return '{ ' + parts.join(', ') + ' }';
+	},
+
+	isTouching: function() {
+		var inter = this._intersection;
+		if (inter && this.getTangent().isCollinear(inter.getTangent())) {
+			var curve1 = this.getCurve(),
+				curve2 = inter.getCurve();
+			return !(curve1.isStraight() && curve2.isStraight()
+					&& curve1.getLine().intersect(curve2.getLine()));
+		}
+		return false;
+	},
+
+	isCrossing: function() {
+		var inter = this._intersection;
+		if (!inter)
+			return false;
+		var t1 = this.getParameter(),
+			t2 = inter.getParameter(),
+			tMin = 4e-7,
+			tMax = 1 - tMin;
+		if (t1 >= tMin && t1 <= tMax || t2 >= tMin && t2 <= tMax)
+			return !this.isTouching();
+		var c2 = this.getCurve(),
+			c1 = c2.getPrevious(),
+			c4 = inter.getCurve(),
+			c3 = c4.getPrevious(),
+			PI = Math.PI;
+		if (!c1 || !c3)
+			return false;
+
+		function isInRange(angle, min, max) {
+			return min < max
+				? angle > min && angle < max
+				: angle > min && angle <= PI || angle >= -PI && angle < max;
+		}
+
+		var a1 = c1.getTangentAt(tMax, true).negate().getAngleInRadians(),
+			a2 = c2.getTangentAt(tMin, true).getAngleInRadians(),
+			a3 = c3.getTangentAt(tMax, true).negate().getAngleInRadians(),
+			a4 = c4.getTangentAt(tMin, true).getAngleInRadians();
+
+		return (isInRange(a3, a1, a2) ^ isInRange(a4, a1, a2))
+			&& (isInRange(a3, a2, a1) ^ isInRange(a4, a2, a1));
+	},
+
+	isOverlap: function() {
+		return !!this._overlap;
 	}
-}, Base.each(['getTangent', 'getNormal', 'getCurvature'], function(name) {
+}, Base.each(Curve.evaluateMethods, function(name) {
 	var get = name + 'At';
 	this[name] = function() {
 		var parameter = this.getParameter(),
 			curve = this.getCurve();
 		return parameter != null && curve && curve[get](parameter, true);
 	};
-}, {}));
+}, {
+	preserve: true
+}),
+new function() {
+
+	function insert(locations, loc, merge) {
+		var length = locations.length,
+			l = 0,
+			r = length - 1;
+
+		function search(index, dir) {
+			for (var i = index + dir; i >= -1 && i <= length; i += dir) {
+				var loc2 = locations[((i % length) + length) % length];
+				if (!loc.getPoint().isClose(loc2.getPoint(),
+						2e-7))
+					break;
+				if (loc.equals(loc2))
+					return loc2;
+			}
+			return null;
+		}
+
+		while (l <= r) {
+			var m = (l + r) >>> 1,
+				loc2 = locations[m],
+				found;
+			if (merge && (found = loc.equals(loc2) ? loc2
+					: (search(m, -1) || search(m, 1)))) {
+				if (loc._overlap) {
+					found._overlap = found._intersection._overlap = true;
+				}
+				return found;
+			}
+		var path1 = loc.getPath(),
+			path2 = loc2.getPath(),
+			diff = path1 === path2
+				? (loc.getIndex() + loc.getParameter())
+				- (loc2.getIndex() + loc2.getParameter())
+				: path1._id - path2._id;
+			if (diff < 0) {
+				r = m - 1;
+			} else {
+				l = m + 1;
+			}
+		}
+		locations.splice(l, 0, loc);
+		return loc;
+	}
+
+	return { statics: {
+		insert: insert,
+
+		expand: function(locations) {
+			var expanded = locations.slice();
+			for (var i = 0, l = locations.length; i < l; i++) {
+				insert(expanded, locations[i]._intersection, false);
+			}
+			return expanded;
+		}
+	}};
+});
 
 var PathItem = Item.extend({
 	_class: 'PathItem',
@@ -11220,60 +13567,64 @@ var PathItem = Item.extend({
 	initialize: function PathItem() {
 	},
 
-	getIntersections: function(path, _matrix, _expand) {
-		if (this === path)
-			path = null;
-		var locations = [],
-			curves1 = this.getCurves(),
-			curves2 = path ? path.getCurves() : curves1,
+	getIntersections: function(path, include, _matrix, _returnFirst) {
+		var self = this === path || !path,
 			matrix1 = this._matrix.orNullIfIdentity(),
-			matrix2 = path ? (_matrix || path._matrix).orNullIfIdentity()
-				: matrix1,
-			length1 = curves1.length,
-			length2 = path ? curves2.length : length1,
-			values2 = [],
-			tMin = 0.000001,
-			tMax = 1 - tMin;
-		if (path && !this.getBounds(matrix1).touches(path.getBounds(matrix2)))
+			matrix2 = self ? matrix1
+				: (_matrix || path._matrix).orNullIfIdentity();
+		if (!self && !this.getBounds(matrix1).touches(path.getBounds(matrix2)))
 			return [];
+		var curves1 = this.getCurves(),
+			curves2 = self ? curves1 : path.getCurves(),
+			length1 = curves1.length,
+			length2 = self ? length1 : curves2.length,
+			values2 = [],
+			arrays = [],
+			locations,
+			path;
 		for (var i = 0; i < length2; i++)
 			values2[i] = curves2[i].getValues(matrix2);
 		for (var i = 0; i < length1; i++) {
 			var curve1 = curves1[i],
-				values1 = path ? curve1.getValues(matrix1) : values2[i];
-			if (!path) {
-				var seg1 = curve1.getSegment1(),
-					seg2 = curve1.getSegment2(),
-					h1 = seg1._handleOut,
-					h2 = seg2._handleIn;
-				if (new Line(seg1._point.subtract(h1), h1.multiply(2), true)
-						.intersect(new Line(seg2._point.subtract(h2),
-						h2.multiply(2), true), false)) {
-					var parts = Curve.subdivide(values1);
-					Curve.getIntersections(
-						parts[0], parts[1], curve1, curve1, locations,
-						function(loc) {
-							if (loc._parameter <= tMax) {
-								loc._parameter /= 2;
-								loc._parameter2 = 0.5 + loc._parameter2 / 2;
-								return true;
-							}
-						}
-					);
-				}
+				values1 = self ? values2[i] : curve1.getValues(matrix1),
+				path1 = curve1.getPath();
+			if (path1 !== path) {
+				path = path1;
+				locations = [];
+				arrays.push(locations);
 			}
-			for (var j = path ? 0 : i + 1; j < length2; j++) {
-				Curve.getIntersections(
-					values1, values2[j], curve1, curves2[j], locations,
-					!path && (j === i + 1 || j === length2 - 1 && i === 0)
-						&& function(loc) {
-							var t = loc._parameter;
-							return t >= tMin && t <= tMax;
-						}
+			if (self) {
+				Curve._getSelfIntersection(values1, curve1, locations, {
+					include: include,
+					startConnected: length1 === 1 &&
+							curve1.getPoint1().equals(curve1.getPoint2())
+				});
+			}
+			for (var j = self ? i + 1 : 0; j < length2; j++) {
+				if (_returnFirst && locations.length)
+					return locations;
+				var curve2 = curves2[j];
+				Curve._getIntersections(
+					values1, values2[j], curve1, curve2, locations,
+					{
+						include: include,
+						startConnected: self && curve1.getPrevious() === curve2,
+						endConnected: self && curve1.getNext() === curve2
+					}
 				);
 			}
 		}
-		return Curve.filterIntersections(locations, _expand);
+		locations = [];
+		for (var i = 0, l = arrays.length; i < l; i++) {
+			locations.push.apply(locations, arrays[i]);
+		}
+		return locations;
+	},
+
+	getCrossings: function(path) {
+		return this.getIntersections(path, function(inter) {
+			return inter.isOverlap() || inter.isCrossing();
+		});
 	},
 
 	_asPathItem: function() {
@@ -11306,7 +13657,7 @@ var PathItem = Item.extend({
 
 		this.clear();
 
-		for (var i = 0, l = parts && parts.length; i < l; i++) {
+		for (var i = 0, l = parts.length; i < l; i++) {
 			var part = parts[i],
 				command = part[0],
 				lower = command.toLowerCase();
@@ -11319,8 +13670,6 @@ var PathItem = Item.extend({
 			case 'm':
 			case 'l':
 				var move = lower === 'm';
-				if (move && previous && previous !== 'z')
-					this.closePath(true);
 				for (var j = 0; j < length; j += 2)
 					this[j === 0 && move ? 'moveTo' : 'lineTo'](
 							current = getPoint(j));
@@ -11376,8 +13725,8 @@ var PathItem = Item.extend({
 			case 'a':
 				for (var j = 0; j < length; j += 7) {
 					this.arcTo(current = getPoint(j + 5),
-							new Size(+coords[j], +coords[j + 1]),
-							+coords[j + 2], +coords[j + 4], +coords[j + 3]);
+							new Size(+coords[0], +coords[1]),
+							+coords[2], +coords[4], +coords[3]);
 				}
 				break;
 			case 'z':
@@ -11409,6 +13758,7 @@ var Path = PathItem.extend({
 	initialize: function Path(arg) {
 		this._closed = false;
 		this._segments = [];
+		this._version = 0;
 		var segments = Array.isArray(arg)
 			? typeof arg[0] === 'object'
 				? arg
@@ -11450,12 +13800,14 @@ var Path = PathItem.extend({
 			var parent = this._parent;
 			if (parent)
 				parent._currentPath = undefined;
-			this._length = this._clockwise = undefined;
-			if (this._curves && !(flags & 16)) {
-				for (var i = 0, l = this._curves.length; i < l; i++)
+			this._length = this._area = this._clockwise = this._monoCurves =
+					undefined;
+			if (flags & 16) {
+				this._version++;
+			} else if (this._curves) {
+			   for (var i = 0, l = this._curves.length; i < l; i++)
 					this._curves[i]._changed();
 			}
-			this._monoCurves = undefined;
 		} else if (flags & 32) {
 			this._bounds = undefined;
 		}
@@ -11585,14 +13937,6 @@ var Path = PathItem.extend({
 		return this._segments.length === 0;
 	},
 
-	isPolygon: function() {
-		for (var i = 0, l = this._segments.length; i < l; i++) {
-			if (!this._segments[i].isLinear())
-				return false;
-		}
-		return true;
-	},
-
 	_transformContent: function(matrix) {
 		var coords = new Array(6);
 		for (var i = 0, l = this._segments.length; i < l; i++)
@@ -11622,12 +13966,12 @@ var Path = PathItem.extend({
 			for (var i = index + amount, l = segments.length; i < l; i++)
 				segments[i]._index = i;
 		}
-		if (curves || segs._curves) {
-			if (!curves)
-				curves = this._curves = [];
-			var from = index > 0 ? index - 1 : index,
+		if (curves) {
+			var total = this._countCurves(),
+				from = index > 0 && index + amount - 1 === total ? index - 1
+					: index,
 				start = from,
-				to = Math.min(from + amount, this._countCurves());
+				to = Math.min(from + amount, total);
 			if (segs._curves) {
 				curves.splice.apply(curves, [from, 0].concat(segs._curves));
 				start += segs._curves.length;
@@ -11732,22 +14076,57 @@ var Path = PathItem.extend({
 
 	clear: '#removeSegments',
 
+	hasHandles: function() {
+		var segments = this._segments;
+		for (var i = 0, l = segments.length; i < l; i++) {
+			if (segments[i].hasHandles())
+				return true;
+		}
+		return false;
+	},
+
+	clearHandles: function() {
+		var segments = this._segments;
+		for (var i = 0, l = segments.length; i < l; i++)
+			segments[i].clearHandles();
+	},
+
 	getLength: function() {
 		if (this._length == null) {
-			var curves = this.getCurves();
-			this._length = 0;
+			var curves = this.getCurves(),
+				length = 0;
 			for (var i = 0, l = curves.length; i < l; i++)
-				this._length += curves[i].getLength();
+				length += curves[i].getLength();
+			this._length = length;
 		}
 		return this._length;
 	},
 
 	getArea: function() {
-		var curves = this.getCurves();
-		var area = 0;
-		for (var i = 0, l = curves.length; i < l; i++)
-			area += curves[i].getArea();
-		return area;
+		if (this._area == null) {
+			var segments = this._segments,
+				count = segments.length,
+				last = count - 1,
+				area = 0;
+			for (var i = 0, l = this._closed ? count : last; i < l; i++) {
+				area += Curve.getArea(Curve.getValues(
+						segments[i], segments[i < last ? i + 1 : 0]));
+			}
+			this._area = area;
+		}
+		return this._area;
+	},
+
+	isClockwise: function() {
+		if (this._clockwise !== undefined)
+			return this._clockwise;
+		return this.getArea() >= 0;
+	},
+
+	setClockwise: function(clockwise) {
+		if (this.isClockwise() != (clockwise = !!clockwise))
+			this.reverse();
+		this._clockwise = clockwise;
 	},
 
 	isFullySelected: function() {
@@ -11791,7 +14170,7 @@ var Path = PathItem.extend({
 			end = iterator.length + (this._closed ? -step : step) / 2;
 		var segments = [];
 		while (pos <= end) {
-			segments.push(new Segment(iterator.evaluate(pos, 0)));
+			segments.push(new Segment(iterator.getPointAt(pos)));
 			pos += step;
 		}
 		this.setSegments(segments);
@@ -11801,7 +14180,8 @@ var Path = PathItem.extend({
 		var curves = this.getCurves();
 		for (var i = curves.length - 1; i >= 0; i--) {
 			var curve = curves[i];
-			if (curve.isLinear() && curve.getLength() === 0)
+			if (!curve.hasHandles() && (curve.getLength() === 0
+					|| curve.isCollinear(curve.getNext())))
 				curve.remove();
 		}
 		return this;
@@ -11822,18 +14202,19 @@ var Path = PathItem.extend({
 			if (typeof arg === 'number')
 				arg = this.getLocationAt(arg);
 			if (!arg)
-				return null
+				return null;
 			index = arg.index;
 			parameter = arg.parameter;
 		}
-		var tolerance = 0.000001;
-		if (parameter >= 1 - tolerance) {
+		var tMin = 4e-7,
+			tMax = 1 - tMin;
+		if (parameter >= tMax) {
 			index++;
 			parameter--;
 		}
 		var curves = this.getCurves();
 		if (index >= 0 && index < curves.length) {
-			if (parameter > tolerance) {
+			if (parameter >= tMin) {
 				curves[index++].divide(parameter, true);
 			}
 			var segs = this.removeSegments(index, this._segments.length, true),
@@ -11842,25 +14223,15 @@ var Path = PathItem.extend({
 				this.setClosed(false);
 				path = this;
 			} else {
-				path = this._clone(new Path().insertAbove(this, true));
+				path = new Path(Item.NO_INSERT);
+				path.insertAbove(this, true);
+				this._clone(path);
 			}
 			path._add(segs, 0);
 			this.addSegment(segs[0]);
 			return path;
 		}
 		return null;
-	},
-
-	isClockwise: function() {
-		if (this._clockwise !== undefined)
-			return this._clockwise;
-		return Path.isClockwise(this._segments);
-	},
-
-	setClockwise: function(clockwise) {
-		if (this.isClockwise() != (clockwise = !!clockwise))
-			this.reverse();
-		this._clockwise = clockwise;
 	},
 
 	reverse: function() {
@@ -11883,27 +14254,26 @@ var Path = PathItem.extend({
 			var segments = path._segments,
 				last1 = this.getLastSegment(),
 				last2 = path.getLastSegment();
-			if (!last2)
-				return this;
-			if (last1 && last1._point.equals(last2._point))
+			if (last1._point.equals(last2._point))
 				path.reverse();
-			var first2 = path.getFirstSegment();
-			if (last1 && last1._point.equals(first2._point)) {
+			var first1,
+				first2 = path.getFirstSegment();
+			if (last1._point.equals(first2._point)) {
 				last1.setHandleOut(first2._handleOut);
 				this._add(segments.slice(1));
 			} else {
-				var first1 = this.getFirstSegment();
-				if (first1 && first1._point.equals(first2._point))
+				first1 = this.getFirstSegment();
+				if (first1._point.equals(first2._point))
 					path.reverse();
 				last2 = path.getLastSegment();
-				if (first1 && first1._point.equals(last2._point)) {
+				if (first1._point.equals(last2._point)) {
 					first1.setHandleIn(last2._handleIn);
 					this._add(segments.slice(0, segments.length - 1), 0);
 				} else {
 					this._add(segments.slice());
 				}
 			}
-			if (path.closed)
+			if (path._closed)
 				this._add([segments[0]]);
 			path.remove();
 		}
@@ -11914,23 +14284,6 @@ var Path = PathItem.extend({
 			last.remove();
 			this.setClosed(true);
 		}
-		return this;
-	},
-
-	interpolate: function(path0, path1, coef) {
-		for (var i = 0, l = this._segments.length; i < l; i++) {
-			if ( !path0._segments[i] || !path1._segments[i] ) {
-				break;
-			}
-
-			this._segments[i].interpolate(
-				path0._segments[i],
-				path1._segments[i],
-				coef
-			);
-		}
-
-		this._changed(9);
 	},
 
 	toShape: function(insert) {
@@ -11943,29 +14296,57 @@ var Path = PathItem.extend({
 			radius,
 			topCenter;
 
-		function isColinear(i, j) {
-			return segments[i].isColinear(segments[j]);
+		function isCollinear(i, j) {
+			var seg1 = segments[i],
+				seg2 = seg1.getNext(),
+				seg3 = segments[j],
+				seg4 = seg3.getNext();
+			return seg1._handleOut.isZero() && seg2._handleIn.isZero()
+					&& seg3._handleOut.isZero() && seg4._handleIn.isZero()
+					&& seg2._point.subtract(seg1._point).isCollinear(
+						seg4._point.subtract(seg3._point));
 		}
 
 		function isOrthogonal(i) {
-			return segments[i].isOrthogonal();
+			var seg2 = segments[i],
+				seg1 = seg2.getPrevious(),
+				seg3 = seg2.getNext();
+			return seg1._handleOut.isZero() && seg2._handleIn.isZero()
+					&& seg2._handleOut.isZero() && seg3._handleIn.isZero()
+					&& seg2._point.subtract(seg1._point).isOrthogonal(
+						seg3._point.subtract(seg2._point));
 		}
 
 		function isArc(i) {
-			return segments[i].isArc();
+			var seg1 = segments[i],
+				seg2 = seg1.getNext(),
+				handle1 = seg1._handleOut,
+				handle2 = seg2._handleIn,
+				kappa = 0.5522847498307936;
+			if (handle1.isOrthogonal(handle2)) {
+				var pt1 = seg1._point,
+					pt2 = seg2._point,
+					corner = new Line(pt1, handle1, true).intersect(
+							new Line(pt2, handle2, true), true);
+				return corner && Numerical.isZero(handle1.getLength() /
+						corner.subtract(pt1).getLength() - kappa)
+					&& Numerical.isZero(handle2.getLength() /
+						corner.subtract(pt2).getLength() - kappa);
+			}
+			return false;
 		}
 
 		function getDistance(i, j) {
 			return segments[i]._point.getDistance(segments[j]._point);
 		}
 
-		if (this.isPolygon() && segments.length === 4
-				&& isColinear(0, 2) && isColinear(1, 3) && isOrthogonal(1)) {
+		if (!this.hasHandles() && segments.length === 4
+				&& isCollinear(0, 2) && isCollinear(1, 3) && isOrthogonal(1)) {
 			type = Shape.Rectangle;
 			size = new Size(getDistance(0, 3), getDistance(0, 1));
 			topCenter = segments[1]._point.add(segments[2]._point).divide(2);
 		} else if (segments.length === 8 && isArc(0) && isArc(2) && isArc(4)
-				&& isArc(6) && isColinear(1, 5) && isColinear(3, 7)) {
+				&& isArc(6) && isCollinear(1, 5) && isCollinear(3, 7)) {
 			type = Shape.Rectangle;
 			size = new Size(getDistance(1, 6), getDistance(0, 3));
 			radius = size.subtract(new Size(getDistance(0, 7),
@@ -11985,16 +14366,13 @@ var Path = PathItem.extend({
 
 		if (type) {
 			var center = this.getPosition(true),
-				shape = new type({
+				shape = this._clone(new type({
 					center: center,
 					size: size,
 					radius: radius,
 					insert: false
-				});
+				}), insert, false);
 			shape.rotate(topCenter.subtract(center).getAngle() + 90);
-			shape.setStyle(this._style);
-			if (insert || insert === undefined)
-				shape.insertAbove(this);
 			return shape;
 		}
 		return null;
@@ -12122,7 +14500,7 @@ var Path = PathItem.extend({
 						: null;
 	}
 
-}, Base.each(['getPoint', 'getTangent', 'getNormal', 'getCurvature'],
+}, Base.each(Curve.evaluateMethods,
 	function(name) {
 		this[name + 'At'] = function(offset, isParameter) {
 			var loc = this.getLocationAt(offset, isParameter);
@@ -12131,22 +14509,6 @@ var Path = PathItem.extend({
 	},
 {
 	beans: false,
-
-	_getOffset: function(location) {
-		var index = location && location.getIndex();
-		if (index != null) {
-			var curves = this.getCurves(),
-				offset = 0;
-			for (var i = 0; i < index; i++)
-				offset += curves[i].getLength();
-			var curve = curves[index],
-				parameter = location.getParameter();
-			if (parameter > 0)
-				offset += curve.getPartLength(0, parameter);
-			return offset;
-		}
-		return null;
-	},
 
 	getLocationOf: function() {
 		var point = Point.read(arguments),
@@ -12168,8 +14530,9 @@ var Path = PathItem.extend({
 		var curves = this.getCurves(),
 			length = 0;
 		if (isParameter) {
-			var index = ~~offset;
-			return curves[index].getLocationAt(offset - index, true);
+			var index = ~~offset,
+				curve = curves[index];
+			return curve ? curve.getLocationAt(offset - index, true) : null;
 		}
 		for (var i = 0, l = curves.length; i < l; i++) {
 			var start = length,
@@ -12179,7 +14542,7 @@ var Path = PathItem.extend({
 				return curve.getLocationAt(offset - start);
 			}
 		}
-		if (offset <= this.getLength())
+		if (curves.length > 0 && offset <= this.getLength())
 			return new CurveLocation(curves[curves.length - 1], 1);
 		return null;
 	},
@@ -12202,7 +14565,8 @@ var Path = PathItem.extend({
 	getNearestPoint: function() {
 		return this.getNearestLocation.apply(this, arguments).getPoint();
 	}
-}), new function() {
+}),
+new function() {
 
 	function drawHandles(ctx, segments, matrix, size) {
 		var half = size / 2;
@@ -12366,8 +14730,8 @@ var Path = PathItem.extend({
 			drawHandles(ctx, this._segments, matrix, paper.settings.handleSize);
 		}
 	};
-}, new function() {
-
+},
+new function() {
 	function getFirstControlPoints(rhs) {
 		var n = rhs.length,
 			x = [],
@@ -12459,7 +14823,8 @@ var Path = PathItem.extend({
 			}
 		}
 	};
-}, new function() {
+},
+new function() {
 	function getCurrentSegment(that) {
 		var segments = that._segments;
 		if (segments.length === 0)
@@ -12545,7 +14910,6 @@ var Path = PathItem.extend({
 					x = pt.x,
 					y = pt.y,
 					abs = Math.abs,
-					epsilon = 1e-12,
 					rx = abs(radius.width),
 					ry = abs(radius.height),
 					rxSq = rx * rx,
@@ -12561,7 +14925,7 @@ var Path = PathItem.extend({
 				}
 				factor = (rxSq * rySq - rxSq * ySq - rySq * xSq) /
 						(rxSq * ySq + rySq * xSq);
-				if (abs(factor) < epsilon)
+				if (abs(factor) < 1e-12)
 					factor = 0;
 				if (factor < 0)
 					throw new Error(
@@ -12691,14 +15055,6 @@ var Path = PathItem.extend({
 	},
 
 statics: {
-	isClockwise: function(segments) {
-		var sum = 0;
-		for (var i = 0, l = segments.length; i < l; i++)
-			sum += Curve.getEdgeSum(Curve.getValues(
-					segments[i], segments[i + 1 < l ? i + 1 : 0]));
-		return sum > 0;
-	},
-
 	getBounds: function(segments, closed, style, matrix, strokePadding) {
 		var first = segments[0];
 		if (!first)
@@ -12757,7 +15113,7 @@ statics: {
 			var handleIn = segment._handleIn,
 				handleOut = segment._handleOut;
 			if (join === 'round' || !handleIn.isZero() && !handleOut.isZero()
-					&& handleIn.isColinear(handleOut)) {
+					&& handleIn.isCollinear(handleOut)) {
 				addRound(segment);
 			} else {
 				Path._addBevelJoin(segment, join, radius, miterLimit, add);
@@ -12836,7 +15192,7 @@ statics: {
 	_addSquareCap: function(segment, cap, radius, addPoint, area) {
 		var point = segment._point,
 			loc = segment.getLocation(),
-			normal = loc.getNormal().normalize(radius);
+			normal = loc.getNormal().multiply(radius);
 		if (area) {
 			addPoint(point.subtract(normal));
 			addPoint(point.add(normal));
@@ -13043,6 +15399,13 @@ var CompoundPath = PathItem.extend({
 	},
 
 	insertChildren: function insertChildren(index, items, _preserve) {
+		for (var i = items.length - 1; i >= 0; i--) {
+			var item = items[i];
+			if (item instanceof CompoundPath) {
+				items.splice.apply(items, [i, 1].concat(item.removeChildren()));
+				item.remove();
+			}
+		}
 		items = insertChildren.base.call(this, index, items, _preserve, Path);
 		for (var i = 0, l = !_preserve && items && items.length; i < l; i++) {
 			var item = items[i];
@@ -13064,29 +15427,20 @@ var CompoundPath = PathItem.extend({
 	},
 
 	reduce: function reduce() {
-		if (this._children.length === 0) {
+		var children = this._children;
+		for (var i = children.length - 1; i >= 0; i--) {
+			var path = children[i].reduce();
+			if (path.isEmpty())
+				children.splice(i, 1);
+		}
+		if (children.length === 0) {
 			var path = new Path(Item.NO_INSERT);
 			path.insertAbove(this);
 			path.setStyle(this._style);
 			this.remove();
 			return path;
-		} else {
-			return reduce.base.call(this);
 		}
-	},
-
-	interpolate: function(compoundpath0, compoundpath1, coef) {
-		for (var i = 0, l = this._children.length; i < l; i++) {
-			if ( !compoundpath0._children[i] || !compoundpath1._children[i] ) {
-				break;
-			}
-
-			this._children[i].interpolate(
-				compoundpath0._children[i],
-				compoundpath1._children[i],
-				coef
-			);
-		}
+		return reduce.base.call(this);
 	},
 
 	isClockwise: function() {
@@ -13144,7 +15498,7 @@ var CompoundPath = PathItem.extend({
 			var child = children[i],
 				mx = child._matrix;
 			paths.push(child.getPathData(_matrix && !mx.isIdentity()
-					? _matrix.chain(mx) : mx, _precision));
+					? _matrix.chain(mx) : _matrix, _precision));
 		}
 		return paths.join(' ');
 	}
@@ -13192,7 +15546,8 @@ var CompoundPath = PathItem.extend({
 						: matrix.chain(mx));
 		}
 	}
-}, new function() {
+},
+new function() {
 	function getCurrentPath(that, check) {
 		var children = that._children;
 		if (check && children.length === 0)
@@ -13203,7 +15558,8 @@ var CompoundPath = PathItem.extend({
 	var fields = {
 		moveTo: function() {
 			var current = getCurrentPath(this),
-				path = current && current.isEmpty() ? current : new Path();
+				path = current && current.isEmpty() ? current
+						: new Path(Item.NO_INSERT);
 			if (path !== current)
 				this.addChild(path);
 			path.moveTo.apply(path, arguments);
@@ -13253,24 +15609,36 @@ PathItem.inject(new function() {
 		}
 	};
 
-	function computeBoolean(path1, path2, operation) {
-		var operator = operators[operation];
-		function preparePath(path) {
-			return path.clone(false).reduce().reorient().transform(null, true,
-					true);
-		}
+	function preparePath(path, resolve) {
+		var res = path.clone(false).reduce().transform(null, true, true);
+		return resolve ? res.resolveCrossings().reorient() : res;
+	}
 
-		var _path1 = preparePath(path1),
-			_path2 = path2 && path1 !== path2 && preparePath(path2);
+	function finishBoolean(ctor, paths, path1, path2, reduce) {
+		var result = new ctor(Item.NO_INSERT);
+		result.addChildren(paths, true);
+		if (reduce)
+			result = result.reduce();
+		result.insertAbove(path2 && path1.isSibling(path2)
+				&& path1.getIndex() < path2.getIndex()
+					? path2 : path1);
+		result.setStyle(path1._style);
+		return result;
+	}
+
+	function computeBoolean(path1, path2, operation) {
+		if (!path1._children && !path1._closed)
+			return computeOpenBoolean(path1, path2, operation);
+		var _path1 = preparePath(path1, true),
+			_path2 = path2 && path1 !== path2 && preparePath(path2, true);
 		if (_path2 && /^(subtract|exclude)$/.test(operation)
 				^ (_path2.isClockwise() !== _path1.isClockwise()))
 			_path2.reverse();
-		splitPath(_path1.getIntersections(_path2, null, true));
+		var crossings = CurveLocation.expand(_path1.getCrossings(_path2));
+		divideLocations(crossings);
 
-		var chain = [],
-			segments = [],
-			monoCurves = [],
-			tolerance = 0.000001;
+		var segments = [],
+			monoCurves = [];
 
 		function collect(paths) {
 			for (var i = 0, l = paths.length; i < l; i++) {
@@ -13283,114 +15651,119 @@ PathItem.inject(new function() {
 		collect(_path1._children || [_path1]);
 		if (_path2)
 			collect(_path2._children || [_path2]);
-		segments.sort(function(a, b) {
-			var _a = a._intersection,
-				_b = b._intersection;
-			return !_a && !_b || _a && _b ? 0 : _a ? -1 : 1;
-		});
+		for (var i = 0, l = crossings.length; i < l; i++) {
+			propagateWinding(crossings[i]._segment, _path1, _path2, monoCurves,
+					operation);
+		}
 		for (var i = 0, l = segments.length; i < l; i++) {
 			var segment = segments[i];
-			if (segment._winding != null)
-				continue;
-			chain.length = 0;
-			var startSeg = segment,
-				totalLength = 0,
-				windingSum = 0;
-			do {
-				var length = segment.getCurve().getLength();
-				chain.push({ segment: segment, length: length });
-				totalLength += length;
-				segment = segment.getNext();
-			} while (segment && !segment._intersection && segment !== startSeg);
-			for (var j = 0; j < 3; j++) {
-				var length = totalLength * (j + 1) / 4;
-				for (k = 0, m = chain.length; k < m; k++) {
-					var node = chain[k],
-						curveLength = node.length;
-					if (length <= curveLength) {
-						if (length <= tolerance
-								|| curveLength - length <= tolerance)
-							length = curveLength / 2;
-						var curve = node.segment.getCurve(),
-							pt = curve.getPointAt(length),
-							hor = curve.isLinear() && Math.abs(curve
-									.getTangentAt(0.5, true).y) <= tolerance,
-							path = curve._path;
-						if (path._parent instanceof CompoundPath)
-							path = path._parent;
-						windingSum += operation === 'subtract' && _path2
-							&& (path === _path1 && _path2._getWinding(pt, hor)
-							|| path === _path2 && !_path1._getWinding(pt, hor))
-							? 0
-							: getWinding(pt, monoCurves, hor);
-						break;
-					}
-					length -= curveLength;
-				}
+			if (segment._winding == null) {
+				propagateWinding(segment, _path1, _path2, monoCurves,
+						operation);
 			}
-			var winding = Math.round(windingSum / 3);
-			for (var j = chain.length - 1; j >= 0; j--)
-				chain[j].segment._winding = winding;
 		}
-		var result = new CompoundPath(Item.NO_INSERT);
-		result.insertAbove(path1);
-		result.addChildren(tracePaths(segments, operator), true);
-		result = result.reduce();
-		result.setStyle(path1._style);
-		return result;
+		return finishBoolean(CompoundPath, tracePaths(segments, operation),
+				path1, path2, true);
 	}
 
-	function splitPath(intersections) {
-		var tMin = 0.000001,
+	function computeOpenBoolean(path1, path2, operation) {
+		if (!path2 || !path2._children && !path2._closed
+				|| !/^(subtract|intersect)$/.test(operation))
+			return null;
+		var _path1 = preparePath(path1, false),
+			_path2 = preparePath(path2, false),
+			crossings = _path1.getCrossings(_path2),
+			sub = operation === 'subtract',
+			paths = [];
+
+		function addPath(path) {
+			if (_path2.contains(path.getPointAt(path.getLength() / 2)) ^ sub) {
+				paths.unshift(path);
+				return true;
+			}
+		}
+
+		for (var i = crossings.length - 1; i >= 0; i--) {
+			var path = crossings[i].split();
+			if (path) {
+				if (addPath(path))
+					path.getFirstSegment().setHandleIn(0, 0);
+				_path1.getLastSegment().setHandleOut(0, 0);
+			}
+		}
+		addPath(_path1);
+		return finishBoolean(Group, paths, path1, path2);
+	}
+
+	function linkIntersections(from, to) {
+		var prev = from;
+		while (prev) {
+			if (prev === to)
+				return;
+			prev = prev._prev;
+		}
+		while (from._next && from._next !== to)
+			from = from._next;
+		if (!from._next) {
+			while (to._prev)
+				to = to._prev;
+			from._next = to;
+			to._prev = from;
+		}
+	}
+
+	function divideLocations(locations) {
+		var tMin = 4e-7,
 			tMax = 1 - tMin,
-			linearHandles;
+			noHandles = false,
+			clearSegments = [],
+			prevCurve,
+			prevT;
 
-		function resetLinear() {
-			for (var i = 0, l = linearHandles.length; i < l; i++)
-				linearHandles[i].set(0, 0);
-		}
-
-		for (var i = intersections.length - 1, curve, prev; i >= 0; i--) {
-			var loc = intersections[i],
-				t = loc._parameter;
-			if (prev && prev._curve === loc._curve && prev._parameter > 0) {
-				t /= prev._parameter;
-			} else {
-				curve = loc._curve;
-				if (linearHandles)
-					resetLinear();
-				linearHandles = curve.isLinear() ? [
-						curve._segment1._handleOut,
-						curve._segment2._handleIn
-					] : null;
+		for (var i = locations.length - 1; i >= 0; i--) {
+			var loc = locations[i],
+				curve = loc._curve,
+				t = loc._parameter,
+				origT = t;
+			if (curve !== prevCurve) {
+				noHandles = !curve.hasHandles();
+			} else if (prevT > 0) {
+				t /= prevT;
 			}
-			var newCurve,
-				segment;
-			if (newCurve = curve.divide(t, true, true)) {
-				segment = newCurve._segment1;
-				curve = newCurve.getPrevious();
-				if (linearHandles)
-					linearHandles.push(segment._handleOut, segment._handleIn);
+			var segment;
+			if (t < tMin) {
+				segment = curve._segment1;
+			} else if (t > tMax) {
+				segment = curve._segment2;
 			} else {
-				segment = t < tMin
-					? curve._segment1
-					: t > tMax
-						? curve._segment2
-						: curve.getPartLength(0, t) < curve.getPartLength(t, 1)
-							? curve._segment1
-							: curve._segment2;
+				segment = curve.divide(t, true, true)._segment1;
+				if (noHandles)
+					clearSegments.push(segment);
 			}
-			segment._intersection = loc.getIntersection();
-			loc._segment = segment;
-			prev = loc;
+			loc._setSegment(segment);
+			var inter = segment._intersection,
+				dest = loc._intersection;
+			if (inter) {
+				linkIntersections(inter, dest);
+				var other = inter;
+				while (other) {
+					linkIntersections(other._intersection, inter);
+					other = other._next;
+				}
+			} else {
+				segment._intersection = dest;
+			}
+			prevCurve = curve;
+			prevT = origT;
 		}
-		if (linearHandles)
-			resetLinear();
+		for (var i = 0, l = clearSegments.length; i < l; i++) {
+			clearSegments[i].clearHandles();
+		}
 	}
 
 	function getWinding(point, curves, horizontal, testContains) {
-		var tolerance = 0.000001,
-			tMin = tolerance,
+		var epsilon = 2e-7,
+			tMin = 4e-7,
 			tMax = 1 - tMin,
 			px = point.x,
 			py = point.y,
@@ -13401,13 +15774,13 @@ PathItem.inject(new function() {
 		if (horizontal) {
 			var yTop = -Infinity,
 				yBottom = Infinity,
-				yBefore = py - tolerance,
-				yAfter = py + tolerance;
+				yBefore = py - epsilon,
+				yAfter = py + epsilon;
 			for (var i = 0, l = curves.length; i < l; i++) {
 				var values = curves[i].values;
 				if (Curve.solveCubic(values, 0, px, roots, 0, 1) > 0) {
 					for (var j = roots.length - 1; j >= 0; j--) {
-						var y = Curve.evaluate(values, roots[j], 0).y;
+						var y = Curve.getPoint(values, roots[j]).y;
 						if (y < yBefore && y > yTop) {
 							yTop = y;
 						} else if (y > yAfter && y < yBottom) {
@@ -13419,130 +15792,215 @@ PathItem.inject(new function() {
 			yTop = (yTop + py) / 2;
 			yBottom = (yBottom + py) / 2;
 			if (yTop > -Infinity)
-				windLeft = getWinding(new Point(px, yTop), curves);
+				windLeft = getWinding(new Point(px, yTop), curves, false,
+						testContains);
 			if (yBottom < Infinity)
-				windRight = getWinding(new Point(px, yBottom), curves);
+				windRight = getWinding(new Point(px, yBottom), curves, false,
+						testContains);
 		} else {
-			var xBefore = px - tolerance,
-				xAfter = px + tolerance;
+			var xBefore = px - epsilon,
+				xAfter = px + epsilon;
+			var startCounted = false,
+				prevCurve,
+				prevT;
 			for (var i = 0, l = curves.length; i < l; i++) {
 				var curve = curves[i],
 					values = curve.values,
-					winding = curve.winding,
-					prevT,
-					prevX;
+					winding = curve.winding;
 				if (winding && (winding === 1
 						&& py >= values[1] && py <= values[7]
 						|| py >= values[7] && py <= values[1])
 					&& Curve.solveCubic(values, 1, py, roots, 0, 1) === 1) {
-					var t = roots[0],
-						x = Curve.evaluate(values, t, 0).x,
-						slope = Curve.evaluate(values, t, 1).y;
-					if (!(t > tMax
-							&& (i === l - 1 || curve.next !== curves[i + 1])
-							&& abs(Curve.evaluate(curve.next.values, 0, 0).x -x)
-								<= tolerance
-						|| i > 0 && curve.previous === curves[i - 1]
-							&& abs(prevX - x) < tolerance
-							&& prevT > tMax && t < tMin)) {
-						if (Numerical.isZero(slope) && !Curve.isLinear(values)
-								|| t < tMin && slope * Curve.evaluate(
-									curve.previous.values, 1, 1).y < 0
-								|| t > tMax && slope * Curve.evaluate(
-									curve.next.values, 0, 1).y < 0) {
+					var t = roots[0];
+					if (!(
+						t > tMax && startCounted && curve.next !== curves[i + 1]
+						|| t < tMin && prevT > tMax
+							&& curve.previous === prevCurve)) {
+						var x = Curve.getPoint(values, t).x,
+							slope = Curve.getTangent(values, t).y,
+							counted = false;
+						if (Numerical.isZero(slope) && !Curve.isStraight(values)
+								|| t < tMin && slope * Curve.getTangent(
+									curve.previous.values, 1).y < 0
+								|| t > tMax && slope * Curve.getTangent(
+									curve.next.values, 0).y < 0) {
 							if (testContains && x >= xBefore && x <= xAfter) {
 								++windLeft;
 								++windRight;
+								counted = true;
 							}
 						} else if (x <= xBefore) {
 							windLeft += winding;
+							counted = true;
 						} else if (x >= xAfter) {
 							windRight += winding;
+							counted = true;
 						}
+						if (curve.previous !== curves[i - 1])
+							startCounted = t < tMin && counted;
 					}
+					prevCurve = curve;
 					prevT = t;
-					prevX = x;
 				}
 			}
 		}
 		return Math.max(abs(windLeft), abs(windRight));
 	}
 
-	function tracePaths(segments, operator, selfOp) {
+	function propagateWinding(segment, path1, path2, monoCurves, operation) {
+		var epsilon = 2e-7,
+			chain = [],
+			start = segment,
+			totalLength = 0,
+			windingSum = 0;
+		do {
+			var curve = segment.getCurve(),
+				length = curve.getLength();
+			chain.push({ segment: segment, curve: curve, length: length });
+			totalLength += length;
+			segment = segment.getNext();
+		} while (segment && !segment._intersection && segment !== start);
+		for (var i = 0; i < 3; i++) {
+			var length = totalLength * (i + 1) / 4;
+			for (var k = 0, m = chain.length; k < m; k++) {
+				var node = chain[k],
+					curveLength = node.length;
+				if (length <= curveLength) {
+					if (length < epsilon || curveLength - length < epsilon)
+						length = curveLength / 2;
+					var curve = node.curve,
+						path = curve._path,
+						parent = path._parent,
+						pt = curve.getPointAt(length),
+						hor = curve.isHorizontal();
+					if (parent instanceof CompoundPath)
+						path = parent;
+					windingSum += operation === 'subtract' && path2
+						&& (path === path1 && path2._getWinding(pt, hor)
+						|| path === path2 && !path1._getWinding(pt, hor))
+						? 0
+						: getWinding(pt, monoCurves, hor);
+					break;
+				}
+				length -= curveLength;
+			}
+		}
+		var winding = Math.round(windingSum / 3);
+		for (var j = chain.length - 1; j >= 0; j--)
+			chain[j].segment._winding = winding;
+	}
+
+	function tracePaths(segments, operation) {
 		var paths = [],
-			tMin = 0.000001,
-			tMax = 1 - tMin;
-		for (var i = 0, seg, startSeg, l = segments.length; i < l; i++) {
-			seg = startSeg = segments[i];
-			if (seg._visited || !operator(seg._winding))
+			start,
+			otherStart,
+			operator = operators[operation],
+			overlapWinding = {
+				unite: { 1: 2 },
+				intersect: { 2: 1 }
+			}[operation];
+
+		function isValid(seg, adjusted) {
+			if (seg._visited)
+				return false;
+			if (!operator)
+				return true;
+			var winding = seg._winding,
+				inter = seg._intersection;
+			if (inter && adjusted && overlapWinding && inter.isOverlap())
+				winding = overlapWinding[winding] || winding;
+			return operator(winding);
+		}
+
+		function isStart(seg) {
+			return seg === start || seg === otherStart;
+		}
+
+		function findBestIntersection(inter, strict) {
+			if (!inter._next)
+				return inter;
+			while (inter) {
+				var seg = inter._segment,
+					nextSeg = seg.getNext(),
+					nextInter = nextSeg._intersection;
+				if (isStart(nextSeg)
+					|| !seg._visited && !nextSeg._visited
+					&& (!operator
+						|| (!strict || isValid(seg))
+						&& (!(strict && nextInter && nextInter.isOverlap())
+							&& isValid(nextSeg)
+							|| !strict && nextInter
+							&& isValid(nextInter._segment))
+					))
+					return inter;
+				inter = inter._next;
+			}
+			return null;
+		}
+
+		function findStartSegment(inter, next) {
+			while (inter) {
+				var seg = inter._segment;
+				if (isStart(seg))
+					return seg;
+				inter = inter[next ? '_next' : '_prev'];
+			}
+		}
+
+		for (var i = 0, l = segments.length; i < l; i++) {
+			var seg = segments[i],
+				path = null,
+				finished = false;
+			if (!isValid(seg, true))
 				continue;
-			var path = new Path(Item.NO_INSERT),
-				inter = seg._intersection,
-				startInterSeg = inter && inter._segment,
-				added = false,
-				dir = 1;
-			do {
-				var handleIn = dir > 0 ? seg._handleIn : seg._handleOut,
-					handleOut = dir > 0 ? seg._handleOut : seg._handleIn,
-					interSeg;
-				if (added && (!operator(seg._winding) || selfOp)
-						&& (inter = seg._intersection)
-						&& (interSeg = inter._segment)
-						&& interSeg !== startSeg) {
-					if (selfOp) {
-						seg._visited = interSeg._visited;
-						seg = interSeg;
-						dir = 1;
-					} else {
-						var c1 = seg.getCurve();
-						if (dir > 0)
-							c1 = c1.getPrevious();
-						var t1 = c1.getTangentAt(dir < 1 ? tMin : tMax, true),
-							c4 = interSeg.getCurve(),
-							c3 = c4.getPrevious(),
-							t3 = c3.getTangentAt(tMax, true),
-							t4 = c4.getTangentAt(tMin, true),
-							w3 = t1.cross(t3),
-							w4 = t1.cross(t4);
-						if (w3 * w4 !== 0) {
-							var curve = w3 < w4 ? c3 : c4,
-								nextCurve = operator(curve._segment1._winding)
-									? curve
-									: w3 < w4 ? c4 : c3,
-								nextSeg = nextCurve._segment1;
-							dir = nextCurve === c3 ? -1 : 1;
-							if (nextSeg._visited && seg._path !== nextSeg._path
-										|| !operator(nextSeg._winding)) {
-								dir = 1;
-							} else {
-								seg._visited = interSeg._visited;
-								seg = interSeg;
-								if (nextSeg._visited)
-									dir = 1;
-							}
-						} else {
-							dir = 1;
+			start = otherStart = null;
+			while (!finished) {
+				var inter = seg._intersection,
+					handleIn = path && seg._handleIn;
+				inter = inter && (findBestIntersection(inter, true)
+						|| findBestIntersection(inter, false)) || inter;
+				var other = inter && inter._segment;
+				if (other && isValid(other))
+					seg = other;
+				if (seg._visited) {
+					finished = isStart(seg);
+					if (!finished && inter) {
+						var found = findStartSegment(inter, true)
+							|| findStartSegment(inter, false);
+						if (found) {
+							seg = found;
+							finished = true;
 						}
 					}
-					handleOut = dir > 0 ? seg._handleOut : seg._handleIn;
+					break;
 				}
-				path.add(new Segment(seg._point, added && handleIn, handleOut));
-				added = true;
+				if (!path) {
+					path = new Path(Item.NO_INSERT);
+					start = seg;
+					otherStart = other;
+				}
+				path.add(new Segment(seg._point, handleIn, seg._handleOut));
 				seg._visited = true;
-				seg = dir > 0 ? seg.getNext() : seg. getPrevious();
-			} while (seg && !seg._visited
-					&& seg !== startSeg && seg !== startInterSeg
-					&& (seg._intersection || operator(seg._winding)));
-			if (seg && (seg === startSeg || seg === startInterSeg)) {
-				path.firstSegment.setHandleIn((seg === startInterSeg
-						? startInterSeg : seg)._handleIn);
-				path.setClosed(true);
-			} else {
-				path.lastSegment._handleOut.set(0, 0);
+				seg = seg.getNext();
+				finished = isStart(seg);
 			}
-			if (path._segments.length >
-					(path._closed ? path.isPolygon() ? 2 : 0 : 1))
+			if (finished) {
+				path.firstSegment.setHandleIn(seg._handleIn);
+				path.setClosed(true);
+			} else if (path) {
+				var length = path.getLength();
+				if (length >= 2e-7) {
+					console.error('Boolean operation resulted in open path',
+							'segments =', path._segments.length,
+							'length =', length);
+				}
+				path = null;
+			}
+			if (path && (path._segments.length > 8
+					|| !Numerical.isZero(path.getArea()))) {
 				paths.push(path);
+				path = null;
+			}
 		}
 		return paths;
 	}
@@ -13570,7 +16028,23 @@ PathItem.inject(new function() {
 		},
 
 		divide: function(path) {
-			return new Group([this.subtract(path), this.intersect(path)]);
+			return finishBoolean(Group,
+					[this.subtract(path), this.intersect(path)],
+					this, path, true);
+		},
+
+		resolveCrossings: function() {
+			var crossings = this.getCrossings();
+			if (!crossings.length)
+				return this;
+			divideLocations(CurveLocation.expand(crossings));
+			var paths = this._children || [this],
+				segments = [];
+			for (var i = 0, l = paths.length; i < l; i++) {
+				segments.push.apply(segments, paths[i]._segments);
+			}
+			return finishBoolean(CompoundPath, tracePaths(segments),
+					this, null, false);
 		}
 	};
 });
@@ -13606,24 +16080,24 @@ Path.inject({
 				y1 = v[3],
 				y2 = v[5],
 				y3 = v[7];
-			if (Curve.isLinear(v)) {
+			if (Curve.isStraight(v)) {
 				insertCurve(v);
 			} else {
 				var a = 3 * (y1 - y2) - y0 + y3,
 					b = 2 * (y0 + y2) - 4 * y1,
 					c = y1 - y0,
-					tolerance = 0.000001,
-					roots = [];
-				var count = Numerical.solveQuadratic(a, b, c, roots, tolerance,
-						1 - tolerance);
-				if (count === 0) {
+					tMin = 4e-7,
+					tMax = 1 - tMin,
+					roots = [],
+					n = Numerical.solveQuadratic(a, b, c, roots, tMin, tMax);
+				if (n === 0) {
 					insertCurve(v);
 				} else {
 					roots.sort();
 					var t = roots[0],
 						parts = Curve.subdivide(v, t);
 					insertCurve(parts[0]);
-					if (count > 1) {
+					if (n > 1) {
 						t = (roots[1] - t) / (1 - t);
 						parts = Curve.subdivide(parts[1], t);
 						insertCurve(parts[0]);
@@ -13671,7 +16145,7 @@ Path.inject({
 						|| y >= values[7] && y <= values[1])
 						&& Curve.solveCubic(values, 1, y, roots, 0, 1) > 0) {
 					for (var j = roots.length - 1; j >= 0; j--)
-						xIntercepts.push(Curve.evaluate(values, roots[j], 0).x);
+						xIntercepts.push(Curve.getPoint(values, roots[j]).x);
 				}
 				if (xIntercepts.length > 1)
 					break;
@@ -13738,7 +16212,7 @@ var PathIterator = Base.extend({
 		function computeParts(curve, index, minT, maxT) {
 			if ((maxT - minT) > minDifference
 					&& !Curve.isFlatEnough(curve, tolerance || 0.25)) {
-				var split = Curve.subdivide(curve),
+				var split = Curve.subdivide(curve, 0.5),
 					halfT = (minT + maxT) / 2;
 				computeParts(split[0], index, minT, halfT);
 				computeParts(split[1], index, halfT, maxT);
@@ -13746,7 +16220,7 @@ var PathIterator = Base.extend({
 				var x = curve[6] - curve[0],
 					y = curve[7] - curve[1],
 					dist = Math.sqrt(x * x + y * y);
-				if (dist > 0.000001) {
+				if (dist > 1e-6) {
 					length += dist;
 					parts.push({
 						offset: length,
@@ -13775,7 +16249,7 @@ var PathIterator = Base.extend({
 		var i, j = this.index;
 		for (;;) {
 			i = j;
-			if (j == 0 || this.parts[--j].offset < offset)
+			if (j === 0 || this.parts[--j].offset < offset)
 				break;
 		}
 		for (var l = this.parts.length; i < l; i++) {
@@ -13799,11 +16273,6 @@ var PathIterator = Base.extend({
 		};
 	},
 
-	evaluate: function(offset, type) {
-		var param = this.getParameterAt(offset);
-		return Curve.evaluate(this.curves[param.index], param.value, type);
-	},
-
 	drawPart: function(ctx, from, to) {
 		from = this.getParameterAt(from);
 		to = this.getParameterAt(to);
@@ -13816,10 +16285,11 @@ var PathIterator = Base.extend({
 			ctx.bezierCurveTo.apply(ctx, curve.slice(2));
 		}
 	}
-}, Base.each(['getPoint', 'getTangent', 'getNormal', 'getCurvature'],
-	function(name, index) {
-		this[name + 'At'] = function(offset) {
-			return this.evaluate(offset, index);
+}, Base.each(Curve.evaluateMethods,
+	function(name) {
+		this[name + 'At'] = function(offset, weighted) {
+			var param = this.getParameterAt(offset);
+			return Curve[name](this.curves[param.index], param.value, weighted);
 		};
 	}, {})
 );
@@ -13875,18 +16345,19 @@ var PathFitter = Base.extend({
 		}
 		var uPrime = this.chordLengthParameterize(first, last),
 			maxError = Math.max(this.error, this.error * this.error),
-			split;
+			split,
+			parametersInOrder = true;
 		for (var i = 0; i <= 4; i++) {
 			var curve = this.generateBezier(first, last, uPrime, tan1, tan2);
 			var max = this.findMaxError(first, last, curve, uPrime);
-			if (max.error < this.error) {
+			if (max.error < this.error && parametersInOrder) {
 				this.addCurve(curve);
 				return;
 			}
 			split = max.index;
 			if (max.error >= maxError)
 				break;
-			this.reparameterize(first, last, uPrime, curve);
+			parametersInOrder = this.reparameterize(first, last, uPrime, curve);
 			maxError = max.error;
 		}
 		var V1 = this.points[split - 1].subtract(this.points[split]),
@@ -13950,20 +16421,35 @@ var PathFitter = Base.extend({
 			}
 		}
 
-		var segLength = pt2.getDistance(pt1);
-		epsilon *= segLength;
-		if (alpha1 < epsilon || alpha2 < epsilon) {
+		var segLength = pt2.getDistance(pt1),
+			eps = epsilon * segLength,
+			handle1,
+			handle2;
+		if (alpha1 < eps || alpha2 < eps) {
 			alpha1 = alpha2 = segLength / 3;
+		} else {
+			var line = pt2.subtract(pt1);
+			handle1 = tan1.normalize(alpha1);
+			handle2 = tan2.normalize(alpha2);
+			if (handle1.dot(line) - handle2.dot(line) > segLength * segLength) {
+				alpha1 = alpha2 = segLength / 3;
+				handle1 = handle2 = null;
+			}
 		}
 
-		return [pt1, pt1.add(tan1.normalize(alpha1)),
-				pt2.add(tan2.normalize(alpha2)), pt2];
+		return [pt1, pt1.add(handle1 || tan1.normalize(alpha1)),
+				pt2.add(handle2 || tan2.normalize(alpha2)), pt2];
 	},
 
 	reparameterize: function(first, last, u, curve) {
 		for (var i = first; i <= last; i++) {
 			u[i - first] = this.findRoot(curve, this.points[i], u[i - first]);
 		}
+		for (var i = 1, l = u.length; i < l; i++) {
+			if (u[i] <= u[i - 1])
+				return false;
+		}
+		return true;
 	},
 
 	findRoot: function(curve, point, u) {
@@ -13980,7 +16466,7 @@ var PathFitter = Base.extend({
 			pt2 = this.evaluate(1, curve2, u),
 			diff = pt.subtract(point),
 			df = pt1.dot(pt1) + diff.dot(pt2);
-		if (Math.abs(df) < 0.000001)
+		if (Math.abs(df) < 1e-6)
 			return u;
 		return u - diff.dot(pt1) / df;
 	},
@@ -14048,9 +16534,9 @@ var TextItem = Item.extend({
 		return this._content === item._content;
 	},
 
-	_clone: function _clone(copy, insert) {
+	_clone: function _clone(copy, insert, includeMatrix) {
 		copy.setContent(this._content);
-		return _clone.base.call(this, copy, insert);
+		return _clone.base.call(this, copy, insert, includeMatrix);
 	},
 
 	getContent: function() {
@@ -14329,11 +16815,8 @@ var Color = Base.extend(new function() {
 					this._properties = types[type];
 					this._type = type;
 				}
-				value = parser.call(this, value);
-				if (value != null) {
-					this._components[index] = value;
-					this._changed();
-				}
+				this._components[index] = parser.call(this, value);
+				this._changed();
 			};
 		}, this);
 	}, {
@@ -14418,7 +16901,7 @@ var Color = Base.extend(new function() {
 								: 'gray' in arg
 									? 'gray'
 									: 'rgb';
-						var properties = types[type];
+						var properties = types[type],
 							parsers = componentParsers[type];
 						this._components = components = [];
 						for (var i = 0, l = properties.length; i < l; i++) {
@@ -14441,8 +16924,7 @@ var Color = Base.extend(new function() {
 					read = 1;
 			}
 			this._type = type || 'rgb';
-			if (type === 'gradient')
-				this._id = Color._id = (Color._id || 0) + 1;
+			this._id = UID.get(Color);
 			if (!components) {
 				this._components = components = [];
 				var parsers = componentParsers[this._type];
@@ -14621,7 +17103,8 @@ var Color = Base.extend(new function() {
 			}
 		}
 	});
-}, new function() {
+},
+new function() {
 	var operators = {
 		add: function(a, b) {
 			return a + b;
@@ -14657,29 +17140,11 @@ var Color = Base.extend(new function() {
 	});
 });
 
-Base.each(Color._types, function(properties, type) {
-	var ctor = this[Base.capitalize(type) + 'Color'] = function(arg) {
-			var argType = arg != null && typeof arg,
-				components = argType === 'object' && arg.length != null
-					? arg
-					: argType === 'string'
-						? null
-						: arguments;
-			return components
-					? new Color(type, components)
-					: new Color(arg);
-		};
-	if (type.length == 3) {
-		var acronym = type.toUpperCase();
-		Color[acronym] = this[acronym + 'Color'] = ctor;
-	}
-}, Base.exports);
-
 var Gradient = Base.extend({
 	_class: 'Gradient',
 
 	initialize: function Gradient(stops, radial) {
-		this._id = Gradient._id = (Gradient._id || 0) + 1;
+		this._id = UID.get();
 		if (stops && this._set(stops))
 			stops = radial = null;
 		if (!this._stops)
@@ -14720,7 +17185,7 @@ var Gradient = Base.extend({
 		var stops = [];
 		for (var i = 0, l = this._stops.length; i < l; i++)
 			stops[i] = this._stops[i].clone();
-		return new Gradient(stops);
+		return new Gradient(stops, this._radial);
 	},
 
 	getStops: function() {
@@ -15226,61 +17691,61 @@ var View = Base.extend(Emitter, {
 		this._scope = project._scope;
 		this._element = element;
 		var size;
-		if ( !noCanvas ) {
-			if (!this._pixelRatio)
-				this._pixelRatio = window.devicePixelRatio || 1;
-			this._id = element.getAttribute('id');
-			if (this._id == null)
-				element.setAttribute('id', this._id = 'view-' + View._id++);
-			DomEvent.add(element, this._viewEvents);
-			var none = 'none';
-			DomElement.setPrefixed(element.style, {
-				userSelect: none,
-				touchAction: none,
-				touchCallout: none,
-				contentZooming: none,
-				userDrag: none,
-				tapHighlightColor: 'rgba(0,0,0,0)'
-			});
+	   if ( !noCanvas ) {
+		if (!this._pixelRatio)
+			this._pixelRatio = window.devicePixelRatio || 1;
+		this._id = element.getAttribute('id');
+		if (this._id == null)
+			element.setAttribute('id', this._id = 'view-' + View._id++);
+		DomEvent.add(element, this._viewEvents);
+		var none = 'none';
+		DomElement.setPrefixed(element.style, {
+			userSelect: none,
+			touchAction: none,
+			touchCallout: none,
+			contentZooming: none,
+			userDrag: none,
+			tapHighlightColor: 'rgba(0,0,0,0)'
+		});
 
-			function getSize(name) {
-				return element[name] || parseInt(element.getAttribute(name), 10);
-			}
-
-			function getCanvasSize() {
-				var size = DomElement.getSize(element);
-				return size.isNaN() || size.isZero()
-						? new Size(getSize('width'), getSize('height'))
-						: size;
-			}
-
-			if (PaperScope.hasAttribute(element, 'resize')) {
-				var that = this;
-				DomEvent.add(window, this._windowEvents = {
-					resize: function() {
-						that.setViewSize(getCanvasSize());
-					}
-				});
-			}
-			this._setViewSize(size = getCanvasSize());
-			if (PaperScope.hasAttribute(element, 'stats')
-					&& typeof Stats !== 'undefined') {
-				this._stats = new Stats();
-				var stats = this._stats.domElement,
-					style = stats.style,
-					offset = DomElement.getOffset(element);
-				style.position = 'absolute';
-				style.left = offset.x + 'px';
-				style.top = offset.y + 'px';
-				document.body.appendChild(stats);
-			}
-
-		} else {
-			if (!this._pixelRatio)
-				this._pixelRatio = 1;
-			this._id = 'view-' + View._id++;
-			size = new Size(element.width, element.height);
+		function getSize(name) {
+			return element[name] || parseInt(element.getAttribute(name), 10);
 		}
+
+		function getCanvasSize() {
+			var size = DomElement.getSize(element);
+			return size.isNaN() || size.isZero()
+					? new Size(getSize('width'), getSize('height'))
+					: size;
+		}
+
+		if (PaperScope.hasAttribute(element, 'resize')) {
+			var that = this;
+			DomEvent.add(window, this._windowEvents = {
+				resize: function() {
+					that.setViewSize(getCanvasSize());
+				}
+			});
+		}
+		this._setViewSize(size = getCanvasSize());
+		if (PaperScope.hasAttribute(element, 'stats')
+				&& typeof Stats !== 'undefined') {
+			this._stats = new Stats();
+			var stats = this._stats.domElement,
+				style = stats.style,
+				offset = DomElement.getOffset(element);
+			style.position = 'absolute';
+			style.left = offset.x + 'px';
+			style.top = offset.y + 'px';
+			document.body.appendChild(stats);
+		}
+
+	   } else {
+		if (!this._pixelRatio)
+			this._pixelRatio = 1;
+		this._id = 'view-' + View._id++;
+		size = new Size(element.width, element.height);
+	   }
 		View._views.push(this);
 		View._viewsById[this._id] = this;
 		this._viewSize = size;
@@ -15310,19 +17775,29 @@ var View = Base.extend(Emitter, {
 		return true;
 	},
 
-	_events: {
-		onFrame: {
-			install: function() {
-				this.play();
-			},
+	_events: Base.each(['onResize', 'onMouseDown', 'onMouseUp', 'onMouseMove'],
+		function(name) {
+			this[name] = {
+				install: function(type) {
+					this._installEvent(type);
+				},
 
-			uninstall: function() {
-				this.pause();
+				uninstall: function(type) {
+					this._uninstallEvent(type);
+				}
+			};
+		}, {
+			onFrame: {
+				install: function() {
+					this.play();
+				},
+
+				uninstall: function() {
+					this.pause();
+				}
 			}
-		},
-
-		onResize: {}
-	},
+		}
+	),
 
 	_animate: false,
 	_time: 0,
@@ -15517,7 +17992,8 @@ var View = Base.extend(Emitter, {
 			return new CanvasView(project, element);
 		}
 	}
-}, new function() {
+},
+new function() {
 	if ( noCanvas ) {
 		return;
 	}
@@ -15644,10 +18120,49 @@ var View = Base.extend(Emitter, {
 		load: updateFocus
 	});
 
+	var mouseFlags = {
+		mousedown: {
+			mousedown: 1,
+			mousedrag: 1,
+			click: 1,
+			doubleclick: 1
+		},
+		mouseup: {
+			mouseup: 1,
+			mousedrag: 1,
+			click: 1,
+			doubleclick: 1
+		},
+		mousemove: {
+			mousedrag: 1,
+			mousemove: 1,
+			mouseenter: 1,
+			mouseleave: 1
+		}
+	};
+
 	return {
 		_viewEvents: viewEvents,
 
 		_handleEvent: function() {},
+
+		_installEvent: function(type) {
+			var counters = this._eventCounters;
+			if (counters) {
+				for (var key in mouseFlags) {
+					counters[key] = (counters[key] || 0)
+							+ (mouseFlags[key][type] || 0);
+				}
+			}
+		},
+
+		_uninstallEvent: function(type) {
+			var counters = this._eventCounters;
+			if (counters) {
+				for (var key in mouseFlags)
+					counters[key] -= mouseFlags[key][type] || 0;
+			}
+		},
 
 		statics: {
 			updateFocus: updateFocus
@@ -15699,12 +18214,23 @@ var CanvasView = View.extend({
 	},
 
 	getPixelSize: function(size) {
-		var ctx = this._context,
-			prevFont = ctx.font;
-		ctx.font = size + ' serif';
-		size = parseFloat(ctx.font);
-		ctx.font = prevFont;
-		return size;
+		var browser = paper.browser,
+			pixels;
+		if (browser && browser.firefox) {
+			var parent = this._element.parentNode,
+				temp = document.createElement('div');
+			temp.style.fontSize = size;
+			parent.appendChild(temp);
+			pixels = parseFloat(DomElement.getStyles(temp).fontSize);
+			parent.removeChild(temp);
+		} else {
+			var ctx = this._context,
+				prevFont = ctx.font;
+			ctx.font = size + ' serif';
+			pixels = parseFloat(ctx.font);
+			ctx.font = prevFont;
+		}
+		return pixels;
 	},
 
 	getTextWidth: function(font, lines) {
@@ -15718,9 +18244,9 @@ var CanvasView = View.extend({
 		return width;
 	},
 
-	update: function() {
+	update: function(force) {
 		var project = this._project;
-		if (!project || !project._needsUpdate)
+		if (!project || !force && !project._needsUpdate)
 			return false;
 		var ctx = this._context,
 			size = this._viewSize;
@@ -15729,8 +18255,8 @@ var CanvasView = View.extend({
 		project._needsUpdate = false;
 		return true;
 	}
-}, new function() {
-
+},
+new function() {
 	var downPoint,
 		lastPoint,
 		overPoint,
@@ -15927,6 +18453,7 @@ var Key = new function() {
 
 	charCodeMap = {},
 	keyMap = {},
+	commandFixMap,
 	downCode;
 
 	function handleKey(down, keyCode, charCode, event) {
@@ -15939,12 +18466,27 @@ var Key = new function() {
 			tool = scope && scope.tool,
 			name;
 		keyMap[key] = down;
-		if (specialKey && (name = Base.camelize(specialKey)) in modifiers)
-			modifiers[name] = down;
 		if (down) {
 			charCodeMap[keyCode] = charCode;
 		} else {
 			delete charCodeMap[keyCode];
+		}
+		if (specialKey && (name = Base.camelize(specialKey)) in modifiers) {
+			modifiers[name] = down;
+			var browser = paper.browser;
+			if (name === 'command' && browser && browser.mac) {
+				if (down) {
+					commandFixMap = {};
+				} else {
+					for (var code in commandFixMap) {
+						if (code in charCodeMap)
+							handleKey(false, code, commandFixMap[code], event);
+					}
+					commandFixMap = null;
+				}
+			}
+		} else if (down && commandFixMap) {
+			commandFixMap[keyCode] = charCode;
 		}
 		if (tool && tool.responds(type)) {
 			paper = scope;
@@ -16138,9 +18680,9 @@ var Tool = PaperScopeItem.extend({
 
 	setMinDistance: function(minDistance) {
 		this._minDistance = minDistance;
-		if (this._minDistance != null && this._maxDistance != null
-				&& this._minDistance > this._maxDistance) {
-			this._maxDistance = this._minDistance;
+		if (minDistance != null && this._maxDistance != null
+				&& minDistance > this._maxDistance) {
+			this._maxDistance = minDistance;
 		}
 	},
 
@@ -16150,8 +18692,8 @@ var Tool = PaperScopeItem.extend({
 
 	setMaxDistance: function(maxDistance) {
 		this._maxDistance = maxDistance;
-		if (this._minDistance != null && this._maxDistance != null
-				&& this._maxDistance < this._minDistance) {
+		if (this._minDistance != null && maxDistance != null
+				&& maxDistance < this._minDistance) {
 			this._minDistance = maxDistance;
 		}
 	},
@@ -16162,8 +18704,7 @@ var Tool = PaperScopeItem.extend({
 	},
 
 	setFixedDistance: function(distance) {
-		this._minDistance = distance;
-		this._maxDistance = distance;
+		this._minDistance = this._maxDistance = distance;
 	},
 
 	_updateEvent: function(type, point, minDistance, maxDistance, start,
@@ -16175,10 +18716,9 @@ var Tool = PaperScopeItem.extend({
 					distance = vector.getLength();
 				if (distance < minDist)
 					return false;
-				var maxDist = maxDistance != null ? maxDistance : 0;
-				if (maxDist != 0) {
-					if (distance > maxDist) {
-						point = this._point.add(vector.normalize(maxDist));
+				if (maxDistance != null && maxDistance !== 0) {
+					if (distance > maxDistance) {
+						point = this._point.add(vector.normalize(maxDistance));
 					} else if (matchMaxDistance) {
 						return false;
 					}
@@ -16272,10 +18812,11 @@ var Tool = PaperScopeItem.extend({
 });
 
 var Http = {
-	request: function(method, url, callback) {
+	request: function(method, url, callback, async) {
+		async = (async === undefined) ? true : async;
 		var xhr = new (window.ActiveXObject || XMLHttpRequest)(
 					'Microsoft.XMLHTTP');
-		xhr.open(method.toUpperCase(), url, true);
+		xhr.open(method.toUpperCase(), url, async);
 		if ('overrideMimeType' in xhr)
 			xhr.overrideMimeType('text/plain');
 		xhr.onreadystatechange = function() {
@@ -16713,19 +19254,22 @@ new function() {
 		return node;
 	}
 
-	function exportRaster(item) {
+	function exportRaster(item, options) {
 		var attrs = getTransform(item._matrix, true),
-			size = item.getSize();
+			size = item.getSize(),
+			image = item.getImage();
 		attrs.x -= size.width / 2;
 		attrs.y -= size.height / 2;
 		attrs.width = size.width;
 		attrs.height = size.height;
-		attrs.href = item.toDataURL();
+		attrs.href = options.embedImages === false && image && image.src
+				|| item.toDataURL();
 		return createElement('image', attrs);
 	}
 
 	function exportPath(item, options) {
-		if (options.matchShapes) {
+		var matchShapes = options.matchShapes;
+		if (matchShapes) {
 			var shape = item.toShape(false);
 			if (shape)
 				return exportShape(shape, options);
@@ -16735,11 +19279,11 @@ new function() {
 			attrs = getTransform(item._matrix);
 		if (segments.length === 0)
 			return null;
-		if (item.isPolygon()) {
+		if (matchShapes && !item.hasHandles()) {
 			if (segments.length >= 3) {
 				type = item._closed ? 'polygon' : 'polyline';
 				var parts = [];
-				for(i = 0, l = segments.length; i < l; i++)
+				for(var i = 0, l = segments.length; i < l; i++)
 					parts.push(formatter.point(segments[i]._point));
 				attrs.points = parts.join(' ');
 			} else {
@@ -17079,10 +19623,17 @@ new function() {
 			item = applyAttributes(item, node, isRoot);
 			project._currentStyle = item._style.clone();
 		}
+		if (isRoot) {
+			var defs = node.querySelectorAll('defs');
+			for (var i = 0, l = defs.length; i < l; i++) {
+				importSVG(defs[i], options, false);
+			}
+		}
 		for (var i = 0, l = nodes.length; i < l; i++) {
 			var childNode = nodes[i],
 				child;
 			if (childNode.nodeType === 1
+					&& childNode.nodeName.toLowerCase() !== 'defs'
 					&& (child = importSVG(childNode, options, false))
 					&& !(child instanceof Symbol))
 				children.push(child);
@@ -17282,7 +19833,7 @@ new function() {
 			color.setAlpha(parseFloat(value));
 	}
 
-	var attributes = Base.each(SVGStyles, function(entry) {
+	var attributes = Base.set(Base.each(SVGStyles, function(entry) {
 		this[entry.attribute] = function(item, value) {
 			item[entry.set](convertValue(value, entry.type, entry.fromSVG));
 			if (entry.type === 'color' && item instanceof Shape) {
@@ -17292,7 +19843,7 @@ new function() {
 							item.getPosition(true).negate()));
 			}
 		};
-	}, {
+	}, {}), {
 		id: function(item, value) {
 			definitions[value] = item;
 			if (item.setName)
@@ -17466,7 +20017,7 @@ new function() {
 		}
 		if (isRoot) {
 			definitions = {};
-			if (applyMatrix && item)
+			if (item && Base.pick(options.applyMatrix, applyMatrix))
 				item.matrix.apply(true, true);
 		}
 		return item;
@@ -17502,7 +20053,7 @@ if (typeof define === 'function' && define.amd) {
 return paper;
 };
 
-},{}],3:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
 function Collection( args ) {
 	// already a Collection? Job's done
 	if ( arguments.length === 1 && args instanceof Collection ) {
@@ -17864,25 +20415,22 @@ Collection.proxy = function( paper ) {
 
 module.exports = Collection;
 
-},{}],4:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	paper = require('../node_modules/paper/dist/paper-core.js'),
-	Glyph = require('./Glyph.js');
+	Glyph = require('./Glyph.js'),
+	assign = require('es6-object-assign').assign;
 
 function Font( args ) {
 	paper.Group.prototype.constructor.apply( this );
 
-	if ( !args ) {
-		args = {};
-	}
-
-	if ( !args.styleName ) {
-		args.styleName = 'Regular';
-	}
-
-	if ( !args.unitsPerEm ) {
-		args.unitsPerEm = 1024;
-	}
+	args = assign({
+		familyName: 'Default familyName',
+		styleName: 'Regular',
+		ascender: 1,
+		descender: -1,
+		unitsPerEm: 1024
+	}, args);
 
 	this.fontinfo = this.ot = new opentype.Font( args );
 
@@ -18176,8 +20724,8 @@ if ( typeof window === 'object' && window.document ) {
 						}.bind(this));
 
 				}.bind(this))
-				.catch(function(err) {
-					console.log('error: ', err);
+				.catch(function(/*err*/) {
+					//console.log('error: ', err);
 				});
 
 		} else {
@@ -18191,7 +20739,7 @@ if ( typeof window === 'object' && window.document ) {
 
 module.exports = Font;
 
-},{"../node_modules/opentype.js/dist/opentype.js":1,"../node_modules/paper/dist/paper-core.js":2,"./Glyph.js":5}],5:[function(require,module,exports){
+},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3,"./Glyph.js":6,"es6-object-assign":1}],6:[function(require,module,exports){
 var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	paper = require('../node_modules/paper/dist/paper-core.js'),
 	Outline = require('./Outline.js');
@@ -18422,7 +20970,7 @@ Glyph.prototype.importOT = function( otGlyph ) {
 
 module.exports = Glyph;
 
-},{"../node_modules/opentype.js/dist/opentype.js":1,"../node_modules/paper/dist/paper-core.js":2,"./Outline.js":7}],6:[function(require,module,exports){
+},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3,"./Outline.js":8}],7:[function(require,module,exports){
 var paper = require('../node_modules/paper/dist/paper-core.js');
 
 Object.defineProperty( paper.Segment.prototype, 'x', {
@@ -18445,7 +20993,7 @@ Object.defineProperty( paper.Segment.prototype, 'y', {
 
 module.exports = paper.Segment;
 
-},{"../node_modules/paper/dist/paper-core.js":2}],7:[function(require,module,exports){
+},{"../node_modules/paper/dist/paper-core.js":3}],8:[function(require,module,exports){
 var paper = require('../node_modules/paper/dist/paper-core.js');
 
 function Outline() {
@@ -18523,7 +21071,7 @@ Outline.prototype.updateOTCommands = function( path ) {
 
 module.exports = Outline;
 
-},{"../node_modules/paper/dist/paper-core.js":2}],8:[function(require,module,exports){
+},{"../node_modules/paper/dist/paper-core.js":3}],9:[function(require,module,exports){
 /* Extend the Path prototype to add OpenType conversion
  * and alias *segments methods and properties to *nodes
  */
@@ -18566,7 +21114,7 @@ proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 		var curve = curves[ reverse ? l - 1 - i : i ],
 			end = curve['point' + ( reverse ? 1 : 2 ) ].transform( matrix );
 
-		if ( curve.isLinear() ) {
+		if ( curve.isStraight() ) {
 			pushSimple(
 				'L',
 				Math.round( end.x ) || 0,
@@ -18654,7 +21202,7 @@ proto.updateSVGData = function( data, matrix ) {
 
 module.exports = paper.Path;
 
-},{"../node_modules/paper/dist/paper-core.js":2}],9:[function(require,module,exports){
+},{"../node_modules/paper/dist/paper-core.js":3}],10:[function(require,module,exports){
 var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
 	paper = require('../node_modules/paper/dist/paper-core.js'),
 	Font = require('./Font.js'),
@@ -18688,7 +21236,7 @@ plumin.proxy(paper);
 
 module.exports = plumin;
 
-},{"../node_modules/opentype.js/dist/opentype.js":1,"../node_modules/paper/dist/paper-core.js":2,"./Collection.js":3,"./Font.js":4,"./Glyph.js":5,"./Node.js":6,"./Outline":7,"./Path.js":8}]},{},[9,2])(9)
+},{"../node_modules/opentype.js/dist/opentype.js":2,"../node_modules/paper/dist/paper-core.js":3,"./Collection.js":4,"./Font.js":5,"./Glyph.js":6,"./Node.js":7,"./Outline":8,"./Path.js":9}]},{},[10,3])(10)
 });
 
 

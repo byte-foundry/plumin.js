@@ -40,7 +40,7 @@ proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 		var curve = curves[ reverse ? l - 1 - i : i ],
 			end = curve['point' + ( reverse ? 1 : 2 ) ].transform( matrix );
 
-		if ( curve.isLinear() ) {
+		if ( curve.isStraight() ) {
 			pushSimple(
 				'L',
 				Math.round( end.x ) || 0,
