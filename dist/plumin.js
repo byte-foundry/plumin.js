@@ -20438,40 +20438,29 @@ function Font( args ) {
 	this.charMap = {};
 	this.altMap = {};
 	this._subset = false;
+	this.fontMap = {};
 
 	this.addGlyph(new Glyph({
 		name: '.notdef',
-		unicode: 0
+		unicode: 0,
+		advanceWidth: 650
 	}));
 
 	if ( args && args.glyphs ) {
 		this.addGlyphs( args.glyphs );
 	}
 
-	if ( typeof window === 'object' && window.document ) {
-		// work around https://bugzilla.mozilla.org/show_bug.cgi?id=1100005
-		// by using fonts.delete in batch, every 1 second
-		if ( document.fonts ) {
-			this.addedFonts = [];
-
-			setInterval(function() {
-				while ( this.addedFonts.length > 1 ) {
-					document.fonts.delete( this.addedFonts.shift() );
-				}
-			}.bind(this), 1000);
-
-		} else {
-			document.head.appendChild(
-				this.styleElement = document.createElement('style')
-			);
-			// let's find the corresponding CSSStyleSheet
-			// (would be much easier with Array#find)
-			this.styleSheet = document.styleSheets[
-				[].map.call(document.styleSheets, function(ss) {
-					return ss.ownerNode;
-				}).indexOf(this.styleElement)
-			];
-		}
+	if ( typeof window === 'object' && window.document && !document.fonts ) {
+		document.head.appendChild(
+			this.styleElement = document.createElement('style')
+		);
+		// let's find the corresponding CSSStyleSheet
+		// (would be much easier with Array#find)
+		this.styleSheet = document.styleSheets[
+			[].map.call(document.styleSheets, function(ss) {
+				return ss.ownerNode;
+			}).indexOf(this.styleElement)
+		];
 	}
 }
 
@@ -20620,12 +20609,35 @@ Font.prototype.updateSVGData = function( set ) {
 };
 
 Font.prototype.updateOTCommands = function( set, united ) {
-	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
-		return glyph.updateOTCommands( null, united);
+	return this.updateOT({
+		set: set,
+		shouldUpdateCommands: true,
+		united: united
 	});
+};
 
+Font.prototype.updateOT = function( args ) {
+	this.ot.glyphs.glyphs = (
+		this.getGlyphSubset( args && args.set ).reduce(function(o, glyph, i) {
+			o[i] = args && args.shouldUpdateCommands ?
+				glyph.updateOTCommands( null, args && args.united ) :
+				glyph.ot;
+			return o;
+		}, {})
+	);
+	this.ot.glyphs.length = Object.keys(this.ot.glyphs.glyphs).length;
 	return this;
 };
+
+Font.prototype.toArrayBuffer = function() {
+	// rewrite the postScriptName to remove invalid characters
+	// TODO: this should be fixed in opentype.js
+	this.ot.names.postScriptName.en = (
+		this.ot.names.postScriptName.en.replace(/[^A-z]/g, '_')
+	);
+
+	return this.ot.toArrayBuffer();
+}
 
 Font.prototype.importOT = function( otFont ) {
 	this.ot = otFont;
@@ -20650,20 +20662,28 @@ if ( typeof window === 'object' && window.document ) {
 	Font.prototype.addToFonts = document.fonts ?
 		// CSS font loading, lightning fast
 		function( buffer ) {
-			var fontface = new window.FontFace(
-				this.ot.familyName,
-				buffer || this.ot.toBuffer()
+			var enFamilyName = this.ot.getEnglishName('fontFamily');
+
+			if ( this.fontMap[ enFamilyName ] ) {
+				document.fonts.delete( this.fontMap[ enFamilyName ] );
+			}
+
+			var fontface = this.fontMap[ enFamilyName ] = (
+				new window.FontFace(
+					enFamilyName,
+					buffer || this.toArrayBuffer()
+				)
 			);
 
 			document.fonts.add( fontface );
-			this.addedFonts.push( fontface );
 
 			return this;
 		} :
 		function( buffer ) {
+			var enFamilyName = this.ot.getEnglishName('fontFamily');
 			var url = _URL.createObjectURL(
 					new Blob(
-						[ new DataView( buffer || this.ot.toBuffer() ) ],
+						[ new DataView( buffer || this.toArrayBuffer() ) ],
 						{ type: 'font/opentype' }
 					)
 				);
@@ -20674,7 +20694,7 @@ if ( typeof window === 'object' && window.document ) {
 			}
 
 			this.styleSheet.insertRule(
-				'@font-face { font-family: "' + this.ot.familyName + '";' +
+				'@font-face { font-family: "' + enFamilyName + '";' +
 				'src: url(' + url + '); }',
 				0
 			);
@@ -20686,11 +20706,11 @@ if ( typeof window === 'object' && window.document ) {
 	var a = document.createElement('a');
 
 	Font.prototype.downloadFromLink = function( buffer ) {
-			var reader = new FileReader(),
-				familyName = this.ot.familyName;
+			var reader = new FileReader();
+			var enFamilyName = this.ot.getEnglishName('fontFamily');
 
 			reader.onloadend = function() {
-				a.download = familyName + '.otf';
+				a.download = enFamilyName + '.otf';
 				a.href = reader.result;
 				a.dispatchEvent(new MouseEvent('click'));
 
@@ -20701,7 +20721,7 @@ if ( typeof window === 'object' && window.document ) {
 			};
 
 			reader.readAsDataURL(new Blob(
-				[ new DataView( buffer || this.ot.toBuffer() ) ],
+				[ new DataView( buffer || this.toArrayBuffer() ) ],
 				{ type: 'font/opentype' }
 			));
 	};
