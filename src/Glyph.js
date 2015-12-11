@@ -47,6 +47,16 @@ Object.defineProperty(Glyph.prototype, 'unicode', {
 	}
 });
 
+// alias .advanceWidth to .ot.advanceWidth
+Object.defineProperty(Glyph.prototype, 'advanceWidth', {
+	set: function( value ) {
+		this.ot.advanceWidth = value;
+	},
+	get: function() {
+		return this.ot.advanceWidth;
+	}
+});
+
 // proxy .contours to .children[0]
 Object.defineProperty( Glyph.prototype, 'contours', {
 	get: function() {
@@ -60,8 +70,6 @@ Object.defineProperty( Glyph.prototype, 'components', {
 		return this.children[1].children;
 	}
 });
-
-// proxy .visible to
 
 // proxy ...Contour[s] methods to children[0]...Child[ren] methods
 // and proxy ...Component[s] methods to children[1]...Child[ren] methods

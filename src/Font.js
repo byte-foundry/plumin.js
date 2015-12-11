@@ -190,11 +190,11 @@ Font.prototype.updateSVGData = function( set ) {
 	return this;
 };
 
-Font.prototype.updateOTCommands = function( set, united ) {
+Font.prototype.updateOTCommands = function( set, merged ) {
 	return this.updateOT({
 		set: set,
 		shouldUpdateCommands: true,
-		united: united
+		merged: merged
 	});
 };
 
@@ -202,7 +202,7 @@ Font.prototype.updateOT = function( args ) {
 	this.ot.glyphs.glyphs = (
 		this.getGlyphSubset( args && args.set ).reduce(function(o, glyph, i) {
 			o[i] = args && args.shouldUpdateCommands ?
-				glyph.updateOTCommands( null, args && args.united ) :
+				glyph.updateOTCommands( null, args && args.merged ) :
 				glyph.ot;
 			return o;
 		}, {})
@@ -287,54 +287,47 @@ if ( typeof window === 'object' && window.document ) {
 
 	var a = document.createElement('a');
 
-	Font.prototype.downloadFromLink = function( buffer ) {
-			var reader = new FileReader();
-			var enFamilyName = this.ot.getEnglishName('fontFamily');
+	var triggerDownload = function( font, arrayBuffer ) {
+		var reader = new FileReader();
+		var enFamilyName = font.ot.getEnglishName('fontFamily');
 
-			reader.onloadend = function() {
-				a.download = enFamilyName + '.otf';
-				a.href = reader.result;
-				a.dispatchEvent(new MouseEvent('click'));
+		reader.onloadend = function() {
+			a.download = enFamilyName + '.otf';
+			a.href = reader.result;
+			a.dispatchEvent(new MouseEvent('click'));
 
-				setTimeout(function() {
-					a.href = '#';
-					_URL.revokeObjectURL( reader.result );
-				}, 100);
-			};
+			setTimeout(function() {
+				a.href = '#';
+				_URL.revokeObjectURL( reader.result );
+			}, 100);
+		};
 
-			reader.readAsDataURL(new Blob(
-				[ new DataView( buffer || this.toArrayBuffer() ) ],
-				{ type: 'font/opentype' }
-			));
+		reader.readAsDataURL(new Blob(
+			[ new DataView( arrayBuffer || font.toArrayBuffer() ) ],
+			{ type: 'font/opentype' }
+		));
 	};
 
-	Font.prototype.download = function( buffer, merged, name, user ) {
+	Font.prototype.download = function( arrayBuffer, merged, name, user ) {
 		if ( merged ) {
-			var headers = new Headers();
-			headers.append('Content-Type', 'application/otf');
-
+			// TODO: replace that with client-side font merging
 			fetch('http://fontforgeconv.cloudapp.net/' + name + '/' + user, {
 					method: 'POST',
-					headers: headers,
-					body: buffer
+					headers: { 'Content-Type': 'application/otf' },
+					body: arrayBuffer
 				})
 				.then(function( response ) {
-
-					response.arrayBuffer()
-						.then(function( bufferToDownload ) {
-							this.downloadFromLink(bufferToDownload);
-						}.bind(this));
-
-				}.bind(this))
-				.catch(function(/*err*/) {
-					//console.log('error: ', err);
-				});
+					return response.arrayBuffer();
+				})
+				.then(function( bufferToDownload ) {
+					triggerDownload( this, bufferToDownload );
+				}.bind(this));
 
 		} else {
-			this.downloadFromLink( buffer );
-
-			return this;
+			triggerDownload( this, arrayBuffer );
 		}
+
+		return this;
 	};
 
 }
