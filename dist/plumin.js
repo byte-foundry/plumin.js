@@ -20675,6 +20675,10 @@ if ( typeof window === 'object' && window.document ) {
 				)
 			);
 
+			if ( fontface.status === 'error' ) {
+				throw new Error('Fontface is invalid and cannot be displayed');
+			}
+
 			document.fonts.add( fontface );
 
 			return this;
