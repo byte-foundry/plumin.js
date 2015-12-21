@@ -20617,6 +20617,13 @@ Font.prototype.updateOTCommands = function( set, merged ) {
 };
 
 Font.prototype.updateOT = function( args ) {
+	if ( args && args.shouldUpdateCommands ) {
+		// the following is required so that the globalMatrix of glyphs
+		// takes the font matrix into account. I assume this is done in the
+		// main thread when calling view.update();
+		this._project._updateVersion++;
+	}
+
 	this.ot.glyphs.glyphs = (
 		this.getGlyphSubset( args && args.set ).reduce(function(o, glyph, i) {
 			o[i] = args && args.shouldUpdateCommands ?
