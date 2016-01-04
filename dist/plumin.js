@@ -20559,7 +20559,17 @@ Font.prototype.normalizeSubset = function( _set ) {
 		set.unshift( this.glyphMap['.notdef'] );
 	}
 
-	// remove undefined glyphs and dedupe the set
+	// when encountering diacritics, include their base-glyph in the subset
+	set.forEach(function( glyph ) {
+		if ( glyph.base !== undefined ) {
+			var base = this.charMap[ glyph.base ];
+			if ( set.indexOf( base ) === -1 ) {
+				set.unshift( base );
+			}
+		}
+	}, this);
+
+	// remove undefined glyphs, dedupe the set and move diacritics at the end
 	return set.filter(function(e, i, arr) {
 		return e && arr.lastIndexOf(e) === i;
 	});
@@ -20619,7 +20629,7 @@ Font.prototype.updateOTCommands = function( set, merged ) {
 Font.prototype.updateOT = function( args ) {
 	if ( args && args.shouldUpdateCommands ) {
 		// the following is required so that the globalMatrix of glyphs
-		// takes the font matrix into account. I assume this is done in the
+		// is taken into account on each update. I assume this is done in the
 		// main thread when calling view.update();
 		this._project._updateVersion++;
 	}
@@ -20649,7 +20659,7 @@ Font.prototype.toArrayBuffer = function() {
 Font.prototype.importOT = function( otFont ) {
 	this.ot = otFont;
 
-	otFont.glyphs.forEach(function( otGlyph ) {
+	otFont.forEachGlyph(function( otGlyph ) {
 		var glyph = new Glyph({
 				name: otGlyph.name,
 				unicode: otGlyph.unicode
@@ -20810,6 +20820,17 @@ Object.defineProperty(Glyph.prototype, 'unicode', {
 	},
 	get: function() {
 		return this.ot.unicode;
+	}
+});
+
+Object.defineProperty(Glyph.prototype, 'base', {
+	set: function( code ) {
+		this._base = typeof code === 'string' ?
+			code.charCodeAt(0) :
+			code;
+	},
+	get: function() {
+		return this._base;
 	}
 });
 

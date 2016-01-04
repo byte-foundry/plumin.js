@@ -141,7 +141,17 @@ Font.prototype.normalizeSubset = function( _set ) {
 		set.unshift( this.glyphMap['.notdef'] );
 	}
 
-	// remove undefined glyphs and dedupe the set
+	// when encountering diacritics, include their base-glyph in the subset
+	set.forEach(function( glyph ) {
+		if ( glyph.base !== undefined ) {
+			var base = this.charMap[ glyph.base ];
+			if ( set.indexOf( base ) === -1 ) {
+				set.unshift( base );
+			}
+		}
+	}, this);
+
+	// remove undefined glyphs, dedupe the set and move diacritics at the end
 	return set.filter(function(e, i, arr) {
 		return e && arr.lastIndexOf(e) === i;
 	});
@@ -231,7 +241,7 @@ Font.prototype.toArrayBuffer = function() {
 Font.prototype.importOT = function( otFont ) {
 	this.ot = otFont;
 
-	otFont.glyphs.forEach(function( otGlyph ) {
+	otFont.forEachGlyph(function( otGlyph ) {
 		var glyph = new Glyph({
 				name: otGlyph.name,
 				unicode: otGlyph.unicode

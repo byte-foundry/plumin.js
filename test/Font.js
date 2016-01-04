@@ -195,6 +195,23 @@ describe('Font', function() {
 				glyphs.A,
 				glyphs.B
 			]);
+
+			font.addGlyph({
+				name: 'À',
+				base: 'A'.charCodeAt(0),
+				_remove: noop,
+				_setProject: noop,
+				ot: { unicode: 'À'.charCodeAt(0) }
+			});
+
+			font.subset = 'ÀB';
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.À,
+				glyphs.B
+			]);
 		});
 	});
 });

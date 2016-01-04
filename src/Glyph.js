@@ -47,6 +47,17 @@ Object.defineProperty(Glyph.prototype, 'unicode', {
 	}
 });
 
+Object.defineProperty(Glyph.prototype, 'base', {
+	set: function( code ) {
+		this._base = typeof code === 'string' ?
+			code.charCodeAt(0) :
+			code;
+	},
+	get: function() {
+		return this._base;
+	}
+});
+
 // alias .advanceWidth to .ot.advanceWidth
 Object.defineProperty(Glyph.prototype, 'advanceWidth', {
 	set: function( value ) {
