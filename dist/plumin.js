@@ -20561,7 +20561,7 @@ Font.prototype.normalizeSubset = function( _set ) {
 
 	// when encountering diacritics, include their base-glyph in the subset
 	set.forEach(function( glyph ) {
-		if ( glyph.base !== undefined ) {
+		if ( glyph && glyph.base !== undefined ) {
 			var base = this.charMap[ glyph.base ];
 			if ( set.indexOf( base ) === -1 ) {
 				set.unshift( base );
@@ -20659,7 +20659,8 @@ Font.prototype.toArrayBuffer = function() {
 Font.prototype.importOT = function( otFont ) {
 	this.ot = otFont;
 
-	otFont.forEachGlyph(function( otGlyph ) {
+	for ( var i = 0; i < otFont.glyphs.length; ++i ) {
+		var otGlyph = otFont.glyphs.get(i);
 		var glyph = new Glyph({
 				name: otGlyph.name,
 				unicode: otGlyph.unicode
@@ -20667,8 +20668,7 @@ Font.prototype.importOT = function( otFont ) {
 
 		this.addGlyph( glyph );
 		glyph.importOT( otGlyph );
-
-	}, this);
+	}
 
 	return this;
 };
@@ -21079,7 +21079,7 @@ Outline.fromPath = function( path ) {
 };
 
 Outline.prototype.interpolate = function( outline0, outline1, coef ) {
-	for (var i = 0, l = this.contours.length; i < l; i++) {
+	for (var i = 0, l = this.children.length; i < l; i++) {
 		// The number of children should be the same everywhere,
 		// but we're going to try our best anyway
 		if ( !outline0.children[i] || !outline1.children[i] ) {

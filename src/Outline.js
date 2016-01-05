@@ -30,7 +30,7 @@ Outline.fromPath = function( path ) {
 };
 
 Outline.prototype.interpolate = function( outline0, outline1, coef ) {
-	for (var i = 0, l = this.contours.length; i < l; i++) {
+	for (var i = 0, l = this.children.length; i < l; i++) {
 		// The number of children should be the same everywhere,
 		// but we're going to try our best anyway
 		if ( !outline0.children[i] || !outline1.children[i] ) {

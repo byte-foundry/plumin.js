@@ -143,7 +143,7 @@ Font.prototype.normalizeSubset = function( _set ) {
 
 	// when encountering diacritics, include their base-glyph in the subset
 	set.forEach(function( glyph ) {
-		if ( glyph.base !== undefined ) {
+		if ( glyph && glyph.base !== undefined ) {
 			var base = this.charMap[ glyph.base ];
 			if ( set.indexOf( base ) === -1 ) {
 				set.unshift( base );
@@ -241,7 +241,8 @@ Font.prototype.toArrayBuffer = function() {
 Font.prototype.importOT = function( otFont ) {
 	this.ot = otFont;
 
-	otFont.forEachGlyph(function( otGlyph ) {
+	for ( var i = 0; i < otFont.glyphs.length; ++i ) {
+		var otGlyph = otFont.glyphs.get(i);
 		var glyph = new Glyph({
 				name: otGlyph.name,
 				unicode: otGlyph.unicode
@@ -249,8 +250,7 @@ Font.prototype.importOT = function( otFont ) {
 
 		this.addGlyph( glyph );
 		glyph.importOT( otGlyph );
-
-	}, this);
+	}
 
 	return this;
 };
