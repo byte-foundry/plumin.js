@@ -332,7 +332,7 @@ if ( typeof window === 'object' && window.document ) {
 	Font.prototype.download = function( arrayBuffer, merged, name, user ) {
 		if ( merged ) {
 			// TODO: replace that with client-side font merging
-			fetch('http://fontforgeconv.cloudapp.net/' + 
+			fetch('http://fontforgeconv.cloudapp.net/' +
 				name.family + '/' +
 				name.style + '/' + user, {
 					method: 'POST',
