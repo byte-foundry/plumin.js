@@ -1,6 +1,3 @@
-var expect = require('../node_modules/chai').expect,
-	plumin = require('../src/plumin');
-
 var noop = function() {};
 
 describe('Glyph', function() {

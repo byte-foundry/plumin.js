@@ -1,4 +1,4 @@
-var paper = require('../node_modules/paper/dist/paper-core.js');
+var paper = require('paper');
 
 Object.defineProperty( paper.Segment.prototype, 'x', {
 	get: function() {

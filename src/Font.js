@@ -1,5 +1,5 @@
-var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
-	paper = require('../node_modules/paper/dist/paper-core.js'),
+var opentype = require('opentype.js'),
+	paper = require('paper'),
 	Glyph = require('./Glyph.js'),
 	assign = require('es6-object-assign').assign;
 

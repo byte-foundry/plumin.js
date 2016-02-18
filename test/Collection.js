@@ -1,7 +1,4 @@
 /* eslint-disable new-cap */
-var expect = require('../node_modules/chai').expect,
-	plumin = require('../src/plumin');
-
 function createOnePath() {
 	return plumin.Path({
 		segments: [[ 20, 20 ], [ 80, 80 ], [ 140, 20 ]],

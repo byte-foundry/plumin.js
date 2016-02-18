@@ -1,5 +1,5 @@
-var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
-	paper = require('../node_modules/paper/dist/paper-core.js'),
+var opentype = require('opentype.js'),
+	paper = require('paper'),
 	Outline = require('./Outline.js');
 
 function Glyph( args ) {

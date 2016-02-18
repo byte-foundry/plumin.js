@@ -165,14 +165,14 @@ counter = new p.Path.Rectangle({
 });
 C.addContour(shape.subtract(counter));
 
-window.font = font.addGlyphs([ A, B, C ])
+this.font = font.addGlyphs([ A, B, C ])
 	.updateOTCommands()
 	.addToFonts();
 
 /*
 // animation is only fluid in Chrome and Firefox
 var center = p.Point([256, 500]);
-window.onFrame = function() {
+this.onFrame = function() {
 	A.rotate(3, center);
 	B.rotate(-3, center);
 	C.rotate(3, center);
@@ -300,14 +300,13 @@ window.onFrame = function() {
 		</script>
 
 		<script id="workerscript" type="text/workerscript">
-			var window = self;
-
 			// importScripts doesn't work with inline worker.
 			// The following placeholder will be replaced with plumin source.
 			// You wouldn't use inline workers and this trick in prod, though.
 			PLUMINSOURCE
 
-			plumin.setup({
+			plumin.paper.install(this);
+			plumin.paper.setup({
 				width: 1024,
 				height: 1024
 			});
@@ -316,7 +315,7 @@ window.onFrame = function() {
 
 			// Overwrite addToFonts to send the buffer over to the UI
 			plumin.paper.Font.prototype.addToFonts = function() {
-				var buffer = this.ot.toBuffer();
+				var buffer = this.ot.toArrayBuffer();
 				postMessage( buffer, [buffer] );
 				// the font has been generated and posted to the UI,
 				// we're ready to generate a new font

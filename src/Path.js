@@ -1,7 +1,7 @@
 /* Extend the Path prototype to add OpenType conversion
  * and alias *segments methods and properties to *nodes
  */
-var paper = require('../node_modules/paper/dist/paper-core.js');
+var paper = require('paper');
 
 var proto = paper.PaperScope.prototype.Path.prototype;
 

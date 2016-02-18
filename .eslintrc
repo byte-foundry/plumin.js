@@ -4,7 +4,9 @@
 		"browser": true,
 		"node": true,
 		"amd": true,
-		"mocha": true
+		"mocha": true,
+        "es6": true,
+        worker: true
 	},
 	"plugins": [
 		"mocha"
@@ -14,5 +16,9 @@
 		"no-unused-vars": 2,
 		"mocha/no-exclusive-tests": 2,
 		"comma-dangle": 0
-	}
+	},
+    "globals": {
+        plumin: false,
+        expect: false
+    }
 }

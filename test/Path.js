@@ -1,6 +1,3 @@
-var expect = require('../node_modules/chai').expect,
-	plumin = require('../src/plumin');
-
 describe('Path', function() {
 	before(function() {
 		plumin.setup({

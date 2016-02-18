@@ -1,4 +1,4 @@
-var paper = require('../node_modules/paper/dist/paper-core.js');
+var paper = require('paper');
 
 function Outline() {
 	paper.CompoundPath.prototype.constructor.apply( this );

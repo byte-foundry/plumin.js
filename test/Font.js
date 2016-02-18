@@ -1,11 +1,9 @@
-var expect = require('../node_modules/chai').expect,
-	plumin = require('../src/plumin');
-
 var noop = function() {};
 
 describe('Font', function() {
 	before(function() {
-		plumin.setup({
+		plumin.paper.install(window);
+		plumin.paper.setup({
 			width: 1024,
 			height: 1024
 		});
@@ -34,18 +32,21 @@ describe('Font', function() {
 					name: 'A',
 					_remove: noop,
 					_setProject: noop,
+					_getOwner: noop,
 					ot: { unicode: 'A'.charCodeAt(0) }
 				});
 				font.addGlyph({
 					name: 'B',
 					_remove: noop,
 					_setProject: noop,
+					_getOwner: noop,
 					ot: { unicode: 'B'.charCodeAt(0) }
 				});
 				font.addGlyph({
 					name: 'C',
 					_remove: noop,
 					_setProject: noop,
+					_getOwner: noop,
 					ot: { unicode: 'C'.charCodeAt(0) }
 				});
 
@@ -64,18 +65,21 @@ describe('Font', function() {
 					name: 'A',
 					_remove: noop,
 					_setProject: noop,
+					_getOwner: noop,
 					ot: { unicode: code }
 				},
 				aBis = {
 					name: 'A bis',
 					_remove: noop,
 					_setProject: noop,
+					_getOwner: noop,
 					ot: { unicode: code }
 				},
 				aTer = {
 					name: 'A ter',
 					_remove: noop,
 					_setProject: noop,
+					_getOwner: noop,
 					ot: { unicode: code }
 				};
 
@@ -97,7 +101,8 @@ describe('Font', function() {
 				glyph = new plumin.Glyph({
 					name: 'A',
 					_remove: noop,
-					_setProject: noop
+					_setProject: noop,
+					_getOwner: noop
 				});
 
 			// the font always has a .notdef glyph
@@ -121,24 +126,28 @@ describe('Font', function() {
 				name: 'A',
 				_remove: noop,
 				_setProject: noop,
+				_getOwner: noop,
 				ot: { unicode: 'A'.charCodeAt(0) }
 			});
 			font.addGlyph({
 				name: 'B',
 				_remove: noop,
 				_setProject: noop,
+				_getOwner: noop,
 				ot: { unicode: 'B'.charCodeAt(0) }
 			});
 			font.addGlyph({
 				name: 'C',
 				_remove: noop,
 				_setProject: noop,
+				_getOwner: noop,
 				ot: { unicode: 'C'.charCodeAt(0) }
 			});
 			font.addGlyph({
 				name: 'Zob',
 				_remove: noop,
 				_setProject: noop,
+				_getOwner: noop,
 				ot: { unicode: undefined }
 			});
 
@@ -201,6 +210,7 @@ describe('Font', function() {
 				base: 'A'.charCodeAt(0),
 				_remove: noop,
 				_setProject: noop,
+				_getOwner: noop,
 				ot: { unicode: 'À'.charCodeAt(0) }
 			});
 
