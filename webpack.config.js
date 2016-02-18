@@ -17,4 +17,7 @@ module.exports = {
 		'./node/window': true,
 		'./node/extend': true,
 	}],
+	node: {
+		Buffer: false,
+	}
 };

@@ -13,7 +13,6 @@ const browsersync = `browser-sync start --server --files "${dest}/${project}.js,
 const mocha = `mocha-phantomjs test.html`;
 
 shelter({
-	mocha: mocha,
 	dist: {
 		dsc: 'generate dist files',
 		cmd: dist

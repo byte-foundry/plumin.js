@@ -212,7 +212,7 @@ Glyph.prototype.importOT = function( otGlyph ) {
 		switch ( command.type ) {
 			case 'M':
 				current = new paper.Path();
-				this.addContour( current );
+				this.contours.addChildren( current );
 
 				current.moveTo( command );
 				break;
