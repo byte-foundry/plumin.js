@@ -8587,7 +8587,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*!
-	 * Paper.js v0.9.25-fix/use_global_self - The Swiss Army Knife of Vector Graphics Scripting.
+	 * Paper.js v0.9.25-develop - The Swiss Army Knife of Vector Graphics Scripting.
 	 * http://paperjs.org/
 	 *
 	 * Copyright (c) 2011 - 2016, Juerg Lehni & Jonathan Puckey
@@ -9355,7 +9355,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			}
 		},
 	
-		version: "0.9.25-fix/use_global_self",
+		version: "0.9.25-develop",
 	
 		getView: function() {
 			var project = this.project;
@@ -23149,7 +23149,9 @@ return /******/ (function(modules) { // webpackBootstrap
 		// If we added an interpolate method to Group, we'd be able to just
 		// interpolate all this.children directly.
 		// instead we interpolate the outline first
-		this.children[0].interpolate( glyph0.children[0], glyph1.children[0] );
+		this.children[0].interpolate(
+			glyph0.children[0], glyph1.children[0], coef
+		);
 		// and then the components
 		this.children[1].children.forEach(function(component, j) {
 			component.interpolate(
@@ -23423,9 +23425,10 @@ return /******/ (function(modules) { // webpackBootstrap
 		// prototypo needs to be able to change the direction of the updated data.
 		var reverse = this.exportReversed,
 			curves = this.curves,
-			start = curves[ reverse ? curves.length - 1 : 0 ]
-				[ 'point' + ( reverse ? 2 : 1 ) ]
-				.transform( matrix );
+			length = curves.length,
+			start =
+				curves[ reverse ? length - 1 : 0 ][ 'point' + ( reverse ? 2 : 1 ) ]
+					.transform( matrix );
 	
 		pushSimple(
 			'M',

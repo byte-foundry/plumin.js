@@ -140,7 +140,9 @@ Glyph.prototype.interpolate = function( glyph0, glyph1, coef ) {
 	// If we added an interpolate method to Group, we'd be able to just
 	// interpolate all this.children directly.
 	// instead we interpolate the outline first
-	this.children[0].interpolate( glyph0.children[0], glyph1.children[0] );
+	this.children[0].interpolate(
+		glyph0.children[0], glyph1.children[0], coef
+	);
 	// and then the components
 	this.children[1].children.forEach(function(component, j) {
 		component.interpolate(

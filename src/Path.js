@@ -26,9 +26,10 @@ proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 	// prototypo needs to be able to change the direction of the updated data.
 	var reverse = this.exportReversed,
 		curves = this.curves,
-		start = curves[ reverse ? curves.length - 1 : 0 ]
-			[ 'point' + ( reverse ? 2 : 1 ) ]
-			.transform( matrix );
+		length = curves.length,
+		start =
+			curves[ reverse ? length - 1 : 0 ][ 'point' + ( reverse ? 2 : 1 ) ]
+				.transform( matrix );
 
 	pushSimple(
 		'M',
