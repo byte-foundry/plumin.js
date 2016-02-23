@@ -30,8 +30,6 @@
     "codemirror": "^5.1.0",
     "es6-object-assign": "^1.0.1",
     "eslint": "^2.1.0",
-    "eslint-config-defaults": "^9.0.0",
-    "eslint-config-eslint": "^3.0.0",
     "eslint-plugin-mocha": "^2.0.0",
     "ghooks": "^1.0.3",
     "gulp": "^3.9.1",
