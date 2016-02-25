@@ -4,13 +4,14 @@ const shelter = require('gulp-shelter')(gulp);
 const src = 'src';
 const dest = 'dist';
 const project = 'plumin';
+
 const webpack = 'webpack --devtool source-map';
 const dist = `${webpack} && cp -R node_modules/paper/dist/node/ dist/`;
 const watch = `${webpack} --watch`;
 const jscs = `jscs ${src}/**.js test/**.js`;
 const eslint = `eslint ${src}/**.js test/**.js`;
 const browsersync = `browser-sync start --server --files "${dest}/${project}.js, index.html"`;
-const mocha = `mocha-phantomjs test.html`;
+const mocha = 'mocha-phantomjs test.html';
 
 shelter({
 	dist: {
@@ -18,7 +19,7 @@ shelter({
 		cmd: dist
 	},
 	build: {
-		dsc: `Lint code, generate ${project}-core.js and test it`,
+		dsc: `Lint code, generate ${project}.js and test it`,
 		cmd: `{ ${jscs} & ${eslint}; } && ${dist} && ${mocha}`
 	},
 	serve: {
