@@ -260,8 +260,8 @@ if ( typeof window === 'object' && window.document ) {
 	var _URL = window.URL || window.webkitURL;
 	Font.prototype.addToFonts = document.fonts ?
 		// CSS font loading, lightning fast
-		function( buffer ) {
-			var enFamilyName = this.ot.getEnglishName('fontFamily');
+		function( buffer, familyName ) {
+			var enFamilyName = familyName || this.ot.getEnglishName('fontFamily');
 
 			if ( this.fontMap[ enFamilyName ] ) {
 				document.fonts.delete( this.fontMap[ enFamilyName ] );
@@ -282,8 +282,8 @@ if ( typeof window === 'object' && window.document ) {
 
 			return this;
 		} :
-		function( buffer ) {
-			var enFamilyName = this.ot.getEnglishName('fontFamily');
+		function( buffer, familyName ) {
+			var enFamilyName = familyName || this.ot.getEnglishName('fontFamily');
 			var url = _URL.createObjectURL(
 					new Blob(
 						[ new DataView( buffer || this.toArrayBuffer() ) ],
