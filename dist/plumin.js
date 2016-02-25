@@ -21118,8 +21118,10 @@ return /******/ (function(modules) { // webpackBootstrap
 		var _URL = window.URL || window.webkitURL;
 		Font.prototype.addToFonts = document.fonts ?
 			// CSS font loading, lightning fast
-			function( buffer ) {
-				var enFamilyName = this.ot.getEnglishName('fontFamily');
+			function( buffer, enFamilyName ) {
+				if ( !enFamilyName ) {
+					enFamilyName = this.ot.getEnglishName('fontFamily');
+				}
 	
 				if ( this.fontMap[ enFamilyName ] ) {
 					document.fonts.delete( this.fontMap[ enFamilyName ] );
@@ -21140,8 +21142,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 				return this;
 			} :
-			function( buffer ) {
-				var enFamilyName = this.ot.getEnglishName('fontFamily');
+			function( buffer, enFamilyName ) {
+				if ( !enFamilyName ) {
+					enFamilyName = this.ot.getEnglishName('fontFamily');
+				}
+	
 				var url = _URL.createObjectURL(
 						new Blob(
 							[ new DataView( buffer || this.toArrayBuffer() ) ],
