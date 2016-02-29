@@ -1740,8 +1740,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        maxLeftSideBearing: Math.max.apply(null, leftSideBearings),
 	        minRightSideBearing: Math.min.apply(null, rightSideBearings)
 	    };
-	    globals.ascender = font.ascender !== undefined ? font.ascender : globals.yMax;
-	    globals.descender = font.descender !== undefined ? font.descender : globals.yMin;
+	    globals.ascender = font.ascender;
+	    globals.descender = font.descender;
 	
 	    var headTable = head.make({
 	        flags: 3, // 00000011 (baseline for font at y=0; left sidebearing point at x=0)
@@ -4357,7 +4357,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        yMin: Math.min.apply(null, yCoords),
 	        xMax: Math.max.apply(null, xCoords),
 	        yMax: Math.max.apply(null, yCoords),
-	        leftSideBearing: 0
+	        leftSideBearing: this.leftSideBearing
 	    };
 	
 	    if (!isFinite(metrics.xMin)) {
@@ -6810,7 +6810,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 *
 	 * All rights reserved.
 	 *
-	 * Date: Wed Feb 17 19:06:29 2016 +0100
+	 * Date: Tue Feb 23 13:54:46 2016 +0100
 	 *
 	 ***
 	 *
@@ -9583,8 +9583,9 @@ return /******/ (function(modules) { // webpackBootstrap
 					matrices: [new Matrix()],
 					updateMatrix: true
 				});
-			for (var i = 0, l = children.length; i < l; i++)
+			for (var i = 0, l = children.length; i < l; i++) {
 				children[i].draw(ctx, param);
+			}
 			ctx.restore();
 	
 			if (this._selectedItemCount > 0) {
@@ -9593,8 +9594,9 @@ return /******/ (function(modules) { // webpackBootstrap
 				var items = this._selectedItems,
 					size = this._scope.settings.handleSize,
 					version = this._updateVersion;
-				for (var id in items)
+				for (var id in items) {
 					items[id]._drawSelection(ctx, matrix, size, items, version);
+				}
 				ctx.restore();
 			}
 		}
@@ -10723,13 +10725,15 @@ return /******/ (function(modules) { // webpackBootstrap
 			var owner = this._getOwner(),
 				project = this._project,
 				index = this._index;
-			if (owner && index != null) {
-				if (project._activeLayer === this)
-					project._activeLayer = this.getNextSibling()
-							|| this.getPreviousSibling();
+			if (owner) {
+				if (index != null) {
+					if (project._activeLayer === this)
+						project._activeLayer = this.getNextSibling()
+								|| this.getPreviousSibling();
+					Base.splice(owner._children, null, index, 1);
+				}
 				if (this._name)
 					this._removeNamed();
-				Base.splice(owner._children, null, index, 1);
 				this._installEvents(false);
 				if (notifySelf && project._changes)
 					this._changed(5);
@@ -18896,7 +18900,7 @@ return /******/ (function(modules) { // webpackBootstrap
 							&& (Date.now() - clickTime < 300);
 						downItem = clickItem = item;
 						dragItem = !prevented && item;
-						downPoint = lastPoint = point;
+						downPoint = point;
 					} else if (mouse.up) {
 						if (!prevented && item === downItem) {
 							clickTime = Date.now();
@@ -19319,9 +19323,8 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		getCount: function() {
-			return /^mouse(down|up)$/.test(this.type)
-					? this.tool._downCount
-					: this.tool._count;
+			return this.tool[/^mouse(down|up)$/.test(this.type)
+					? '_downCount' : '_moveCount'];
 		},
 	
 		setCount: function(count) {
@@ -19368,8 +19371,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		initialize: function Tool(props) {
 			PaperScopeItem.call(this);
-			this._firstMove = true;
-			this._count = 0;
+			this._moveCount = -1;
 			this._downCount = -1;
 			this._set(props);
 		},
@@ -19409,22 +19411,21 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		_handleMouseEvent: function(type, event, point, mouse) {
 			paper = this._scope;
-			var move = mouse.move || mouse.drag && !this.responds(type);
-			if (move)
+			if (mouse.drag && !this.responds(type))
 				type = 'mousemove';
-			var responds = this.responds(type),
+			var move = mouse.move || mouse.drag,
+				responds = this.responds(type),
 				minDistance = this.minDistance,
 				maxDistance = this.maxDistance,
 				called = false,
 				tool = this;
-			function update(start, minDistance, maxDistance) {
-				var toolPoint = tool._point,
-					pt = point;
-				if (start) {
-					tool._count = 0;
-				} else {
-					if (pt.equals(toolPoint))
+			function update(minDistance, maxDistance) {
+				var pt = point,
+					toolPoint = move ? tool._point : tool._downPoint || pt;
+				if (move) {
+					if (tool._moveCount && pt.equals(toolPoint)) {
 						return false;
+					}
 					if (minDistance != null || maxDistance != null) {
 						var vector = pt.subtract(toolPoint),
 							distance = vector.getLength();
@@ -19435,38 +19436,34 @@ return /******/ (function(modules) { // webpackBootstrap
 									Math.min(distance, maxDistance)));
 						}
 					}
-					tool._count++;
+					tool._moveCount++;
 				}
-				if (responds) {
-					tool._point = pt;
-					tool._lastPoint = move || mouse.drag
-						? start && move ? pt : toolPoint
-						: tool._downPoint || pt;
-				}
+				tool._point = pt;
+				tool._lastPoint = toolPoint;
 				if (mouse.down) {
+					tool._moveCount = -1;
 					tool._downPoint = pt;
 					tool._downCount++;
 				}
 				return true;
 			}
 	
-			function emit(firstMove) {
+			function emit() {
 				if (responds) {
 					called = tool.emit(type, new ToolEvent(tool, type, event))
 							|| called;
-					tool._firstMove = firstMove;
 				}
 			}
 	
 			if (mouse.down) {
-				update(responds);
-				emit(false);
+				update();
+				emit();
 			} else if (mouse.up) {
-				update(false, null, maxDistance);
-				emit(true);
+				update(null, maxDistance);
+				emit();
 			} else if (responds) {
-				while (update(this._firstMove, minDistance, maxDistance))
-					emit(false);
+				while (update(minDistance, maxDistance))
+					emit();
 			}
 			return called;
 		}
@@ -19810,7 +19807,9 @@ return /******/ (function(modules) { // webpackBootstrap
 			xlink = 'http://www.w3.org/1999/xlink',
 			attributeNamespace = {
 				href: xlink,
-				xlink: xmlns
+				xlink: xmlns,
+				xmlns: xmlns,
+				'xmlns:xlink': xmlns
 			};
 	
 		function create(tag, attributes, formatter) {
@@ -19832,7 +19831,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				if (typeof value === 'number' && formatter)
 					value = formatter.number(value);
 				if (namespace) {
-					node.setAttributeNS(namespace, name, value);
+					node.setAttributeNS(namespace + '/', name, value);
 				} else {
 					node.setAttribute(name, value);
 				}
@@ -21171,9 +21170,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		var a = document.createElement('a');
 	
-		var triggerDownload = function( font, arrayBuffer ) {
+		var triggerDownload = function( font, arrayBuffer, filename ) {
 			var reader = new FileReader();
-			var enFamilyName = font.ot.getEnglishName('fontFamily');
+			var enFamilyName = filename || font.ot.getEnglishName('fontFamily');
 	
 			reader.onloadend = function() {
 				a.download = enFamilyName + '.otf';
@@ -21210,7 +21209,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					}.bind(this));
 	
 			} else {
-				triggerDownload( this, arrayBuffer );
+				triggerDownload( this, arrayBuffer, name.family + ' ' + name.style);
 			}
 	
 			return this;

@@ -313,9 +313,9 @@ if ( typeof window === 'object' && window.document ) {
 
 	var a = document.createElement('a');
 
-	var triggerDownload = function( font, arrayBuffer ) {
+	var triggerDownload = function( font, arrayBuffer, filename ) {
 		var reader = new FileReader();
-		var enFamilyName = font.ot.getEnglishName('fontFamily');
+		var enFamilyName = filename || font.ot.getEnglishName('fontFamily');
 
 		reader.onloadend = function() {
 			a.download = enFamilyName + '.otf';
@@ -352,7 +352,7 @@ if ( typeof window === 'object' && window.document ) {
 				}.bind(this));
 
 		} else {
-			triggerDownload( this, arrayBuffer );
+			triggerDownload( this, arrayBuffer, name.family + ' ' + name.style);
 		}
 
 		return this;
