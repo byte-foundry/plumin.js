@@ -39,7 +39,7 @@
     "knacss": "^4.0.3",
     "mocha": "^2.4.5",
     "mocha-phantomjs": "^4.0.2",
-    "opentype.js": "nodebox/opentype.js",
+	"opentype.js": "0.6.0",
     "paper": "paperjs/paper.js#prebuilt/module",
     "webpack": "^1.12.13"
   },

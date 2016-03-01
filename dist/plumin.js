@@ -1740,8 +1740,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        maxLeftSideBearing: Math.max.apply(null, leftSideBearings),
 	        minRightSideBearing: Math.min.apply(null, rightSideBearings)
 	    };
-	    globals.ascender = font.ascender;
-	    globals.descender = font.descender;
+	    globals.ascender = font.ascender !== undefined ? font.ascender : globals.yMax;
+	    globals.descender = font.descender !== undefined ? font.descender : globals.yMin;
 	
 	    var headTable = head.make({
 	        flags: 3, // 00000011 (baseline for font at y=0; left sidebearing point at x=0)
@@ -4357,7 +4357,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        yMin: Math.min.apply(null, yCoords),
 	        xMax: Math.max.apply(null, xCoords),
 	        yMax: Math.max.apply(null, yCoords),
-	        leftSideBearing: this.leftSideBearing
+	        leftSideBearing: 0
 	    };
 	
 	    if (!isFinite(metrics.xMin)) {
@@ -6810,7 +6810,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 *
 	 * All rights reserved.
 	 *
-	 * Date: Tue Feb 23 13:54:46 2016 +0100
+	 * Date: Fri Feb 26 17:49:44 2016 +0100
 	 *
 	 ***
 	 *
@@ -8811,7 +8811,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					var owner = this._owner;
 					if (owner.setSelected) {
 						owner._boundsSelected = selected;
-						owner.setSelected(selected || owner._selectedSegmentState > 0);
+						owner.setSelected(selected || owner._segmentSelection > 0);
 					}
 				}
 			})
@@ -12139,6 +12139,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	var Segment = Base.extend({
 		_class: 'Segment',
 		beans: true,
+		_selection: 0,
 	
 		initialize: function Segment(arg0, arg1, arg2, arg3, arg4, arg5) {
 			var count = arguments.length,
@@ -12230,35 +12231,32 @@ return /******/ (function(modules) { // webpackBootstrap
 			this._handleOut.set(0, 0);
 		},
 	
-		_selectionState: 0,
+		_getSelectionFlag: function(point) {
+			return !point ? 7
+					: point === this._point ? 4
+					: point === this._handleIn ? 1
+					: point === this._handleOut ? 2
+					: 0;
+		},
 	
 		isSelected: function(_point) {
-			var state = this._selectionState;
-			return !_point ? !!(state & 7)
-				: _point === this._point ? !!(state & 4)
-				: _point === this._handleIn ? !!(state & 1)
-				: _point === this._handleOut ? !!(state & 2)
-				: false;
+			return !!(this._selection & this._getSelectionFlag(_point));
 		},
 	
 		setSelected: function(selected, _point) {
 			var path = this._path,
 				selected = !!selected,
-				state = this._selectionState,
-				oldState = state,
-				flag = !_point ? 7
-						: _point === this._point ? 4
-						: _point === this._handleIn ? 1
-						: _point === this._handleOut ? 2
-						: 0;
+				selection = this._selection,
+				oldSelection = selection,
+				flag = this._getSelectionFlag(_point);
 			if (selected) {
-				state |= flag;
+				selection |= flag;
 			} else {
-				state &= ~flag;
+				selection &= ~flag;
 			}
-			this._selectionState = state;
-			if (path && state !== oldState) {
-				path._updateSelection(this, oldState, state);
+			this._selection = selection;
+			if (path && selection !== oldSelection) {
+				path._updateSelection(this, oldSelection, selection);
 				path._changed(129);
 			}
 		},
@@ -12968,14 +12966,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		getArea: function(v) {
 			var p1x = v[0], p1y = v[1],
-				p2x = v[6], p2y = v[7],
-				h1x = (v[2] + p1x) / 2,
-				h1y = (v[3] + p1y) / 2,
-				h2x = (v[4] + v[6]) / 2,
-				h2y = (v[5] + v[7]) / 2;
-			return 6 * ((p1x - h1x) * (h1y + p1y)
-					  + (h1x - h2x) * (h2y + h1y)
-					  + (h2x - p2x) * (p2y + h2y)) / 10;
+				c1x = v[2], c1y = v[3],
+				c2x = v[4], c2y = v[5],
+				p2x = v[6], p2y = v[7];
+			return (6 * (p1x*c1y-p1y*c1x+c2x*p2y-p2x*c2y) +
+					3 * (c1x*p2y-c1y*p2x+p1x*c2y-c2x*p1y+c1x*c2y-c1y*c2x) +
+					1 * (p1x*p2y-p1y*p2x)) / 20;
 		},
 	
 		getBounds: function(v) {
@@ -14296,7 +14292,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				this.setSegments(segments);
 			} else {
 				this._curves = undefined;
-				this._selectedSegmentState = 0;
+				this._segmentSelection = 0;
 				if (!segments && typeof arg === 'string') {
 					this.setPathData(arg);
 					arg = null;
@@ -14346,7 +14342,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		setSegments: function(segments) {
 			var fullySelected = this.isFullySelected();
 			this._segments.length = 0;
-			this._selectedSegmentState = 0;
+			this._segmentSelection = 0;
 			this._curves = undefined;
 			if (segments && segments.length > 0)
 				this._add(Segment.readAll(segments));
@@ -14478,8 +14474,8 @@ return /******/ (function(modules) { // webpackBootstrap
 					segment = segs[i] = segment.clone();
 				segment._path = this;
 				segment._index = index + i;
-				if (segment._selectionState)
-					this._updateSelection(segment, 0, segment._selectionState);
+				if (segment._selection)
+					this._updateSelection(segment, 0, segment._selection);
 			}
 			if (append) {
 				segments.push.apply(segments, segs);
@@ -14577,8 +14573,8 @@ return /******/ (function(modules) { // webpackBootstrap
 				return removed;
 			for (var i = 0; i < amount; i++) {
 				var segment = removed[i];
-				if (segment._selectionState)
-					this._updateSelection(segment, segment._selectionState, 0);
+				if (segment._selection)
+					this._updateSelection(segment, segment._selection, 0);
 				segment._index = segment._path = null;
 			}
 			for (var i = start, l = segments.length; i < l; i++)
@@ -14655,7 +14651,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		isFullySelected: function() {
 			var length = this._segments.length;
-			return this._selected && length > 0 && this._selectedSegmentState
+			return this._selected && length > 0 && this._segmentSelection
 					=== length * 7;
 		},
 	
@@ -14673,17 +14669,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		_selectSegments: function(selected) {
 			var length = this._segments.length;
-			this._selectedSegmentState = selected
+			this._segmentSelection = selected
 					? length * 7 : 0;
-			for (var i = 0; i < length; i++)
-				this._segments[i]._selectionState = selected
+			for (var i = 0; i < length; i++) {
+				this._segments[i]._selection = selected
 						? 7 : 0;
+			}
 		},
 	
-		_updateSelection: function(segment, oldState, newState) {
-			segment._selectionState = newState;
-			var total = this._selectedSegmentState += newState - oldState;
-			if (total > 0)
+		_updateSelection: function(segment, oldSelection, newSelection) {
+			segment._selection = newSelection;
+			var selection = this._segmentSelection += newSelection - oldSelection;
+			if (selection > 0)
 				this.setSelected(true);
 		},
 	
@@ -15204,15 +15201,15 @@ return /******/ (function(modules) { // webpackBootstrap
 			for (var i = 0, l = segments.length; i < l; i++) {
 				var segment = segments[i];
 				segment._transformCoordinates(matrix, coords);
-				var state = segment._selectionState,
+				var selection = segment._selection,
 					pX = coords[0],
 					pY = coords[1];
-				if (state & 1)
+				if (selection & 1)
 					drawHandle(2);
-				if (state & 2)
+				if (selection & 2)
 					drawHandle(4);
 				ctx.fillRect(pX - half, pY - half, size, size);
-				if (!(state & 4)) {
+				if (!(selection & 4)) {
 					var fillStyle = ctx.fillStyle;
 					ctx.fillStyle = '#ffffff';
 					ctx.fillRect(pX - half + 1, pY - half + 1, size - 2, size - 2);
@@ -16058,9 +16055,10 @@ return /******/ (function(modules) { // webpackBootstrap
 			for (var i = 0, l = children.length; i < l; i++) {
 				var child = children[i],
 					mx = child._matrix;
-				if (!selectedItems[child._id])
+				if (!selectedItems[child._id]) {
 					child._drawSelected(ctx, mx.isIdentity() ? matrix
 							: matrix.appended(mx));
+				}
 			}
 		}
 	},
@@ -18762,6 +18760,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		});
 	
 		var called = false,
+			prevented = false,
 			fallbacks = {
 				doubleclick: 'click',
 				mousedrag: 'mousemove'
@@ -18769,7 +18768,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		function emitMouseEvent(obj, type, event, point, prevPoint, stopItem) {
 			var target = obj,
-				prevented = false,
+				stopped = false,
 				mouseEvent;
 	
 			function emit(obj, type) {
@@ -18783,7 +18782,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						if (mouseEvent.prevented)
 							prevented = true;
 						if (mouseEvent.stopped)
-							return true;
+							return stopped = true;
 					}
 				} else {
 					var fallback = fallbacks[type];
@@ -18797,12 +18796,12 @@ return /******/ (function(modules) { // webpackBootstrap
 					break;
 				obj = obj._parent;
 			}
-			return prevented;
+			return stopped;
 		}
 	
 		function emitMouseEvents(view, item, type, event, point, prevPoint) {
 			view._project.removeOn(type);
-			called = false;
+			prevented = called = false;
 			return (dragItem && emitMouseEvent(dragItem, type, event, point,
 						prevPoint)
 				|| item && item !== dragItem && !item.isDescendant(dragItem)
@@ -18893,8 +18892,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 				wasInView = inView;
 				if (mouse.down && inView || mouse.up && downPoint) {
-					var prevented = emitMouseEvents(this, item, type, event, point,
-							downPoint);
+					emitMouseEvents(this, item, type, event, point, downPoint);
 					if (mouse.down) {
 						dblClick = item === clickItem
 							&& (Date.now() - clickTime < 300);
