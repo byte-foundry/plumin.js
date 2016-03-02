@@ -168,8 +168,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var p = 12;
 	    for (var i = 0; i < numTables; i += 1) {
 	        var tag = parse.getTag(data, p);
+	        var checksum = parse.getULong(data, p + 4);
 	        var offset = parse.getULong(data, p + 8);
-	        tableEntries.push({tag: tag, offset: offset, compression: false});
+	        var length = parse.getULong(data, p + 12);
+	        tableEntries.push({tag: tag, checksum: checksum, offset: offset, length: length, compression: false});
 	        p += 16;
 	    }
 	
@@ -1082,6 +1084,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this.unitsPerEm = options.unitsPerEm || 1000;
 	        this.ascender = options.ascender;
 	        this.descender = options.descender;
+	        this.os2Values = {
+	            weightClass: options.weightClass || this.usWeightClasses.MEDIUM,
+	            widthClass: options.widthClass || this.usWidthClasses.MEDIUM,
+	            fsSelection: options.fsSelection || this.fsSelectionValues.REGULAR
+	        };
 	    }
 	
 	    this.supported = true; // Deprecated: parseBuffer will throw an error if font is not supported.
@@ -1365,6 +1372,43 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var buffer = util.arrayBufferToNodeBuffer(arrayBuffer);
 	        fs.writeFileSync(fileName, buffer);
 	    }
+	};
+	
+	Font.prototype.fsSelectionValues = {
+	    ITALIC:              0x001, //1
+	    UNDERSCORE:          0x002, //2
+	    NEGATIVE:            0x004, //4
+	    OUTLINED:            0x008, //8
+	    STRIKEOUT:           0x010, //16
+	    BOLD:                0x020, //32
+	    REGULAR:             0x040, //64
+	    USER_TYPO_METRICS:   0x080, //128
+	    WWS:                 0x100, //256
+	    OBLIQUE:             0x200  //512
+	};
+	
+	Font.prototype.usWidthClasses = {
+	    ULTRA_CONDENSED: 1,
+	    EXTRA_CONDENSED: 2,
+	    CONDENSED: 3,
+	    SEMI_CONDENSED: 4,
+	    MEDIUM: 5,
+	    SEMI_EXPANDED: 6,
+	    EXPANDED: 7,
+	    EXTRA_EXPANDED: 8,
+	    ULTRA_EXPANDED: 9
+	};
+	
+	Font.prototype.usWeightClasses = {
+	    THIN: 100,
+	    EXTRA_LIGHT: 200,
+	    LIGHT: 300,
+	    NORMAL: 400,
+	    MEDIUM: 500,
+	    SEMI_BOLD: 600,
+	    BOLD: 700,
+	    EXTRA_BOLD: 800,
+	    BLACK:    900
 	};
 	
 	exports.Font = Font;
@@ -1740,8 +1784,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        maxLeftSideBearing: Math.max.apply(null, leftSideBearings),
 	        minRightSideBearing: Math.min.apply(null, rightSideBearings)
 	    };
-	    globals.ascender = font.ascender !== undefined ? font.ascender : globals.yMax;
-	    globals.descender = font.descender !== undefined ? font.descender : globals.yMin;
+	    globals.ascender = font.ascender;
+	    globals.descender = font.descender;
 	
 	    var headTable = head.make({
 	        flags: 3, // 00000011 (baseline for font at y=0; left sidebearing point at x=0)
@@ -1767,15 +1811,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    var os2Table = os2.make({
 	        xAvgCharWidth: Math.round(globals.advanceWidthAvg),
-	        usWeightClass: 500, // Medium FIXME Make this configurable
-	        usWidthClass: 5, // Medium (normal) FIXME Make this configurable
+	        usWeightClass: font.os2Values.weightClass,
+	        usWidthClass: font.os2Values.widthClass,
 	        usFirstCharIndex: firstCharIndex,
 	        usLastCharIndex: lastCharIndex,
 	        ulUnicodeRange1: ulUnicodeRange1,
 	        ulUnicodeRange2: ulUnicodeRange2,
 	        ulUnicodeRange3: ulUnicodeRange3,
 	        ulUnicodeRange4: ulUnicodeRange4,
-	        fsSelection: 64, // REGULAR
+	        fsSelection: font.os2Values.fsSelection, // REGULAR
 	        // See http://typophile.com/node/13081 for more info on vertical metrics.
 	        // We get metrics for typical characters (such as "x" for xHeight).
 	        // We provide some fallback characters if characters are unavailable: their
@@ -2526,18 +2570,36 @@ return /******/ (function(modules) { // webpackBootstrap
 	encode.TABLE = function(table) {
 	    var d = [];
 	    var length = table.fields.length;
+	    var subtables = [];
+	    var subtableOffsets = [];
+	    var i;
 	
-	    for (var i = 0; i < length; i += 1) {
+	    for (i = 0; i < length; i += 1) {
 	        var field = table.fields[i];
 	        var encodingFunction = encode[field.type];
-	        check.argument(encodingFunction !== undefined, 'No encoding function for field type ' + field.type);
+	        check.argument(encodingFunction !== undefined, 'No encoding function for field type ' + field.type + ' (' + field.name + ')');
 	        var value = table[field.name];
 	        if (value === undefined) {
 	            value = field.value;
 	        }
 	
 	        var bytes = encodingFunction(value);
-	        d = d.concat(bytes);
+	        if (field.type === 'SUBTABLE') {
+	            subtableOffsets.push(d.length);
+	            d = d.concat([0, 0]);
+	            subtables.push(bytes);
+	        } else {
+	            d = d.concat(bytes);
+	        }
+	    }
+	
+	    for (i = 0; i < subtables.length; i += 1) {
+	        var o = subtableOffsets[i];
+	        var offset = d.length;
+	        check.argument(offset < 65536, 'Table ' + table.name + ' too big.');
+	        d[o] = offset >> 8;
+	        d[o + 1] = offset & 0xff;
+	        d = d.concat(subtables[i]);
 	    }
 	
 	    return d;
@@ -2550,17 +2612,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	    for (var i = 0; i < length; i += 1) {
 	        var field = table.fields[i];
 	        var sizeOfFunction = sizeOf[field.type];
-	        check.argument(sizeOfFunction !== undefined, 'No sizeOf function for field type ' + field.type);
+	        check.argument(sizeOfFunction !== undefined, 'No sizeOf function for field type ' + field.type + ' (' + field.name + ')');
 	        var value = table[field.name];
 	        if (value === undefined) {
 	            value = field.value;
 	        }
 	
 	        numBytes += sizeOfFunction(value);
+	
+	        // Subtables take 2 more bytes for offsets.
+	        if (field.type === 'SUBTABLE') {
+	            numBytes += 2;
+	        }
 	    }
 	
 	    return numBytes;
 	};
+	
+	encode.SUBTABLE = encode.TABLE;
+	sizeOf.SUBTABLE = sizeOf.TABLE;
 	
 	// Merge in a list of bytes.
 	encode.LITERAL = function(v) {
@@ -4357,7 +4427,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        yMin: Math.min.apply(null, yCoords),
 	        xMax: Math.max.apply(null, xCoords),
 	        yMax: Math.max.apply(null, yCoords),
-	        leftSideBearing: 0
+	        leftSideBearing: this.leftSideBearing
 	    };
 	
 	    if (!isFinite(metrics.xMin)) {
@@ -6046,16 +6116,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return nameID;
 	}
 	
-	function makeFvarAxis(axis, names) {
+	function makeFvarAxis(n, axis, names) {
 	    var nameID = addName(axis.name, names);
-	    return new table.Table('fvarAxis', [
-	        {name: 'tag', type: 'TAG', value: axis.tag},
-	        {name: 'minValue', type: 'FIXED', value: axis.minValue << 16},
-	        {name: 'defaultValue', type: 'FIXED', value: axis.defaultValue << 16},
-	        {name: 'maxValue', type: 'FIXED', value: axis.maxValue << 16},
-	        {name: 'flags', type: 'USHORT', value: 0},
-	        {name: 'nameID', type: 'USHORT', value: nameID}
-	    ]);
+	    return [
+	        {name: 'tag_' + n, type: 'TAG', value: axis.tag},
+	        {name: 'minValue_' + n, type: 'FIXED', value: axis.minValue << 16},
+	        {name: 'defaultValue_' + n, type: 'FIXED', value: axis.defaultValue << 16},
+	        {name: 'maxValue_' + n, type: 'FIXED', value: axis.maxValue << 16},
+	        {name: 'flags_' + n, type: 'USHORT', value: 0},
+	        {name: 'nameID_' + n, type: 'USHORT', value: nameID}
+	    ];
 	}
 	
 	function parseFvarAxis(data, start, names) {
@@ -6070,23 +6140,23 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return axis;
 	}
 	
-	function makeFvarInstance(inst, axes, names) {
+	function makeFvarInstance(n, inst, axes, names) {
 	    var nameID = addName(inst.name, names);
 	    var fields = [
-	        {name: 'nameID', type: 'USHORT', value: nameID},
-	        {name: 'flags', type: 'USHORT', value: 0}
+	        {name: 'nameID_' + n, type: 'USHORT', value: nameID},
+	        {name: 'flags_' + n, type: 'USHORT', value: 0}
 	    ];
 	
 	    for (var i = 0; i < axes.length; ++i) {
 	        var axisTag = axes[i].tag;
 	        fields.push({
-	            name: 'axis ' + axisTag,
+	            name: 'axis_' + n + ' ' + axisTag,
 	            type: 'FIXED',
 	            value: inst.coordinates[axisTag] << 16
 	        });
 	    }
 	
-	    return new table.Table('fvarInstance', fields);
+	    return fields;
 	}
 	
 	function parseFvarInstance(data, start, axes, names) {
@@ -6116,18 +6186,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	    result.offsetToData = result.sizeOf();
 	
 	    for (var i = 0; i < fvar.axes.length; i++) {
-	        result.fields.push({
-	            name: 'axis ' + i,
-	            type: 'TABLE',
-	            value: makeFvarAxis(fvar.axes[i], names)});
+	        result.fields = result.fields.concat(makeFvarAxis(i, fvar.axes[i], names));
 	    }
 	
 	    for (var j = 0; j < fvar.instances.length; j++) {
-	        result.fields.push({
-	            name: 'instance ' + j,
-	            type: 'TABLE',
-	            value: makeFvarInstance(fvar.instances[j], fvar.axes, names)
-	        });
+	        result.fields = result.fields.concat(makeFvarInstance(j, fvar.instances[j], fvar.axes, names));
 	    }
 	
 	    return result;
