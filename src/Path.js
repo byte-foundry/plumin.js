@@ -18,7 +18,7 @@ Object.defineProperties(proto, {
 	lastNode: Object.getOwnPropertyDescriptor( proto, 'lastSegment' )
 });
 
-proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
+proto._updateData = function( data, pushSimple, pushBezier ) {
 	if ( this.visible === false || this.curves.length === 0) {
 		return data;
 	}
@@ -27,6 +27,7 @@ proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 	var reverse = this.exportReversed,
 		curves = this.curves,
 		length = curves.length,
+		matrix = this.globalMatrix,
 		start =
 			curves[ reverse ? length - 1 : 0 ][ 'point' + ( reverse ? 2 : 1 ) ]
 				.transform( matrix );
@@ -89,10 +90,9 @@ proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
 	return data;
 };
 
-proto.updateOTCommands = function( data, matrix ) {
+proto.updateOTCommands = function( data ) {
 	return this._updateData(
 		data,
-		matrix,
 		function pushSimple() {
 			data.commands.push({
 				type: arguments[0],
@@ -114,10 +114,9 @@ proto.updateOTCommands = function( data, matrix ) {
 	);
 };
 
-proto.updateSVGData = function( data, matrix ) {
+proto.updateSVGData = function( data ) {
 	return this._updateData(
 		data,
-		matrix,
 		function pushSimple() {
 			data.push.apply( data, arguments );
 		},

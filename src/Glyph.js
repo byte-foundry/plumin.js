@@ -183,19 +183,17 @@ Glyph.prototype.updateSVGData = function( path ) {
 	return this.svgData;
 };
 
-Glyph.prototype.updateOTCommands = function( path ) {
+Glyph.prototype.updateOTCommands = function( path, shouldMerge ) {
 	if ( !path ) {
 		this.ot.path.commands = [];
 		path = this.ot.path;
 	}
 
-/* eslint-disable */
-	this.children[0].updateOTCommands( path );
+	this.children[0].updateOTCommands( path, shouldMerge );
 
 	this.children[1].children.forEach(function( component ) {
-		component.updateOTCommands( path );
+		component.updateOTCommands( path, shouldMerge );
 	});
-/* eslint-enable */
 
 	return this.ot;
 };

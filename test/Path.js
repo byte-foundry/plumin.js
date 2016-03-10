@@ -46,11 +46,12 @@ describe('Path', function() {
 		it('should return an array with pseudo-svg commands - closed path',
 			function() {
 				var data = [],
-					result = closedPath._updateData(data,
-						null,
+					result = closedPath._updateData(
+						data,
 						function() {
 							data.push.apply(data, arguments);
-						}, function() {
+						},
+						function() {
 							data.push.apply(data, arguments);
 						}
 					);
@@ -70,11 +71,12 @@ describe('Path', function() {
 		it('should return an array with pseudo-svg commands - open path',
 			function() {
 				var data = [],
-					result = openPath._updateData(data,
-						null,
+					result = openPath._updateData(
+						data,
 						function() {
 							data.push.apply(data, arguments);
-						}, function() {
+						},
+						function() {
 							data.push.apply(data, arguments);
 						}
 					);
@@ -92,11 +94,12 @@ describe('Path', function() {
 		it('should return an array with pseudo-svg commands - circle',
 			function() {
 				var data = [],
-					result = circle._updateData(data,
-						null,
+					result = circle._updateData(
+						data,
 						function() {
 							data.push.apply(data, arguments);
-						}, function() {
+						},
+						function() {
 							data.push.apply(data, arguments);
 						}
 					);
@@ -119,11 +122,12 @@ describe('Path', function() {
 				circle.exportReversed = true;
 
 				var data = [],
-					result = circle._updateData(data,
-						null,
+					result = circle._updateData(
+						data,
 						function() {
 							data.push.apply(data, arguments);
-						}, function() {
+						},
+						function() {
 							data.push.apply(data, arguments);
 						}
 					);

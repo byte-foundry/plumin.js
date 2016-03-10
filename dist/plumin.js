@@ -21103,11 +21103,11 @@ return /******/ (function(modules) { // webpackBootstrap
 		return this;
 	};
 	
-	Font.prototype.updateOTCommands = function( set, merged ) {
+	Font.prototype.updateOTCommands = function( set, shouldMerge ) {
 		return this.updateOT({
 			set: set,
 			shouldUpdateCommands: true,
-			merged: merged
+			shouldMerge: shouldMerge
 		});
 	};
 	
@@ -21122,7 +21122,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		this.ot.glyphs.glyphs = (
 			this.getGlyphSubset( args && args.set ).reduce(function(o, glyph, i) {
 				o[i] = args && args.shouldUpdateCommands ?
-					glyph.updateOTCommands( null, args && args.merged ) :
+					glyph.updateOTCommands( null, args && args.shouldMerge ) :
 					glyph.ot;
 				return o;
 			}, {})
@@ -21456,19 +21456,17 @@ return /******/ (function(modules) { // webpackBootstrap
 		return this.svgData;
 	};
 	
-	Glyph.prototype.updateOTCommands = function( path ) {
+	Glyph.prototype.updateOTCommands = function( path, shouldMerge ) {
 		if ( !path ) {
 			this.ot.path.commands = [];
 			path = this.ot.path;
 		}
 	
-	/* eslint-disable */
-		this.children[0].updateOTCommands( path );
+		this.children[0].updateOTCommands( path, shouldMerge );
 	
 		this.children[1].children.forEach(function( component ) {
-			component.updateOTCommands( path );
+			component.updateOTCommands( path, shouldMerge );
 		});
-	/* eslint-enable */
 	
 		return this.ot;
 	};
@@ -21583,21 +21581,35 @@ return /******/ (function(modules) { // webpackBootstrap
 		}
 	
 		this.children.forEach(function( contour ) {
-			contour.updateSVGData( path, contour.globalMatrix );
+			contour.updateSVGData( path );
 		}, this);
 	
 		return this.svgData;
 	};
 	
-	Outline.prototype.updateOTCommands = function( path ) {
+	Outline.prototype.updateOTCommands = function( path, shouldMerge ) {
 		if ( !path ) {
 			this.ot.path.commands = [];
 			path = this.ot.path;
 		}
 	
-		this.children.forEach(function( contour ) {
-			contour.updateOTCommands( path, contour.globalMatrix );
-		}, this);
+		if ( shouldMerge ) {
+			var merged = this.children.reduce(function( merged, contour ) {
+				if ( !merged ) {
+					return contour;
+				}
+	
+				return contour
+	
+			}, null).bind(this);
+	
+			merged.updateOTCommands( path );
+	
+		} else {
+			this.children.forEach(function( contour ) {
+				contour.updateOTCommands( path );
+			}).bind(this);
+		}
 	
 		return this.ot;
 	};
@@ -21681,7 +21693,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		lastNode: Object.getOwnPropertyDescriptor( proto, 'lastSegment' )
 	});
 	
-	proto._updateData = function( data, matrix, pushSimple, pushBezier ) {
+	proto._updateData = function( data, pushSimple, pushBezier ) {
 		if ( this.visible === false || this.curves.length === 0) {
 			return data;
 		}
@@ -21690,6 +21702,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		var reverse = this.exportReversed,
 			curves = this.curves,
 			length = curves.length,
+			matrix = this.globalMatrix,
 			start =
 				curves[ reverse ? length - 1 : 0 ][ 'point' + ( reverse ? 2 : 1 ) ]
 					.transform( matrix );
@@ -21752,10 +21765,9 @@ return /******/ (function(modules) { // webpackBootstrap
 		return data;
 	};
 	
-	proto.updateOTCommands = function( data, matrix ) {
+	proto.updateOTCommands = function( data ) {
 		return this._updateData(
 			data,
-			matrix,
 			function pushSimple() {
 				data.commands.push({
 					type: arguments[0],
@@ -21777,10 +21789,9 @@ return /******/ (function(modules) { // webpackBootstrap
 		);
 	};
 	
-	proto.updateSVGData = function( data, matrix ) {
+	proto.updateSVGData = function( data ) {
 		return this._updateData(
 			data,
-			matrix,
 			function pushSimple() {
 				data.push.apply( data, arguments );
 			},

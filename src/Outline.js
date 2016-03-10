@@ -54,21 +54,35 @@ Outline.prototype.updateSVGData = function( path ) {
 	}
 
 	this.children.forEach(function( contour ) {
-		contour.updateSVGData( path, contour.globalMatrix );
+		contour.updateSVGData( path );
 	}, this);
 
 	return this.svgData;
 };
 
-Outline.prototype.updateOTCommands = function( path ) {
+Outline.prototype.updateOTCommands = function( path, shouldMerge ) {
 	if ( !path ) {
 		this.ot.path.commands = [];
 		path = this.ot.path;
 	}
 
-	this.children.forEach(function( contour ) {
-		contour.updateOTCommands( path, contour.globalMatrix );
-	}, this);
+	if ( shouldMerge ) {
+		var merged = this.children.reduce(function( merged, contour ) {
+			if ( !merged ) {
+				return contour;
+			}
+
+			return contour
+
+		}, null).bind(this);
+
+		merged.updateOTCommands( path );
+
+	} else {
+		this.children.forEach(function( contour ) {
+			contour.updateOTCommands( path );
+		}).bind(this);
+	}
 
 	return this.ot;
 };
