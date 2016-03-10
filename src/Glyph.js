@@ -212,7 +212,7 @@ Glyph.prototype.importOT = function( otGlyph ) {
 		switch ( command.type ) {
 			case 'M':
 				current = new paper.Path();
-				this.contours.addChildren( current );
+				this.children[0].addChild( current );
 
 				current.moveTo( command );
 				break;
@@ -242,7 +242,7 @@ Glyph.prototype.importOT = function( otGlyph ) {
 				}
 				break;
 		}
-	}, this);
+	}.bind(this));
 
 	return this;
 };

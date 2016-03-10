@@ -88,24 +88,24 @@
 				<textarea id="editor" class="editor">
 (function(p) {
 
-var font = p.Font({
+var font = new p.Font({
 		familyName: 'Demo',
 		ascender: 800,
 		descender: -200
 	}),
 
 	// glyphs
-	A = p.Glyph({
+	A = new p.Glyph({
 		name: 'A',
 		unicode: 'A',
 		advanceWidth: 512
 	}),
-	B = p.Glyph({
+	B = new p.Glyph({
 		name: 'B',
 		unicode: 'B',
 		advanceWidth: 512
 	}),
-	C = p.Glyph({
+	C = new p.Glyph({
 		name: 'C',
 		unicode: 'C',
 		advanceWidth: 512
@@ -114,12 +114,12 @@ var font = p.Font({
 	counter;
 
 // A contours
-shape = p.Path.RegularPolygon({
+shape = new p.Path.RegularPolygon({
 	center: [256, 136],
 	sides: 3,
 	radius: 256
 });
-counter = p.Path.RegularPolygon({
+counter = new p.Path.RegularPolygon({
 	center: [256, 61],
 	sides: 3,
 	radius: 256
@@ -130,31 +130,31 @@ A.addContour(shape.subtract(counter));
 A.scale(1,2, [256, 0]);
 
 // B contours
-shape = p.Path.Rectangle({
+shape = new p.Path.Rectangle({
 	point: [0, 0],
 	size: [450, 450]
 });
-counter = p.Path.Rectangle({
+counter = new p.Path.Rectangle({
 	point: [40, 40],
 	size: [370, 370]
 });
 B.addContour(shape.subtract(counter));
-shape = p.Path.Rectangle({
+shape = new p.Path.Rectangle({
 	point: [0, 410],
 	size: [340, 340]
 });
-counter = p.Path.Rectangle({
+counter = new p.Path.Rectangle({
 	point: [40, 450],
 	size: [260, 260]
 });
 B.addContour(shape.subtract(counter));
 
 // C contours
-shape = p.Path.Ellipse({
+shape = new p.Path.Ellipse({
 	point: [0, 0],
 	size: [520, 800]
 });
-counter = p.Path.Ellipse({
+counter = new p.Path.Ellipse({
 	point: [40, 40],
 	size: [440, 720]
 });
@@ -165,9 +165,9 @@ counter = new p.Path.Rectangle({
 });
 C.addContour(shape.subtract(counter));
 
-this.font = font.addGlyphs([ A, B, C ])
-	.updateOTCommands()
-	.addToFonts();
+this.font = font.addGlyphs([ A, B, C ]);
+font.updateOTCommands();
+font.addToFonts();
 
 /*
 // animation is only fluid in Chrome and Firefox
@@ -177,8 +177,8 @@ this.onFrame = function() {
 	B.rotate(-3, center);
 	C.rotate(3, center);
 
-	font.updateOTCommands()
-		.addToFonts();
+	font.updateOTCommands();
+	font.addToFonts();
 };
 */
 

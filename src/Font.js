@@ -352,7 +352,8 @@ if ( typeof window === 'object' && window.document ) {
 				}.bind(this));
 
 		} else {
-			triggerDownload( this, arrayBuffer, name.family + ' ' + name.style);
+			triggerDownload(
+				this, arrayBuffer, name && ( name.family + ' ' + name.style ) );
 		}
 
 		return this;
