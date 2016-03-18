@@ -21121,9 +21121,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		this.ot.glyphs.glyphs = (
 			this.getGlyphSubset( args && args.set ).reduce(function(o, glyph, i) {
-				o[i] = args && args.shouldUpdateCommands ?
-					glyph.updateOTCommands( null, args && args.shouldMerge ) :
-					glyph.ot;
+				if ( args && args.shouldUpdateCommands ) {
+					o[i] = args.shouldMerge ?
+						glyph.mergeOTCommands( null ) :
+						glyph.updateOTCommands( null );
+				} else {
+					o[i] = glyph.ot;
+				}
+	
 				return o;
 			}, {})
 		);
@@ -21456,20 +21461,53 @@ return /******/ (function(modules) { // webpackBootstrap
 		return this.svgData;
 	};
 	
-	Glyph.prototype.updateOTCommands = function( path, shouldMerge ) {
+	Glyph.prototype.updateOTCommands = function( path ) {
 		if ( !path ) {
 			this.ot.path.commands = [];
 			path = this.ot.path;
 		}
 	
-		this.children[0].updateOTCommands( path, shouldMerge );
+		this.children[0].updateOTCommands( path );
 	
 		this.children[1].children.forEach(function( component ) {
-			component.updateOTCommands( path, shouldMerge );
+			component.updateOTCommands( path );
 		});
 	
 		return this.ot;
 	};
+	
+	Glyph.prototype.mergeOTCommands = function( path ) {
+		if ( !path ) {
+			this.ot.path.commands = [];
+			path = this.ot.path;
+		}
+	
+		var merged = this.combineTo( new Outline() );
+		if ( merged ) {
+			merged.updateOTCommands( path );
+		}
+	
+		return this.ot;
+	};
+	
+	Glyph.prototype.combineTo = function( outline ) {
+		if ( !outline ) {
+			outline = new Outline();
+		}
+	
+		this.children[0].combineTo( outline );
+	
+		return this.children[1].children.reduce(function( outline, component ) {
+			// start by combining the component itself
+			var componentOutline = new Outline();
+			component.combineTo( componentOutline );
+	
+			// and then combine it to the rest of the glyph
+			componentOutline.combineTo( outline );
+	
+			return outline;
+		}, outline);
+	}
 	
 	Glyph.prototype.importOT = function( otGlyph ) {
 		var current;
@@ -21528,7 +21566,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	var paper = __webpack_require__(32);
 	
 	function Outline() {
-		paper.CompoundPath.prototype.constructor.apply( this );
+		paper.CompoundPath.prototype.constructor.apply( this, arguments );
 	}
 	
 	// inehrit CompoundPath
@@ -21587,32 +21625,60 @@ return /******/ (function(modules) { // webpackBootstrap
 		return this.svgData;
 	};
 	
-	Outline.prototype.updateOTCommands = function( path, shouldMerge ) {
+	Outline.prototype.updateOTCommands = function( path ) {
 		if ( !path ) {
 			this.ot.path.commands = [];
 			path = this.ot.path;
 		}
 	
-		if ( shouldMerge ) {
-			var merged = this.children.reduce(function( merged, contour ) {
-				if ( !merged ) {
-					return contour;
-				}
-	
-				return contour
-	
-			}, null).bind(this);
-	
-			merged.updateOTCommands( path );
-	
-		} else {
-			this.children.forEach(function( contour ) {
-				contour.updateOTCommands( path );
-			}).bind(this);
-		}
+		this.children.forEach(function( contour ) {
+			contour.updateOTCommands( path );
+		}.bind(this));
 	
 		return this.ot;
 	};
+	
+	Outline.prototype.combineTo = function( outline ) {
+		if ( !outline ) {
+			outline = new Outline();
+		}
+	
+		return this.children.reduce(function( outlineSum, path ) {
+			if ( path.curves.length === 0 || !path.closed || !outlineSum.closed ) {
+				return outlineSum;
+			}
+	
+			return outlineSum[
+				path.clockwise === !(path.exportReversed) ? 'unite' : 'subtract'
+			]( path );
+		}, outline);
+	};
+	
+	// Outline.prototype.combinePaths = function( outline ) {
+	// 	if ( !outline ) {
+	// 		outline = new Outline();
+	// 	}
+	// 	var isMergedClockwise;
+	//
+	// 	return this.children.reduce(function( merged, path ) {
+	// 		// invisible paths (such as skeletons) should be ignored
+	// 		if ( path.visible === false ) {
+	// 			return merged;
+	// 		}
+	//
+	// 		// first iteration
+	// 		if ( !merged ) {
+	// 			isMergedClockwise = path.clockwise === !(path.exportReversed);
+	// 			return path;
+	// 		}
+	//
+	// 		var isPathClockwise = path.clockwise === !(path.exportReversed);
+	// 		return merged[
+	// 			isMergedClockwise === isPathClockwise ? 'unite' : 'subtract'
+	// 		]( path );
+	//
+	// 	}, null);
+	// };
 	
 	module.exports = Outline;
 

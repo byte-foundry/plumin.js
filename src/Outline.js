@@ -1,7 +1,7 @@
 var paper = require('paper');
 
 function Outline() {
-	paper.CompoundPath.prototype.constructor.apply( this );
+	paper.CompoundPath.prototype.constructor.apply( this, arguments );
 }
 
 // inehrit CompoundPath
@@ -60,31 +60,59 @@ Outline.prototype.updateSVGData = function( path ) {
 	return this.svgData;
 };
 
-Outline.prototype.updateOTCommands = function( path, shouldMerge ) {
+Outline.prototype.updateOTCommands = function( path ) {
 	if ( !path ) {
 		this.ot.path.commands = [];
 		path = this.ot.path;
 	}
 
-	if ( shouldMerge ) {
-		var merged = this.children.reduce(function( merged, contour ) {
-			if ( !merged ) {
-				return contour;
-			}
-
-			return contour
-
-		}, null).bind(this);
-
-		merged.updateOTCommands( path );
-
-	} else {
-		this.children.forEach(function( contour ) {
-			contour.updateOTCommands( path );
-		}).bind(this);
-	}
+	this.children.forEach(function( contour ) {
+		contour.updateOTCommands( path );
+	}.bind(this));
 
 	return this.ot;
 };
+
+Outline.prototype.combineTo = function( outline ) {
+	if ( !outline ) {
+		outline = new Outline();
+	}
+
+	return this.children.reduce(function( outlineSum, path ) {
+		if ( path.curves.length === 0 || !path.closed || !outlineSum.closed ) {
+			return outlineSum;
+		}
+
+		return outlineSum[
+			path.clockwise === !(path.exportReversed) ? 'unite' : 'subtract'
+		]( path );
+	}, outline);
+};
+
+// Outline.prototype.combinePaths = function( outline ) {
+// 	if ( !outline ) {
+// 		outline = new Outline();
+// 	}
+// 	var isMergedClockwise;
+//
+// 	return this.children.reduce(function( merged, path ) {
+// 		// invisible paths (such as skeletons) should be ignored
+// 		if ( path.visible === false ) {
+// 			return merged;
+// 		}
+//
+// 		// first iteration
+// 		if ( !merged ) {
+// 			isMergedClockwise = path.clockwise === !(path.exportReversed);
+// 			return path;
+// 		}
+//
+// 		var isPathClockwise = path.clockwise === !(path.exportReversed);
+// 		return merged[
+// 			isMergedClockwise === isPathClockwise ? 'unite' : 'subtract'
+// 		]( path );
+//
+// 	}, null);
+// };
 
 module.exports = Outline;

@@ -183,20 +183,53 @@ Glyph.prototype.updateSVGData = function( path ) {
 	return this.svgData;
 };
 
-Glyph.prototype.updateOTCommands = function( path, shouldMerge ) {
+Glyph.prototype.updateOTCommands = function( path ) {
 	if ( !path ) {
 		this.ot.path.commands = [];
 		path = this.ot.path;
 	}
 
-	this.children[0].updateOTCommands( path, shouldMerge );
+	this.children[0].updateOTCommands( path );
 
 	this.children[1].children.forEach(function( component ) {
-		component.updateOTCommands( path, shouldMerge );
+		component.updateOTCommands( path );
 	});
 
 	return this.ot;
 };
+
+Glyph.prototype.mergeOTCommands = function( path ) {
+	if ( !path ) {
+		this.ot.path.commands = [];
+		path = this.ot.path;
+	}
+
+	var merged = this.combineTo( new Outline() );
+	if ( merged ) {
+		merged.updateOTCommands( path );
+	}
+
+	return this.ot;
+};
+
+Glyph.prototype.combineTo = function( outline ) {
+	if ( !outline ) {
+		outline = new Outline();
+	}
+
+	this.children[0].combineTo( outline );
+
+	return this.children[1].children.reduce(function( outline, component ) {
+		// start by combining the component itself
+		var componentOutline = new Outline();
+		component.combineTo( componentOutline );
+
+		// and then combine it to the rest of the glyph
+		componentOutline.combineTo( outline );
+
+		return outline;
+	}, outline);
+}
 
 Glyph.prototype.importOT = function( otGlyph ) {
 	var current;

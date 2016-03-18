@@ -218,9 +218,14 @@ Font.prototype.updateOT = function( args ) {
 
 	this.ot.glyphs.glyphs = (
 		this.getGlyphSubset( args && args.set ).reduce(function(o, glyph, i) {
-			o[i] = args && args.shouldUpdateCommands ?
-				glyph.updateOTCommands( null, args && args.shouldMerge ) :
-				glyph.ot;
+			if ( args && args.shouldUpdateCommands ) {
+				o[i] = args.shouldMerge ?
+					glyph.mergeOTCommands( null ) :
+					glyph.updateOTCommands( null );
+			} else {
+				o[i] = glyph.ot;
+			}
+
 			return o;
 		}, {})
 	);
