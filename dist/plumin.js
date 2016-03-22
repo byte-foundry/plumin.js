@@ -21123,7 +21123,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			this.getGlyphSubset( args && args.set ).reduce(function(o, glyph, i) {
 				if ( args && args.shouldUpdateCommands ) {
 					o[i] = args.shouldMerge ?
-						glyph.mergeOTCommands( null ) :
+						glyph.combineOTCommands( null ) :
 						glyph.updateOTCommands( null );
 				} else {
 					o[i] = glyph.ot;
@@ -21476,15 +21476,15 @@ return /******/ (function(modules) { // webpackBootstrap
 		return this.ot;
 	};
 	
-	Glyph.prototype.mergeOTCommands = function( path ) {
+	Glyph.prototype.combineOTCommands = function( path ) {
 		if ( !path ) {
 			this.ot.path.commands = [];
 			path = this.ot.path;
 		}
 	
-		var merged = this.combineTo( new Outline() );
-		if ( merged ) {
-			merged.updateOTCommands( path );
+		var combined = this.combineTo( new Outline() );
+		if ( combined ) {
+			combined.updateOTCommands( path );
 		}
 	
 		return this.ot;
@@ -21495,19 +21495,15 @@ return /******/ (function(modules) { // webpackBootstrap
 			outline = new Outline();
 		}
 	
-		this.children[0].combineTo( outline );
+		outline = this.children[0].combineTo( outline );
 	
 		return this.children[1].children.reduce(function( outline, component ) {
-			// start by combining the component itself
-			var componentOutline = new Outline();
-			component.combineTo( componentOutline );
-	
 			// and then combine it to the rest of the glyph
-			componentOutline.combineTo( outline );
+			component.combineTo( outline );
 	
 			return outline;
 		}, outline);
-	}
+	};
 	
 	Glyph.prototype.importOT = function( otGlyph ) {
 		var current;
@@ -21565,13 +21561,15 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	var paper = __webpack_require__(32);
 	
-	function Outline() {
-		paper.CompoundPath.prototype.constructor.apply( this, arguments );
-	}
+	var Outline = paper.CompoundPath;
 	
-	// inehrit CompoundPath
-	Outline.prototype = Object.create(paper.CompoundPath.prototype);
-	Outline.prototype.constructor = Outline;
+	// function Outline() {
+	// 	paper.CompoundPath.prototype.constructor.apply( this, arguments );
+	// }
+	//
+	// // inehrit CompoundPath
+	// Outline.prototype = Object.create(paper.CompoundPath.prototype);
+	// Outline.prototype.constructor = Outline;
 	
 	// Fix two problems with CompoundPath#insertChildren:
 	// - it arbitrarily changes the direction of paths
@@ -21639,46 +21637,28 @@ return /******/ (function(modules) { // webpackBootstrap
 	};
 	
 	Outline.prototype.combineTo = function( outline ) {
-		if ( !outline ) {
-			outline = new Outline();
-		}
-	
-		return this.children.reduce(function( outlineSum, path ) {
-			if ( path.curves.length === 0 || !path.closed || !outlineSum.closed ) {
-				return outlineSum;
+		return this.children.reduce(function( reducing, path ) {
+			// ignore empty and open paths
+			if ( path.curves.length === 0 || !path.closed ) {
+				return reducing;
 			}
 	
-			return outlineSum[
-				path.clockwise === !(path.exportReversed) ? 'unite' : 'subtract'
-			]( path );
+			var tmp = ( reducing == undefined  ?
+				// when the initial value doesn't exist, use the first path
+				// (clone it otherwise it's removed from this.children)
+				path.clone( false ) :
+				reducing[
+					path.clockwise === !(path.exportReversed) ? 'unite' : 'subtract'
+				]( path )
+			);
+	
+			return ( tmp.constructor === paper.Path ?
+				new paper.CompoundPath({ children: [ tmp ] }) :
+				tmp
+			);
+	
 		}, outline);
 	};
-	
-	// Outline.prototype.combinePaths = function( outline ) {
-	// 	if ( !outline ) {
-	// 		outline = new Outline();
-	// 	}
-	// 	var isMergedClockwise;
-	//
-	// 	return this.children.reduce(function( merged, path ) {
-	// 		// invisible paths (such as skeletons) should be ignored
-	// 		if ( path.visible === false ) {
-	// 			return merged;
-	// 		}
-	//
-	// 		// first iteration
-	// 		if ( !merged ) {
-	// 			isMergedClockwise = path.clockwise === !(path.exportReversed);
-	// 			return path;
-	// 		}
-	//
-	// 		var isPathClockwise = path.clockwise === !(path.exportReversed);
-	// 		return merged[
-	// 			isMergedClockwise === isPathClockwise ? 'unite' : 'subtract'
-	// 		]( path );
-	//
-	// 	}, null);
-	// };
 	
 	module.exports = Outline;
 

@@ -220,7 +220,7 @@ Font.prototype.updateOT = function( args ) {
 		this.getGlyphSubset( args && args.set ).reduce(function(o, glyph, i) {
 			if ( args && args.shouldUpdateCommands ) {
 				o[i] = args.shouldMerge ?
-					glyph.mergeOTCommands( null ) :
+					glyph.combineOTCommands( null ) :
 					glyph.updateOTCommands( null );
 			} else {
 				o[i] = glyph.ot;

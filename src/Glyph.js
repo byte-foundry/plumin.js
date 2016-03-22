@@ -198,15 +198,15 @@ Glyph.prototype.updateOTCommands = function( path ) {
 	return this.ot;
 };
 
-Glyph.prototype.mergeOTCommands = function( path ) {
+Glyph.prototype.combineOTCommands = function( path ) {
 	if ( !path ) {
 		this.ot.path.commands = [];
 		path = this.ot.path;
 	}
 
-	var merged = this.combineTo( new Outline() );
-	if ( merged ) {
-		merged.updateOTCommands( path );
+	var combined = this.combineTo( new Outline() );
+	if ( combined ) {
+		combined.updateOTCommands( path );
 	}
 
 	return this.ot;
@@ -217,19 +217,15 @@ Glyph.prototype.combineTo = function( outline ) {
 		outline = new Outline();
 	}
 
-	this.children[0].combineTo( outline );
+	outline = this.children[0].combineTo( outline );
 
 	return this.children[1].children.reduce(function( outline, component ) {
-		// start by combining the component itself
-		var componentOutline = new Outline();
-		component.combineTo( componentOutline );
-
 		// and then combine it to the rest of the glyph
-		componentOutline.combineTo( outline );
+		component.combineTo( outline );
 
 		return outline;
 	}, outline);
-}
+};
 
 Glyph.prototype.importOT = function( otGlyph ) {
 	var current;

@@ -1,12 +1,14 @@
 var paper = require('paper');
 
-function Outline() {
-	paper.CompoundPath.prototype.constructor.apply( this, arguments );
-}
+var Outline = paper.CompoundPath;
 
-// inehrit CompoundPath
-Outline.prototype = Object.create(paper.CompoundPath.prototype);
-Outline.prototype.constructor = Outline;
+// function Outline() {
+// 	paper.CompoundPath.prototype.constructor.apply( this, arguments );
+// }
+//
+// // inehrit CompoundPath
+// Outline.prototype = Object.create(paper.CompoundPath.prototype);
+// Outline.prototype.constructor = Outline;
 
 // Fix two problems with CompoundPath#insertChildren:
 // - it arbitrarily changes the direction of paths
@@ -74,45 +76,27 @@ Outline.prototype.updateOTCommands = function( path ) {
 };
 
 Outline.prototype.combineTo = function( outline ) {
-	if ( !outline ) {
-		outline = new Outline();
-	}
-
-	return this.children.reduce(function( outlineSum, path ) {
-		if ( path.curves.length === 0 || !path.closed || !outlineSum.closed ) {
-			return outlineSum;
+	return this.children.reduce(function( reducing, path ) {
+		// ignore empty and open paths
+		if ( path.curves.length === 0 || !path.closed ) {
+			return reducing;
 		}
 
-		return outlineSum[
-			path.clockwise === !(path.exportReversed) ? 'unite' : 'subtract'
-		]( path );
+		var tmp = ( reducing == undefined  ?
+			// when the initial value doesn't exist, use the first path
+			// (clone it otherwise it's removed from this.children)
+			path.clone( false ) :
+			reducing[
+				path.clockwise === !(path.exportReversed) ? 'unite' : 'subtract'
+			]( path )
+		);
+
+		return ( tmp.constructor === paper.Path ?
+			new paper.CompoundPath({ children: [ tmp ] }) :
+			tmp
+		);
+
 	}, outline);
 };
-
-// Outline.prototype.combinePaths = function( outline ) {
-// 	if ( !outline ) {
-// 		outline = new Outline();
-// 	}
-// 	var isMergedClockwise;
-//
-// 	return this.children.reduce(function( merged, path ) {
-// 		// invisible paths (such as skeletons) should be ignored
-// 		if ( path.visible === false ) {
-// 			return merged;
-// 		}
-//
-// 		// first iteration
-// 		if ( !merged ) {
-// 			isMergedClockwise = path.clockwise === !(path.exportReversed);
-// 			return path;
-// 		}
-//
-// 		var isPathClockwise = path.clockwise === !(path.exportReversed);
-// 		return merged[
-// 			isMergedClockwise === isPathClockwise ? 'unite' : 'subtract'
-// 		]( path );
-//
-// 	}, null);
-// };
 
 module.exports = Outline;
