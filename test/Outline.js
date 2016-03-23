@@ -149,7 +149,9 @@ describe('Node', function() {
 
 			var combined = outline.combineTo();
 
-			expect(combined.children.length).to.equal(2);
+			expect(combined.children).to.have.length(2);
+			expect(combined.children[0].clockwise).to.be.true;
+			expect(combined.children[1].clockwise).to.be.false;
 		});
 	});
 
