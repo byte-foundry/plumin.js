@@ -1,12 +1,14 @@
 var paper = require('paper');
 
-function Outline() {
-	paper.CompoundPath.prototype.constructor.apply( this );
-}
+var Outline = paper.CompoundPath;
 
-// inehrit CompoundPath
-Outline.prototype = Object.create(paper.CompoundPath.prototype);
-Outline.prototype.constructor = Outline;
+// function Outline() {
+// 	paper.CompoundPath.prototype.constructor.apply( this, arguments );
+// }
+//
+// // inehrit CompoundPath
+// Outline.prototype = Object.create(paper.CompoundPath.prototype);
+// Outline.prototype.constructor = Outline;
 
 // Fix two problems with CompoundPath#insertChildren:
 // - it arbitrarily changes the direction of paths
@@ -60,31 +62,41 @@ Outline.prototype.updateSVGData = function( path ) {
 	return this.svgData;
 };
 
-Outline.prototype.updateOTCommands = function( path, shouldMerge ) {
+Outline.prototype.updateOTCommands = function( path ) {
 	if ( !path ) {
 		this.ot.path.commands = [];
 		path = this.ot.path;
 	}
 
-	if ( shouldMerge ) {
-		var merged = this.children.reduce(function( merged, contour ) {
-			if ( !merged ) {
-				return contour;
-			}
-
-			return contour
-
-		}, null).bind(this);
-
-		merged.updateOTCommands( path );
-
-	} else {
-		this.children.forEach(function( contour ) {
-			contour.updateOTCommands( path );
-		}).bind(this);
-	}
+	this.children.forEach(function( contour ) {
+		contour.updateOTCommands( path );
+	}.bind(this));
 
 	return this.ot;
+};
+
+Outline.prototype.combineTo = function( outline ) {
+	return this.children.reduce(function( reducing, path ) {
+		// ignore empty and open paths
+		if ( path.curves.length === 0 || !path.closed ) {
+			return reducing;
+		}
+
+		var tmp = ( reducing == undefined  ?
+			// when the initial value doesn't exist, use the first path
+			// (clone it otherwise it's removed from this.children)
+			path.clone( false ) :
+			reducing[
+				path.clockwise === !(path.exportReversed) ? 'unite' : 'subtract'
+			]( path )
+		);
+
+		return ( tmp.constructor === paper.Path ?
+			new paper.CompoundPath({ children: [ tmp ] }) :
+			tmp
+		);
+
+	}, outline);
 };
 
 module.exports = Outline;
