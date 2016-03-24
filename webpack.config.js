@@ -6,7 +6,7 @@ module.exports = {
 		path: path.join(__dirname, 'dist'),
 		filename: 'plumin.js',
 		library: 'plumin',
-        libraryTarget: 'umd',
+		libraryTarget: 'umd',
 	},
 	resolve: {
 		alias: {

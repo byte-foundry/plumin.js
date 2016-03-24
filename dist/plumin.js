@@ -6858,7 +6858,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 *
 	 * All rights reserved.
 	 *
-	 * Date: Thu Mar 17 14:15:28 2016 +0100
+	 * Date: Thu Mar 24 14:28:41 2016 +0100
 	 *
 	 ***
 	 *
@@ -21302,9 +21302,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		var a = document.createElement('a');
 	
-		var triggerDownload = function( font, arrayBuffer, filename ) {
+		Font.prototype.download = function( arrayBuffer, name ) {
 			var reader = new FileReader();
-			var enFamilyName = filename || font.ot.getEnglishName('fontFamily');
+			var enFamilyName = typeof name === 'object' ?
+				name.family + ' ' + name.style :
+				name || this.ot.getEnglishName('fontFamily');
 	
 			reader.onloadend = function() {
 				a.download = enFamilyName + '.otf';
@@ -21318,32 +21320,9 @@ return /******/ (function(modules) { // webpackBootstrap
 			};
 	
 			reader.readAsDataURL(new Blob(
-				[ new DataView( arrayBuffer || font.toArrayBuffer() ) ],
+				[ new DataView( arrayBuffer || this.toArrayBuffer() ) ],
 				{ type: 'font/opentype' }
 			));
-		};
-	
-		Font.prototype.download = function( arrayBuffer, merged, name, user ) {
-			if ( merged ) {
-				// TODO: replace that with client-side font merging
-				fetch('http://fontforgeconv.cloudapp.net/' +
-					name.family + '/' +
-					name.style + '/' + user, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/otf' },
-						body: arrayBuffer
-					})
-					.then(function( response ) {
-						return response.arrayBuffer();
-					})
-					.then(function( bufferToDownload ) {
-						triggerDownload( this, bufferToDownload );
-					}.bind(this));
-	
-			} else {
-				triggerDownload(
-					this, arrayBuffer, name && ( name.family + ' ' + name.style ) );
-			}
 	
 			return this;
 		};
