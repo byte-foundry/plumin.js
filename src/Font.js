@@ -318,11 +318,9 @@ if ( typeof window === 'object' && window.document ) {
 
 	var a = document.createElement('a');
 
-	Font.prototype.download = function( arrayBuffer, name ) {
+	var triggerDownload = function( font, arrayBuffer, filename ) {
 		var reader = new FileReader();
-		var enFamilyName = typeof name === 'object' ?
-			name.family + ' ' + name.style :
-			name || this.ot.getEnglishName('fontFamily');
+		var enFamilyName = filename || font.ot.getEnglishName('fontFamily');
 
 		reader.onloadend = function() {
 			a.download = enFamilyName + '.otf';
@@ -336,9 +334,32 @@ if ( typeof window === 'object' && window.document ) {
 		};
 
 		reader.readAsDataURL(new Blob(
-			[ new DataView( arrayBuffer || this.toArrayBuffer() ) ],
+			[ new DataView( arrayBuffer || font.toArrayBuffer() ) ],
 			{ type: 'font/opentype' }
 		));
+	};
+
+	Font.prototype.download = function( arrayBuffer, merged, name, user ) {
+		if ( merged ) {
+			// TODO: replace that with client-side font merging
+			fetch('https://merge.prototypo.io/' +
+				name.family + '/' +
+				name.style + '/' + user, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/otf' },
+					body: arrayBuffer
+			})
+			.then(function( response ) {
+				return response.arrayBuffer();
+			})
+			.then(function( bufferToDownload ) {
+				triggerDownload( this, bufferToDownload );
+			}.bind(this));
+
+		} else {
+			triggerDownload(
+				this, arrayBuffer, name && ( name.family + ' ' + name.style ) );
+		}
 
 		return this;
 	};
