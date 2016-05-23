@@ -1,0 +1,25 @@
+<html>
+	<head>
+		<meta charset="utf-8">
+		<!-- encoding must be set for mocha's special characters to render properly -->
+		<link rel="stylesheet" href="node_modules/mocha/mocha.css" />
+	</head>
+	<body>
+		<div id="mocha"></div>
+		<script src="node_modules/mocha/mocha.js"></script>
+		<script src="node_modules/chai/chai.js"></script>
+		<script>
+			mocha.ui('bdd');
+			expect = chai.expect;
+		</script>
+		<script src="dist/plumin.js"></script>
+		<script src="test/Font.js"></script>
+		<script src="test/Glyph.js"></script>
+		<script src="test/Node.js"></script>
+		<script src="test/Outline.js"></script>
+		<script src="test/Path.js"></script>
+		<script>
+			mocha.run();
+		</script>
+	</body>
+</html>

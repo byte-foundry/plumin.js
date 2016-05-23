@@ -1,7 +1,7 @@
 /* Extend the Path prototype to add OpenType conversion
  * and alias *segments methods and properties to *nodes
  */
-var paper = require('../node_modules/paper/dist/paper-core.js');
+var paper = require('paper');
 
 var proto = paper.PaperScope.prototype.Path.prototype;
 
@@ -19,36 +19,69 @@ Object.defineProperties(proto, {
 });
 
 proto._updateData = function( data, pushSimple, pushBezier ) {
-	if ( this.visible === false ) {
+	if ( this.visible === false || this.curves.length === 0) {
 		return data;
 	}
 
+	// prototypo needs to be able to change the direction of the updated data.
+	var reverse = this.exportReversed,
+		curves = this.curves,
+		length = curves.length,
+		matrix = this.globalMatrix,
+		start =
+			curves[ reverse ? length - 1 : 0 ][ 'point' + ( reverse ? 2 : 1 ) ]
+				.transform( matrix );
+
 	pushSimple(
 		'M',
-		Math.round( this.curves[0].point1.x ) || 0,
-		Math.round( this.curves[0].point1.y ) || 0
+		Math.round( start.x ) || 0,
+		Math.round( start.y ) || 0
 	);
 
-	this.curves.forEach(function( curve ) {
-		if ( curve.isLinear() ) {
+	for ( var i = -1, l = curves.length; ++i < l; ) {
+		var curve = curves[ reverse ? l - 1 - i : i ],
+			end = curve['point' + ( reverse ? 1 : 2 ) ].transform( matrix );
+
+		if ( curve.isStraight() ) {
 			pushSimple(
 				'L',
-				Math.round( curve.point2.x ) || 0,
-				Math.round( curve.point2.y ) || 0
+				Math.round( end.x ) || 0,
+				Math.round( end.y ) || 0
 			);
 
 		} else {
-			pushBezier(
-				'C',
-				Math.round( curve.point1.x + curve.handle1.x ) || 0,
-				Math.round( curve.point1.y + curve.handle1.y ) || 0,
-				Math.round( curve.point2.x + curve.handle2.x ) || 0,
-				Math.round( curve.point2.y + curve.handle2.y ) || 0,
-				Math.round( curve.point2.x ) || 0,
-				Math.round( curve.point2.y ) || 0
-			);
+			var ctrl1 = new paper.Point(
+					curve.point1.x + curve.handle1.x,
+					curve.point1.y + curve.handle1.y
+				).transform( matrix ),
+				ctrl2 = new paper.Point(
+					curve.point2.x + curve.handle2.x,
+					curve.point2.y + curve.handle2.y
+				).transform( matrix );
+
+			if ( reverse ) {
+				pushBezier(
+					'C',
+					Math.round( ctrl2.x ) || 0,
+					Math.round( ctrl2.y ) || 0,
+					Math.round( ctrl1.x ) || 0,
+					Math.round( ctrl1.y ) || 0,
+					Math.round( end.x ) || 0,
+					Math.round( end.y ) || 0
+				);
+			} else {
+				pushBezier(
+					'C',
+					Math.round( ctrl1.x ) || 0,
+					Math.round( ctrl1.y ) || 0,
+					Math.round( ctrl2.x ) || 0,
+					Math.round( ctrl2.y ) || 0,
+					Math.round( end.x ) || 0,
+					Math.round( end.y ) || 0
+				);
+			}
 		}
-	});
+	}
 
 	if ( this.closed ) {
 		pushSimple('Z');

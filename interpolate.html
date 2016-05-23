@@ -151,7 +151,9 @@ Amazingly few discotheques provide jukeboxes
 				);
 
 				worker.onmessage = function(e) {
-					font.addToFonts( lastBuffer = e.data );
+					console.log(e);
+					lastBuffer = e.data;
+					font.addToFonts( lastBuffer );
 				};
 			}
 
@@ -192,7 +194,7 @@ Amazingly few discotheques provide jukeboxes
 		</script>
 
 		<script id="workerscript" type="text/workerscript">
-			var window = self,
+			var otFont,
 				otFont0,
 				otFont1,
 				font,
@@ -205,6 +207,7 @@ Amazingly few discotheques provide jukeboxes
 			// You wouldn't use inline workers and this trick in prod, though.
 			PLUMINSOURCE
 
+			plumin.paper.install(this);
 			plumin.paper.setup({
 				width: 1024,
 				height: 1024
@@ -212,7 +215,7 @@ Amazingly few discotheques provide jukeboxes
 
 			// Overwrite addToFonts to send the buffer over to the UI
 			plumin.paper.Font.prototype.addToFonts = function() {
-				var buffer = this.ot.toBuffer();
+				var buffer = this.ot.toArrayBuffer();
 				postMessage( buffer, [buffer] );
 			};
 
@@ -226,13 +229,14 @@ Amazingly few discotheques provide jukeboxes
 						return;
 					}
 
+					otFont = plumin.opentype.parse( data[0] );
 					otFont0 = plumin.opentype.parse( data[0] );
 					otFont1 = plumin.opentype.parse( data[1] );
 
 					font = new plumin.paper.Font();
 					// save default encoding
 					var encoding = font.ot.encoding;
-					font.importOT( otFont0 );
+					font.importOT( otFont );
 					font.ot.familyName = 'Demo';
 					font.ot.encoding = encoding;
 
@@ -248,18 +252,18 @@ Amazingly few discotheques provide jukeboxes
 				// parse incoming subset
 				case 'string':
 					// TODO: optimize to only interpolate new glyphs added to the subset
-					font.subset = data.split('');
-					font.interpolate(font0, font1, coef)
-						.updateOTCommands()
-						.addToFonts();
+					font.subset = data;
+					font.interpolate(font0, font1, coef);
+					font.updateOTCommands();
+					font.addToFonts();
 					break;
 
 				// parse incoming interpolation coef
 				case 'number':
 					coef = data;
-					font.interpolate(font0, font1, coef)
-						.updateOTCommands()
-						.addToFonts();
+					font.interpolate(font0, font1, coef);
+					font.updateOTCommands();
+					font.addToFonts();
 					break;
 				}
 			};

@@ -1,6 +1,8 @@
+# this forces Travis to use its new docker infrastructure
+sudo: false
 language: node_js
 node_js:
-- 'iojs'
+- 'v4.2.3'
 before_script:
 - npm install
 after_script:

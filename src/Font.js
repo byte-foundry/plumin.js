@@ -1,65 +1,66 @@
-var opentype = require('../node_modules/opentype.js/dist/opentype.js'),
-	Glyph = require('./Glyph.js');
+var opentype = require('opentype.js'),
+	paper = require('paper'),
+	Glyph = require('./Glyph.js'),
+	assign = require('es6-object-assign').assign;
 
 function Font( args ) {
-	if ( !args ) {
-		args = {};
-	}
+	paper.Group.prototype.constructor.apply( this );
 
-	if ( !args.styleName ) {
-		args.styleName = 'Regular';
-	}
+	args = assign({
+		familyName: 'Default familyName',
+		styleName: 'Regular',
+		ascender: 1,
+		descender: -1,
+		unitsPerEm: 1024
+	}, args);
 
-	if ( !args.unitsPerEm ) {
-		args.unitsPerEm = 1024;
-	}
+	this.fontinfo = this.ot = new opentype.Font( args );
 
-	this.ot = new opentype.Font( args );
-
-	this.glyphs = [];
 	this.glyphMap = {};
 	this.charMap = {};
 	this.altMap = {};
 	this._subset = false;
+	this.fontMap = {};
 
 	this.addGlyph(new Glyph({
 		name: '.notdef',
-		unicode: 0
+		unicode: 0,
+		advanceWidth: 650
 	}));
 
 	if ( args && args.glyphs ) {
 		this.addGlyphs( args.glyphs );
 	}
 
-	if ( typeof window === 'object' && window.document ) {
-		// work around https://bugzilla.mozilla.org/show_bug.cgi?id=1100005
-		// by using fonts.delete in batch, every 1 second
-		if ( document.fonts ) {
-			this.addedFonts = [];
-
-			setInterval(function() {
-				while ( this.addedFonts.length > 1 ) {
-					document.fonts.delete( this.addedFonts.shift() );
-				}
-			}.bind(this), 1000);
-
-		} else {
-			document.head.appendChild(
-				this.styleElement = document.createElement('style')
-			);
-			// let's find the corresponding CSSStyleSheet
-			// (would be much easier with Array#find)
-			this.styleSheet = document.styleSheets[
-				[].map.call(document.styleSheets, function(ss) {
-					return ss.ownerNode;
-				}).indexOf(this.styleElement)
-			];
-		}
+	if ( typeof window === 'object' && window.document && !document.fonts ) {
+		document.head.appendChild(
+			this.styleElement = document.createElement('style')
+		);
+		// let's find the corresponding CSSStyleSheet
+		// (would be much easier with Array#find)
+		this.styleSheet = document.styleSheets[
+			[].map.call(document.styleSheets, function(ss) {
+				return ss.ownerNode;
+			}).indexOf(this.styleElement)
+		];
 	}
 }
 
+Font.prototype = Object.create(paper.Group.prototype);
+Font.prototype.constructor = Font;
+
+// proxy .glyphs to .children
+// TODO: handle unicode updates
+Object.defineProperty(
+	Font.prototype,
+	'glyphs',
+	Object.getOwnPropertyDescriptor( paper.Item.prototype, 'children' )
+);
+
+// TODO: proper proxying of ...Glyph[s] methods to ...Child[ren] methods
+// see Glyph.js
 Font.prototype.addGlyph = function( glyph ) {
-	this.glyphs.push( glyph );
+	this.addChild( glyph );
 	this.glyphMap[glyph.name] = glyph;
 
 	if ( glyph.ot.unicode === undefined ) {
@@ -98,57 +99,70 @@ Font.prototype.addGlyphs = function( glyphs ) {
 
 Object.defineProperty( Font.prototype, 'subset', {
 	get: function() {
+		if ( !this._subset ) {
+			this._subset = this.normalizeSubset( false );
+		}
 		return this._subset;
 	},
 	set: function( set ) {
-		this._subset = set === false ?
-			false : Font.normalizeSubset( set );
-
-		return this._subset;
+		this._subset = this.normalizeSubset( set );
 	}
 });
 
-Font.prototype.getGlyphSubset = function( set ) {
-	if ( set === true ) {
-		return this.glyphs;
+Font.prototype.normalizeSubset = function( _set ) {
+	var set;
+
+	// two cases where _set isn't an array
+	// false set = all glyphs in the charMap
+	if ( _set === false ) {
+		set = Object.keys( this.charMap ).map(function( unicode ) {
+			return this.charMap[unicode];
+		}.bind(this));
+
+	// convert string to array of chars
+	} else if ( typeof _set === 'string' ) {
+		set = _set.split('').map(function(e) {
+			return e.charCodeAt(0);
+		});
+
+	} else {
+		set = _set;
 	}
 
-	set = set !== undefined ?
-		Font.normalizeSubset( set ) :
-		this._subset;
-
-	// reuse last subset if possible
-	// TODO: implement caching using immutable.js
-	if ( this._lastSubset &&
-			this._lastSubset[0] === ( this._subset || [] ).join() ) {
-
-		return this._lastSubset[1];
+	// convert array of number to array of glyphs
+	if ( Array.isArray( set ) && typeof set[0] === 'number' ) {
+		set = set.map(function( unicode ) {
+			return this.charMap[ unicode ];
+		}.bind(this));
 	}
 
-	// memoize last subset
-	this._lastSubset = [
-		( this._subset || [] ).join(),
-		this.glyphs.filter(function( glyph ) {
-			if ( this._subset === false &&
-					( glyph.ot.unicode !== undefined ||
-					( glyph.ot.unicodes && glyph.ot.unicodes.length ) ) ) {
+	// always include .undef
+	if ( set.indexOf( this.glyphMap['.notdef'] ) === -1 ) {
+		set.unshift( this.glyphMap['.notdef'] );
+	}
 
-				return true;
+	// when encountering diacritics, include their base-glyph in the subset
+	set.forEach(function( glyph ) {
+		if ( glyph && glyph.base !== undefined ) {
+			var base = this.charMap[ glyph.base ];
+			if ( set.indexOf( base ) === -1 ) {
+				set.unshift( base );
 			}
+		}
+	}, this);
 
-			if ( this._subset &&
-					this._subset.indexOf( glyph.ot.unicode ) !== -1 ) {
+	// remove undefined glyphs, dedupe the set and move diacritics at the end
+	return set.filter(function(e, i, arr) {
+		return e && arr.lastIndexOf(e) === i;
+	});
+};
 
-				return true;
-			}
+Font.prototype.getGlyphSubset = function( _set ) {
+	return _set !== undefined ? this.normalizeSubset( _set ) : this.subset;
+};
 
-			// TODO: handle multiple unicodes
-			return false;
-
-		}, this)
-	];
-
-	return this._lastSubset[1];
+Font.prototype.setAlternateFor = function( unicode, glyphName ) {
+	this.charMap[ unicode ] = this.glyphMap[ glyphName ];
 };
 
 Font.prototype.interpolate = function( font0, font1, coef, set ) {
@@ -186,18 +200,54 @@ Font.prototype.updateSVGData = function( set ) {
 	return this;
 };
 
-Font.prototype.updateOTCommands = function( set ) {
-	this.ot.glyphs = this.getGlyphSubset( set ).map(function( glyph ) {
-		return glyph.updateOTCommands();
+Font.prototype.updateOTCommands = function( set, shouldMerge ) {
+	return this.updateOT({
+		set: set,
+		shouldUpdateCommands: true,
+		shouldMerge: shouldMerge
 	});
+};
 
+Font.prototype.updateOT = function( args ) {
+	if ( args && args.shouldUpdateCommands ) {
+		// the following is required so that the globalMatrix of glyphs
+		// is taken into account on each update. I assume this is done in the
+		// main thread when calling view.update();
+		this._project._updateVersion++;
+	}
+
+	this.ot.glyphs.glyphs = (
+		this.getGlyphSubset( args && args.set ).reduce(function(o, glyph, i) {
+			if ( args && args.shouldUpdateCommands ) {
+				o[i] = args.shouldMerge ?
+					glyph.combineOTCommands( null ) :
+					glyph.updateOTCommands( null );
+			} else {
+				o[i] = glyph.ot;
+			}
+
+			return o;
+		}, {})
+	);
+	this.ot.glyphs.length = Object.keys(this.ot.glyphs.glyphs).length;
 	return this;
 };
+
+Font.prototype.toArrayBuffer = function() {
+	// rewrite the postScriptName to remove invalid characters
+	// TODO: this should be fixed in opentype.js
+	this.ot.names.postScriptName.en = (
+		this.ot.names.postScriptName.en.replace(/[^A-z]/g, '_')
+	);
+
+	return this.ot.toArrayBuffer();
+}
 
 Font.prototype.importOT = function( otFont ) {
 	this.ot = otFont;
 
-	otFont.glyphs.forEach(function( otGlyph ) {
+	for ( var i = 0; i < otFont.glyphs.length; ++i ) {
+		var otGlyph = otFont.glyphs.get(i);
 		var glyph = new Glyph({
 				name: otGlyph.name,
 				unicode: otGlyph.unicode
@@ -205,8 +255,7 @@ Font.prototype.importOT = function( otFont ) {
 
 		this.addGlyph( glyph );
 		glyph.importOT( otGlyph );
-
-	}, this);
+	}
 
 	return this;
 };
@@ -216,21 +265,38 @@ if ( typeof window === 'object' && window.document ) {
 	var _URL = window.URL || window.webkitURL;
 	Font.prototype.addToFonts = document.fonts ?
 		// CSS font loading, lightning fast
-		function( buffer ) {
-			var fontface = new window.FontFace(
-				this.ot.familyName,
-				buffer || this.ot.toBuffer()
+		function( buffer, enFamilyName ) {
+			if ( !enFamilyName ) {
+				enFamilyName = this.ot.getEnglishName('fontFamily');
+			}
+
+			if ( this.fontMap[ enFamilyName ] ) {
+				document.fonts.delete( this.fontMap[ enFamilyName ] );
+			}
+
+			var fontface = this.fontMap[ enFamilyName ] = (
+				new window.FontFace(
+					enFamilyName,
+					buffer || this.toArrayBuffer()
+				)
 			);
 
+			if ( fontface.status === 'error' ) {
+				throw new Error('Fontface is invalid and cannot be displayed');
+			}
+
 			document.fonts.add( fontface );
-			this.addedFonts.push( fontface );
 
 			return this;
 		} :
-		function( buffer ) {
+		function( buffer, enFamilyName ) {
+			if ( !enFamilyName ) {
+				enFamilyName = this.ot.getEnglishName('fontFamily');
+			}
+
 			var url = _URL.createObjectURL(
 					new Blob(
-						[ new DataView( buffer || this.ot.toBuffer() ) ],
+						[ new DataView( buffer || this.toArrayBuffer() ) ],
 						{ type: 'font/opentype' }
 					)
 				);
@@ -241,7 +307,7 @@ if ( typeof window === 'object' && window.document ) {
 			}
 
 			this.styleSheet.insertRule(
-				'@font-face { font-family: "' + this.ot.familyName + '";' +
+				'@font-face { font-family: "' + enFamilyName + '";' +
 				'src: url(' + url + '); }',
 				0
 			);
@@ -250,34 +316,54 @@ if ( typeof window === 'object' && window.document ) {
 			return this;
 		};
 
-	Font.prototype.download = function( buffer ) {
+	var a = document.createElement('a');
+
+	var triggerDownload = function( font, arrayBuffer, filename ) {
 		var reader = new FileReader();
+		var enFamilyName = filename || font.ot.getEnglishName('fontFamily');
 
 		reader.onloadend = function() {
-			window.location = reader.result;
+			a.download = enFamilyName + '.otf';
+			a.href = reader.result;
+			a.dispatchEvent(new MouseEvent('click'));
+
+			setTimeout(function() {
+				a.href = '#';
+				_URL.revokeObjectURL( reader.result );
+			}, 100);
 		};
 
 		reader.readAsDataURL(new Blob(
-			[ new DataView( buffer || this.ot.toBuffer() ) ],
+			[ new DataView( arrayBuffer || font.toArrayBuffer() ) ],
 			{ type: 'font/opentype' }
 		));
+	};
+
+	Font.prototype.download = function( arrayBuffer, merged, name, user ) {
+		if ( merged ) {
+			// TODO: replace that with client-side font merging
+			fetch('https://merge.prototypo.io/' +
+				name.family + '/' +
+				name.style + '/' + user, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/otf' },
+					body: arrayBuffer
+			})
+			.then(function( response ) {
+				return response.arrayBuffer();
+			})
+			.then(function( bufferToDownload ) {
+				triggerDownload( this, bufferToDownload );
+			}.bind(this));
+
+		} else {
+			triggerDownload(
+				this, arrayBuffer, name && ( name.family + ' ' + name.style ) );
+		}
 
 		return this;
 	};
 
 }
-
-Font.normalizeSubset = function( set ) {
-	return ( typeof set === 'string' ?
-			set.split('').map(function(e) {
-				return e.charCodeAt(0);
-			}) :
-			set
-		)
-		.filter(function(e, i, arr) {
-			return arr.lastIndexOf(e) === i;
-		})
-		.sort();
-};
 
 module.exports = Font;

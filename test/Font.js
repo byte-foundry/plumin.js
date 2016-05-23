@@ -1,11 +1,19 @@
-var expect = require('../node_modules/chai').expect,
-	plumin = require('../src/plumin');
+var noop = function() {};
 
 describe('Font', function() {
 	before(function() {
-		plumin.setup({
+		plumin.paper.install(window);
+		plumin.paper.setup({
 			width: 1024,
 			height: 1024
+		});
+	});
+
+	describe('#glyphs', function() {
+		it('should proxy #glyphs prop to its #children prop', function() {
+			var font = new plumin.Font();
+
+			expect( font.glyphs ).to.equal( font.children );
 		});
 	});
 
@@ -21,13 +29,25 @@ describe('Font', function() {
 					];
 
 				font.addGlyph({
-					name: 'A', ot: { unicode: 'A'.charCodeAt(0) }
+					name: 'A',
+					_remove: noop,
+					_setProject: noop,
+					_getOwner: noop,
+					ot: { unicode: 'A'.charCodeAt(0) }
 				});
 				font.addGlyph({
-					name: 'B', ot: { unicode: 'B'.charCodeAt(0) }
+					name: 'B',
+					_remove: noop,
+					_setProject: noop,
+					_getOwner: noop,
+					ot: { unicode: 'B'.charCodeAt(0) }
 				});
 				font.addGlyph({
-					name: 'C', ot: { unicode: 'C'.charCodeAt(0) }
+					name: 'C',
+					_remove: noop,
+					_setProject: noop,
+					_getOwner: noop,
+					ot: { unicode: 'C'.charCodeAt(0) }
 				});
 
 				expect(Object.keys( font.glyphMap )).to.deep.equal([
@@ -40,9 +60,28 @@ describe('Font', function() {
 
 		it('should handle two glyphs sharing the same unicode', function() {
 			var font = new plumin.Font(),
-				a = { name: 'A', ot: { unicode: 'A'.charCodeAt(0) }},
-				aBis = { name: 'A bis', ot: { unicode: 'A'.charCodeAt(0) }},
-				aTer = { name: 'A ter', ot: { unicode: 'A'.charCodeAt(0) }};
+				code = 'A'.charCodeAt(0),
+				a = {
+					name: 'A',
+					_remove: noop,
+					_setProject: noop,
+					_getOwner: noop,
+					ot: { unicode: code }
+				},
+				aBis = {
+					name: 'A bis',
+					_remove: noop,
+					_setProject: noop,
+					_getOwner: noop,
+					ot: { unicode: code }
+				},
+				aTer = {
+					name: 'A ter',
+					_remove: noop,
+					_setProject: noop,
+					_getOwner: noop,
+					ot: { unicode: code }
+				};
 
 			font.addGlyph(aTer);
 			font.addGlyph(aBis);
@@ -56,6 +95,133 @@ describe('Font', function() {
 				aTer, aBis, a
 			]);
 		});
+
+		it('should add glyphs to the #children prop', function() {
+			var font = new plumin.Font(),
+				glyph = new plumin.Glyph({
+					name: 'A',
+					_remove: noop,
+					_setProject: noop,
+					_getOwner: noop
+				});
+
+			// the font always has a .notdef glyph
+			expect( font.children ).to.have.length( 1 );
+			expect( font.children[0] ).to.equal( font.glyphMap['.notdef'] );
+
+			font.addGlyph( glyph );
+
+			expect( font.children ).to.have.length( 2 );
+			expect( font.children[1] ).to.equal( glyph );
+
+		});
 	});
 
+	describe('#subset', function() {
+		it('should be possible to isolate some glyphs of the font', function() {
+			var font = new plumin.Font(),
+				glyphs = font.glyphMap;
+
+			font.addGlyph({
+				name: 'A',
+				_remove: noop,
+				_setProject: noop,
+				_getOwner: noop,
+				ot: { unicode: 'A'.charCodeAt(0) }
+			});
+			font.addGlyph({
+				name: 'B',
+				_remove: noop,
+				_setProject: noop,
+				_getOwner: noop,
+				ot: { unicode: 'B'.charCodeAt(0) }
+			});
+			font.addGlyph({
+				name: 'C',
+				_remove: noop,
+				_setProject: noop,
+				_getOwner: noop,
+				ot: { unicode: 'C'.charCodeAt(0) }
+			});
+			font.addGlyph({
+				name: 'Zob',
+				_remove: noop,
+				_setProject: noop,
+				_getOwner: noop,
+				ot: { unicode: undefined }
+			});
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.B,
+				glyphs.C
+			]);
+
+			// font.subset = true;
+			//
+			// expect( font.subset ).to.have.members([
+			// 	glyphs['.notdef'],
+			// 	glyphs.A,
+			// 	glyphs.B,
+			// 	glyphs.C,
+			// 	glyphs.Zob
+			// ]);
+
+			font.subset = 'AB';
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.B
+			]);
+
+			font.subset = [ 66, 67 ];
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.B,
+				glyphs.C
+			]);
+
+			font.subset = false;
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.B,
+				glyphs.C
+			]);
+
+			font.subset = '';
+
+			expect( font.subset ).to.have.members([ glyphs['.notdef'] ]);
+
+			font.subset = [ glyphs.A, glyphs.B ];
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.B
+			]);
+
+			font.addGlyph({
+				name: 'À',
+				base: 'A'.charCodeAt(0),
+				_remove: noop,
+				_setProject: noop,
+				_getOwner: noop,
+				ot: { unicode: 'À'.charCodeAt(0) }
+			});
+
+			font.subset = 'ÀB';
+
+			expect( font.subset ).to.have.members([
+				glyphs['.notdef'],
+				glyphs.A,
+				glyphs.À,
+				glyphs.B
+			]);
+		});
+	});
 });

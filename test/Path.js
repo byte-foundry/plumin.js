@@ -1,7 +1,4 @@
-var expect = require('../node_modules/chai').expect,
-	plumin = require('../src/plumin');
-
-describe('Font', function() {
+describe('Path', function() {
 	before(function() {
 		plumin.setup({
 			width: 1024,
@@ -49,10 +46,12 @@ describe('Font', function() {
 		it('should return an array with pseudo-svg commands - closed path',
 			function() {
 				var data = [],
-					result = closedPath._updateData(data,
+					result = closedPath._updateData(
+						data,
 						function() {
 							data.push.apply(data, arguments);
-						}, function() {
+						},
+						function() {
 							data.push.apply(data, arguments);
 						}
 					);
@@ -72,10 +71,12 @@ describe('Font', function() {
 		it('should return an array with pseudo-svg commands - open path',
 			function() {
 				var data = [],
-					result = openPath._updateData(data,
+					result = openPath._updateData(
+						data,
 						function() {
 							data.push.apply(data, arguments);
-						}, function() {
+						},
+						function() {
 							data.push.apply(data, arguments);
 						}
 					);
@@ -93,10 +94,12 @@ describe('Font', function() {
 		it('should return an array with pseudo-svg commands - circle',
 			function() {
 				var data = [],
-					result = circle._updateData(data,
+					result = circle._updateData(
+						data,
 						function() {
 							data.push.apply(data, arguments);
-						}, function() {
+						},
+						function() {
 							data.push.apply(data, arguments);
 						}
 					);
@@ -107,6 +110,34 @@ describe('Font', function() {
 					'C', 75, 100, 100, 75, 100, 50,
 					'C', 100, 25, 75, 0, 50, 0,
 					'C', 25, 0, 0, 25, 0, 50,
+					'Z'
+				]);
+
+			}
+		);
+
+		it('should return an array with pseudo-svg commands' +
+			' - exportReversed circle',
+			function() {
+				circle.exportReversed = true;
+
+				var data = [],
+					result = circle._updateData(
+						data,
+						function() {
+							data.push.apply(data, arguments);
+						},
+						function() {
+							data.push.apply(data, arguments);
+						}
+					);
+
+				expect(result).to.deep.equal([
+					'M', 0, 50,
+					'C', 0, 25, 25, 0, 50, 0,
+					'C', 75, 0, 100, 25, 100, 50,
+					'C', 100, 75, 75, 100, 50, 100,
+					'C', 25, 100, 0, 75, 0, 50,
 					'Z'
 				]);
 
