@@ -355,11 +355,13 @@ if ( typeof window === 'object' && window.document ) {
 			return response.arrayBuffer();
 		})
 		.then(function( bufferToDownload ) {
-			if( merged ) {
+			if ( merged ) {
 				triggerDownload( this, bufferToDownload );
 			} else {
 				triggerDownload(
-					this, arrayBuffer, name && ( name.family + ' ' + name.style ) );
+					this,
+					arrayBuffer,
+					name && ( name.family + ' ' + name.style ) );
 			}
 		}.bind(this));
 
