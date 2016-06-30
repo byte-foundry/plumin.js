@@ -21526,7 +21526,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			this.ot.advanceWidth = value;
 		},
 		get: function() {
-			return this.ot.advanceWidth || 0;
+			return this.ot.advanceWidth;
 		}
 	});
 	
