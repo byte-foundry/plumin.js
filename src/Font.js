@@ -340,6 +340,12 @@ if ( typeof window === 'object' && window.document ) {
 	};
 
 	Font.prototype.download = function( arrayBuffer, merged, name, user ) {
+		if ( !merged ) {
+			triggerDownload(
+				this,
+				arrayBuffer,
+				name && ( name.family + ' ' + name.style ) );
+		}
 		// TODO: replace that with client-side font merging
 		fetch('http://localhost:3000/' +
 			name.family + '/' +
@@ -357,11 +363,6 @@ if ( typeof window === 'object' && window.document ) {
 		.then(function( bufferToDownload ) {
 			if ( merged ) {
 				triggerDownload( this, bufferToDownload );
-			} else {
-				triggerDownload(
-					this,
-					arrayBuffer,
-					name && ( name.family + ' ' + name.style ) );
 			}
 		}.bind(this));
 
