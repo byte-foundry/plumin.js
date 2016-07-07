@@ -340,26 +340,31 @@ if ( typeof window === 'object' && window.document ) {
 	};
 
 	Font.prototype.download = function( arrayBuffer, merged, name, user ) {
-		if ( merged ) {
-			// TODO: replace that with client-side font merging
-			fetch('https://merge.prototypo.io/' +
-				name.family + '/' +
-				name.style + '/' + user, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/otf' },
-					body: arrayBuffer
-			})
-			.then(function( response ) {
-				return response.arrayBuffer();
-			})
-			.then(function( bufferToDownload ) {
-				triggerDownload( this, bufferToDownload );
-			}.bind(this));
-
-		} else {
+		if ( !merged ) {
 			triggerDownload(
-				this, arrayBuffer, name && ( name.family + ' ' + name.style ) );
+				this,
+				arrayBuffer,
+				name && ( name.family + ' ' + name.style ) );
 		}
+		// TODO: replace that with client-side font merging
+		fetch('http://localhost:3000/' +
+			name.family + '/' +
+			name.style + '/' +
+			user +
+			(name.template ? '/' + name.template : '') +
+			(merged ? '/overlap' : ''), {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/otf' },
+				body: arrayBuffer
+		})
+		.then(function( response ) {
+			return response.arrayBuffer();
+		})
+		.then(function( bufferToDownload ) {
+			if ( merged ) {
+				triggerDownload( this, bufferToDownload );
+			}
+		}.bind(this));
 
 		return this;
 	};

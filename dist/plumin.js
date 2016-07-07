@@ -258,66 +258,66 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var tableEntry = tableEntries[i];
 	        var table;
 	        switch (tableEntry.tag) {
-	            case 'cmap':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.cmap = cmap.parse(table.data, table.offset);
-	                font.encoding = new encoding.CmapEncoding(font.tables.cmap);
-	                break;
-	            case 'fvar':
-	                fvarTableEntry = tableEntry;
-	                break;
-	            case 'head':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.head = head.parse(table.data, table.offset);
-	                font.unitsPerEm = font.tables.head.unitsPerEm;
-	                indexToLocFormat = font.tables.head.indexToLocFormat;
-	                break;
-	            case 'hhea':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.hhea = hhea.parse(table.data, table.offset);
-	                font.ascender = font.tables.hhea.ascender;
-	                font.descender = font.tables.hhea.descender;
-	                font.numberOfHMetrics = font.tables.hhea.numberOfHMetrics;
-	                break;
-	            case 'hmtx':
-	                hmtxTableEntry = tableEntry;
-	                break;
-	            case 'ltag':
-	                table = uncompressTable(data, tableEntry);
-	                ltagTable = ltag.parse(table.data, table.offset);
-	                break;
-	            case 'maxp':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.maxp = maxp.parse(table.data, table.offset);
-	                font.numGlyphs = font.tables.maxp.numGlyphs;
-	                break;
-	            case 'name':
-	                nameTableEntry = tableEntry;
-	                break;
-	            case 'OS/2':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.os2 = os2.parse(table.data, table.offset);
-	                break;
-	            case 'post':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.post = post.parse(table.data, table.offset);
-	                font.glyphNames = new encoding.GlyphNames(font.tables.post);
-	                break;
-	            case 'glyf':
-	                glyfTableEntry = tableEntry;
-	                break;
-	            case 'loca':
-	                locaTableEntry = tableEntry;
-	                break;
-	            case 'CFF ':
-	                cffTableEntry = tableEntry;
-	                break;
-	            case 'kern':
-	                kernTableEntry = tableEntry;
-	                break;
-	            case 'GPOS':
-	                gposTableEntry = tableEntry;
-	                break;
+	        case 'cmap':
+	            table = uncompressTable(data, tableEntry);
+	            font.tables.cmap = cmap.parse(table.data, table.offset);
+	            font.encoding = new encoding.CmapEncoding(font.tables.cmap);
+	            break;
+	        case 'fvar':
+	            fvarTableEntry = tableEntry;
+	            break;
+	        case 'head':
+	            table = uncompressTable(data, tableEntry);
+	            font.tables.head = head.parse(table.data, table.offset);
+	            font.unitsPerEm = font.tables.head.unitsPerEm;
+	            indexToLocFormat = font.tables.head.indexToLocFormat;
+	            break;
+	        case 'hhea':
+	            table = uncompressTable(data, tableEntry);
+	            font.tables.hhea = hhea.parse(table.data, table.offset);
+	            font.ascender = font.tables.hhea.ascender;
+	            font.descender = font.tables.hhea.descender;
+	            font.numberOfHMetrics = font.tables.hhea.numberOfHMetrics;
+	            break;
+	        case 'hmtx':
+	            hmtxTableEntry = tableEntry;
+	            break;
+	        case 'ltag':
+	            table = uncompressTable(data, tableEntry);
+	            ltagTable = ltag.parse(table.data, table.offset);
+	            break;
+	        case 'maxp':
+	            table = uncompressTable(data, tableEntry);
+	            font.tables.maxp = maxp.parse(table.data, table.offset);
+	            font.numGlyphs = font.tables.maxp.numGlyphs;
+	            break;
+	        case 'name':
+	            nameTableEntry = tableEntry;
+	            break;
+	        case 'OS/2':
+	            table = uncompressTable(data, tableEntry);
+	            font.tables.os2 = os2.parse(table.data, table.offset);
+	            break;
+	        case 'post':
+	            table = uncompressTable(data, tableEntry);
+	            font.tables.post = post.parse(table.data, table.offset);
+	            font.glyphNames = new encoding.GlyphNames(font.tables.post);
+	            break;
+	        case 'glyf':
+	            glyfTableEntry = tableEntry;
+	            break;
+	        case 'loca':
+	            locaTableEntry = tableEntry;
+	            break;
+	        case 'CFF ':
+	            cffTableEntry = tableEntry;
+	            break;
+	        case 'kern':
+	            kernTableEntry = tableEntry;
+	            break;
+	        case 'GPOS':
+	            gposTableEntry = tableEntry;
+	            break;
 	        }
 	    }
 	
@@ -375,17 +375,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	        if (err) {
 	            return callback(err);
 	        }
-	        var font;
-	        try {
-	            font = parseBuffer(arrayBuffer);
-	        } catch (e) {
-	            return callback(e, null);
-	        }
+	
+	        var font = parseBuffer(arrayBuffer);
 	        return callback(null, font);
 	    });
 	}
 	
-	// Synchronously load the font from a URL or file.
+	// Syncronously load the font from a URL or file.
 	// When done, return the font object or throw an error.
 	function loadSync(url) {
 	    var fs = __webpack_require__(26);
@@ -956,30 +952,30 @@ return /******/ (function(modules) { // webpackBootstrap
 	function GlyphNames(post) {
 	    var i;
 	    switch (post.version) {
-	        case 1:
-	            this.names = exports.standardNames.slice();
-	            break;
-	        case 2:
-	            this.names = new Array(post.numberOfGlyphs);
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
-	                if (post.glyphNameIndex[i] < exports.standardNames.length) {
-	                    this.names[i] = exports.standardNames[post.glyphNameIndex[i]];
-	                } else {
-	                    this.names[i] = post.names[post.glyphNameIndex[i] - exports.standardNames.length];
-	                }
+	    case 1:
+	        this.names = exports.standardNames.slice();
+	        break;
+	    case 2:
+	        this.names = new Array(post.numberOfGlyphs);
+	        for (i = 0; i < post.numberOfGlyphs; i++) {
+	            if (post.glyphNameIndex[i] < exports.standardNames.length) {
+	                this.names[i] = exports.standardNames[post.glyphNameIndex[i]];
+	            } else {
+	                this.names[i] = post.names[post.glyphNameIndex[i] - exports.standardNames.length];
 	            }
+	        }
 	
-	            break;
-	        case 2.5:
-	            this.names = new Array(post.numberOfGlyphs);
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
-	                this.names[i] = exports.standardNames[i + post.glyphNameIndex[i]];
-	            }
+	        break;
+	    case 2.5:
+	        this.names = new Array(post.numberOfGlyphs);
+	        for (i = 0; i < post.numberOfGlyphs; i++) {
+	            this.names[i] = exports.standardNames[i + post.glyphNameIndex[i]];
+	        }
 	
-	            break;
-	        case 3:
-	            this.names = [];
-	            break;
+	        break;
+	    case 3:
+	        this.names = [];
+	        break;
 	    }
 	}
 	
@@ -1073,7 +1069,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	        this.unitsPerEm = options.unitsPerEm || 1000;
 	        this.ascender = options.ascender;
 	        this.descender = options.descender;
-	        this.createdTimestamp = options.createdTimestamp;
 	        this.tables = { os2: {
 	            usWeightClass: options.weightClass || this.usWeightClasses.MEDIUM,
 	            usWidthClass: options.widthClass || this.usWidthClasses.MEDIUM,
@@ -1732,15 +1727,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var glyph = font.glyphs.get(i);
 	        var unicode = glyph.unicode | 0;
 	
-	        if (isNaN(glyph.advanceWidth)) {
-	            throw new Error('Glyph ' + glyph.name + ' (' + i + '): advanceWidth is not a number.');
+	        if (typeof glyph.advanceWidth === 'undefined') {
+	            throw new Error('Glyph ' + glyph.name + ' (' + i + '): advanceWidth is required.');
 	        }
 	
-	        if (firstCharIndex > unicode || firstCharIndex === undefined) {
-	            // ignore .notdef char
-	            if (unicode > 0) {
-	                firstCharIndex = unicode;
-	            }
+	        if (firstCharIndex > unicode || firstCharIndex === null) {
+	            firstCharIndex = unicode;
 	        }
 	
 	        if (lastCharIndex < unicode) {
@@ -1792,8 +1784,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        yMin: globals.yMin,
 	        xMax: globals.xMax,
 	        yMax: globals.yMax,
-	        lowestRecPPEM: 3,
-	        createdTimestamp: font.createdTimestamp
+	        lowestRecPPEM: 3
 	    });
 	
 	    var hheaTable = hhea.make({
@@ -2092,9 +2083,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	sizeOf.UFWORD = sizeOf.USHORT;
 	
 	// FIXME Implement LONGDATETIME
-	// Convert a 32-bit Apple Mac timestamp integer to a list of 8 bytes, 64-bit timestamp.
-	encode.LONGDATETIME = function(v) {
-	    return [0, 0, 0, 0, (v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
+	encode.LONGDATETIME = function() {
+	    return [0, 0, 0, 0, 0, 0, 0, 0];
 	};
 	
 	sizeOf.LONGDATETIME = constant(8);
@@ -3006,12 +2996,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	// LONGDATETIME is a 64-bit integer.
 	// JavaScript and unix timestamps traditionally use 32 bits, so we
 	// only take the last 32 bits.
-	// + Since until 2038 those bits will be filled by zeros we can ignore them.
 	Parser.prototype.parseLongDateTime = function() {
 	    var v = exports.getULong(this.data, this.offset + this.relativeOffset + 4);
-	    // Substract seconds between 01/01/1904 and 01/01/1970
-	    // to convert Apple Mac timstamp to Standard Unix timestamp
-	    v -= 2082844800;
 	    this.relativeOffset += 8;
 	    return v;
 	};
@@ -3468,221 +3454,57 @@ return /******/ (function(modules) { // webpackBootstrap
 	            var v = code[i];
 	            i += 1;
 	            switch (v) {
-	                case 1: // hstem
-	                    parseStems();
-	                    break;
-	                case 3: // vstem
-	                    parseStems();
-	                    break;
-	                case 4: // vmoveto
-	                    if (stack.length > 1 && !haveWidth) {
-	                        width = stack.shift() + font.nominalWidthX;
-	                        haveWidth = true;
-	                    }
+	            case 1: // hstem
+	                parseStems();
+	                break;
+	            case 3: // vstem
+	                parseStems();
+	                break;
+	            case 4: // vmoveto
+	                if (stack.length > 1 && !haveWidth) {
+	                    width = stack.shift() + font.nominalWidthX;
+	                    haveWidth = true;
+	                }
 	
-	                    y += stack.pop();
-	                    newContour(x, y);
-	                    break;
-	                case 5: // rlineto
-	                    while (stack.length > 0) {
-	                        x += stack.shift();
-	                        y += stack.shift();
-	                        p.lineTo(x, y);
-	                    }
-	
-	                    break;
-	                case 6: // hlineto
-	                    while (stack.length > 0) {
-	                        x += stack.shift();
-	                        p.lineTo(x, y);
-	                        if (stack.length === 0) {
-	                            break;
-	                        }
-	
-	                        y += stack.shift();
-	                        p.lineTo(x, y);
-	                    }
-	
-	                    break;
-	                case 7: // vlineto
-	                    while (stack.length > 0) {
-	                        y += stack.shift();
-	                        p.lineTo(x, y);
-	                        if (stack.length === 0) {
-	                            break;
-	                        }
-	
-	                        x += stack.shift();
-	                        p.lineTo(x, y);
-	                    }
-	
-	                    break;
-	                case 8: // rrcurveto
-	                    while (stack.length > 0) {
-	                        c1x = x + stack.shift();
-	                        c1y = y + stack.shift();
-	                        c2x = c1x + stack.shift();
-	                        c2y = c1y + stack.shift();
-	                        x = c2x + stack.shift();
-	                        y = c2y + stack.shift();
-	                        p.curveTo(c1x, c1y, c2x, c2y, x, y);
-	                    }
-	
-	                    break;
-	                case 10: // callsubr
-	                    codeIndex = stack.pop() + font.subrsBias;
-	                    subrCode = font.subrs[codeIndex];
-	                    if (subrCode) {
-	                        parse(subrCode);
-	                    }
-	
-	                    break;
-	                case 11: // return
-	                    return;
-	                case 12: // flex operators
-	                    v = code[i];
-	                    i += 1;
-	                    switch (v) {
-	                        case 35: // flex
-	                            // |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
-	                            c1x = x   + stack.shift();    // dx1
-	                            c1y = y   + stack.shift();    // dy1
-	                            c2x = c1x + stack.shift();    // dx2
-	                            c2y = c1y + stack.shift();    // dy2
-	                            jpx = c2x + stack.shift();    // dx3
-	                            jpy = c2y + stack.shift();    // dy3
-	                            c3x = jpx + stack.shift();    // dx4
-	                            c3y = jpy + stack.shift();    // dy4
-	                            c4x = c3x + stack.shift();    // dx5
-	                            c4y = c3y + stack.shift();    // dy5
-	                            x = c4x + stack.shift();      // dx6
-	                            y = c4y + stack.shift();      // dy6
-	                            stack.shift();                // flex depth
-	                            p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
-	                            p.curveTo(c3x, c3y, c4x, c4y, x, y);
-	                            break;
-	                        case 34: // hflex
-	                            // |- dx1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |-
-	                            c1x = x   + stack.shift();    // dx1
-	                            c1y = y;                      // dy1
-	                            c2x = c1x + stack.shift();    // dx2
-	                            c2y = c1y + stack.shift();    // dy2
-	                            jpx = c2x + stack.shift();    // dx3
-	                            jpy = c2y;                    // dy3
-	                            c3x = jpx + stack.shift();    // dx4
-	                            c3y = c2y;                    // dy4
-	                            c4x = c3x + stack.shift();    // dx5
-	                            c4y = y;                      // dy5
-	                            x = c4x + stack.shift();      // dx6
-	                            p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
-	                            p.curveTo(c3x, c3y, c4x, c4y, x, y);
-	                            break;
-	                        case 36: // hflex1
-	                            // |- dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |-
-	                            c1x = x   + stack.shift();    // dx1
-	                            c1y = y   + stack.shift();    // dy1
-	                            c2x = c1x + stack.shift();    // dx2
-	                            c2y = c1y + stack.shift();    // dy2
-	                            jpx = c2x + stack.shift();    // dx3
-	                            jpy = c2y;                    // dy3
-	                            c3x = jpx + stack.shift();    // dx4
-	                            c3y = c2y;                    // dy4
-	                            c4x = c3x + stack.shift();    // dx5
-	                            c4y = c3y + stack.shift();    // dy5
-	                            x = c4x + stack.shift();      // dx6
-	                            p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
-	                            p.curveTo(c3x, c3y, c4x, c4y, x, y);
-	                            break;
-	                        case 37: // flex1
-	                            // |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
-	                            c1x = x   + stack.shift();    // dx1
-	                            c1y = y   + stack.shift();    // dy1
-	                            c2x = c1x + stack.shift();    // dx2
-	                            c2y = c1y + stack.shift();    // dy2
-	                            jpx = c2x + stack.shift();    // dx3
-	                            jpy = c2y + stack.shift();    // dy3
-	                            c3x = jpx + stack.shift();    // dx4
-	                            c3y = jpy + stack.shift();    // dy4
-	                            c4x = c3x + stack.shift();    // dx5
-	                            c4y = c3y + stack.shift();    // dy5
-	                            if (Math.abs(c4x - x) > Math.abs(c4y - y)) {
-	                                x = c4x + stack.shift();
-	                            } else {
-	                                y = c4y + stack.shift();
-	                            }
-	
-	                            p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
-	                            p.curveTo(c3x, c3y, c4x, c4y, x, y);
-	                            break;
-	                        default:
-	                            console.log('Glyph ' + glyph.index + ': unknown operator ' + 1200 + v);
-	                            stack.length = 0;
-	                    }
-	                    break;
-	                case 14: // endchar
-	                    if (stack.length > 0 && !haveWidth) {
-	                        width = stack.shift() + font.nominalWidthX;
-	                        haveWidth = true;
-	                    }
-	
-	                    if (open) {
-	                        p.closePath();
-	                        open = false;
-	                    }
-	
-	                    break;
-	                case 18: // hstemhm
-	                    parseStems();
-	                    break;
-	                case 19: // hintmask
-	                case 20: // cntrmask
-	                    parseStems();
-	                    i += (nStems + 7) >> 3;
-	                    break;
-	                case 21: // rmoveto
-	                    if (stack.length > 2 && !haveWidth) {
-	                        width = stack.shift() + font.nominalWidthX;
-	                        haveWidth = true;
-	                    }
-	
-	                    y += stack.pop();
-	                    x += stack.pop();
-	                    newContour(x, y);
-	                    break;
-	                case 22: // hmoveto
-	                    if (stack.length > 1 && !haveWidth) {
-	                        width = stack.shift() + font.nominalWidthX;
-	                        haveWidth = true;
-	                    }
-	
-	                    x += stack.pop();
-	                    newContour(x, y);
-	                    break;
-	                case 23: // vstemhm
-	                    parseStems();
-	                    break;
-	                case 24: // rcurveline
-	                    while (stack.length > 2) {
-	                        c1x = x + stack.shift();
-	                        c1y = y + stack.shift();
-	                        c2x = c1x + stack.shift();
-	                        c2y = c1y + stack.shift();
-	                        x = c2x + stack.shift();
-	                        y = c2y + stack.shift();
-	                        p.curveTo(c1x, c1y, c2x, c2y, x, y);
-	                    }
-	
+	                y += stack.pop();
+	                newContour(x, y);
+	                break;
+	            case 5: // rlineto
+	                while (stack.length > 0) {
 	                    x += stack.shift();
 	                    y += stack.shift();
 	                    p.lineTo(x, y);
-	                    break;
-	                case 25: // rlinecurve
-	                    while (stack.length > 6) {
-	                        x += stack.shift();
-	                        y += stack.shift();
-	                        p.lineTo(x, y);
+	                }
+	
+	                break;
+	            case 6: // hlineto
+	                while (stack.length > 0) {
+	                    x += stack.shift();
+	                    p.lineTo(x, y);
+	                    if (stack.length === 0) {
+	                        break;
 	                    }
 	
+	                    y += stack.shift();
+	                    p.lineTo(x, y);
+	                }
+	
+	                break;
+	            case 7: // vlineto
+	                while (stack.length > 0) {
+	                    y += stack.shift();
+	                    p.lineTo(x, y);
+	                    if (stack.length === 0) {
+	                        break;
+	                    }
+	
+	                    x += stack.shift();
+	                    p.lineTo(x, y);
+	                }
+	
+	                break;
+	            case 8: // rrcurveto
+	                while (stack.length > 0) {
 	                    c1x = x + stack.shift();
 	                    c1y = y + stack.shift();
 	                    c2x = c1x + stack.shift();
@@ -3690,120 +3512,284 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    x = c2x + stack.shift();
 	                    y = c2y + stack.shift();
 	                    p.curveTo(c1x, c1y, c2x, c2y, x, y);
+	                }
+	
+	                break;
+	            case 10: // callsubr
+	                codeIndex = stack.pop() + font.subrsBias;
+	                subrCode = font.subrs[codeIndex];
+	                if (subrCode) {
+	                    parse(subrCode);
+	                }
+	
+	                break;
+	            case 11: // return
+	                return;
+	            case 12: // flex operators
+	                v = code[i];
+	                i += 1;
+	                switch (v) {
+	                case 35: // flex
+	                    // |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
+	                    c1x = x   + stack.shift();    // dx1
+	                    c1y = y   + stack.shift();    // dy1
+	                    c2x = c1x + stack.shift();    // dx2
+	                    c2y = c1y + stack.shift();    // dy2
+	                    jpx = c2x + stack.shift();    // dx3
+	                    jpy = c2y + stack.shift();    // dy3
+	                    c3x = jpx + stack.shift();    // dx4
+	                    c3y = jpy + stack.shift();    // dy4
+	                    c4x = c3x + stack.shift();    // dx5
+	                    c4y = c3y + stack.shift();    // dy5
+	                    x = c4x + stack.shift();      // dx6
+	                    y = c4y + stack.shift();      // dy6
+	                    stack.shift();                // flex depth
+	                    p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
+	                    p.curveTo(c3x, c3y, c4x, c4y, x, y);
 	                    break;
-	                case 26: // vvcurveto
-	                    if (stack.length % 2) {
-	                        x += stack.shift();
-	                    }
-	
-	                    while (stack.length > 0) {
-	                        c1x = x;
-	                        c1y = y + stack.shift();
-	                        c2x = c1x + stack.shift();
-	                        c2y = c1y + stack.shift();
-	                        x = c2x;
-	                        y = c2y + stack.shift();
-	                        p.curveTo(c1x, c1y, c2x, c2y, x, y);
-	                    }
-	
+	                case 34: // hflex
+	                    // |- dx1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |-
+	                    c1x = x   + stack.shift();    // dx1
+	                    c1y = y;                      // dy1
+	                    c2x = c1x + stack.shift();    // dx2
+	                    c2y = c1y + stack.shift();    // dy2
+	                    jpx = c2x + stack.shift();    // dx3
+	                    jpy = c2y;                    // dy3
+	                    c3x = jpx + stack.shift();    // dx4
+	                    c3y = c2y;                    // dy4
+	                    c4x = c3x + stack.shift();    // dx5
+	                    c4y = y;                      // dy5
+	                    x = c4x + stack.shift();      // dx6
+	                    p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
+	                    p.curveTo(c3x, c3y, c4x, c4y, x, y);
 	                    break;
-	                case 27: // hhcurveto
-	                    if (stack.length % 2) {
-	                        y += stack.shift();
-	                    }
-	
-	                    while (stack.length > 0) {
-	                        c1x = x + stack.shift();
-	                        c1y = y;
-	                        c2x = c1x + stack.shift();
-	                        c2y = c1y + stack.shift();
-	                        x = c2x + stack.shift();
-	                        y = c2y;
-	                        p.curveTo(c1x, c1y, c2x, c2y, x, y);
-	                    }
-	
+	                case 36: // hflex1
+	                    // |- dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |-
+	                    c1x = x   + stack.shift();    // dx1
+	                    c1y = y   + stack.shift();    // dy1
+	                    c2x = c1x + stack.shift();    // dx2
+	                    c2y = c1y + stack.shift();    // dy2
+	                    jpx = c2x + stack.shift();    // dx3
+	                    jpy = c2y;                    // dy3
+	                    c3x = jpx + stack.shift();    // dx4
+	                    c3y = c2y;                    // dy4
+	                    c4x = c3x + stack.shift();    // dx5
+	                    c4y = c3y + stack.shift();    // dy5
+	                    x = c4x + stack.shift();      // dx6
+	                    p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
+	                    p.curveTo(c3x, c3y, c4x, c4y, x, y);
 	                    break;
-	                case 28: // shortint
-	                    b1 = code[i];
-	                    b2 = code[i + 1];
-	                    stack.push(((b1 << 24) | (b2 << 16)) >> 16);
-	                    i += 2;
-	                    break;
-	                case 29: // callgsubr
-	                    codeIndex = stack.pop() + font.gsubrsBias;
-	                    subrCode = font.gsubrs[codeIndex];
-	                    if (subrCode) {
-	                        parse(subrCode);
+	                case 37: // flex1
+	                    // |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
+	                    c1x = x   + stack.shift();    // dx1
+	                    c1y = y   + stack.shift();    // dy1
+	                    c2x = c1x + stack.shift();    // dx2
+	                    c2y = c1y + stack.shift();    // dy2
+	                    jpx = c2x + stack.shift();    // dx3
+	                    jpy = c2y + stack.shift();    // dy3
+	                    c3x = jpx + stack.shift();    // dx4
+	                    c3y = jpy + stack.shift();    // dy4
+	                    c4x = c3x + stack.shift();    // dx5
+	                    c4y = c3y + stack.shift();    // dy5
+	                    if (Math.abs(c4x - x) > Math.abs(c4y - y)) {
+	                        x = c4x + stack.shift();
+	                    } else {
+	                        y = c4y + stack.shift();
 	                    }
 	
-	                    break;
-	                case 30: // vhcurveto
-	                    while (stack.length > 0) {
-	                        c1x = x;
-	                        c1y = y + stack.shift();
-	                        c2x = c1x + stack.shift();
-	                        c2y = c1y + stack.shift();
-	                        x = c2x + stack.shift();
-	                        y = c2y + (stack.length === 1 ? stack.shift() : 0);
-	                        p.curveTo(c1x, c1y, c2x, c2y, x, y);
-	                        if (stack.length === 0) {
-	                            break;
-	                        }
-	
-	                        c1x = x + stack.shift();
-	                        c1y = y;
-	                        c2x = c1x + stack.shift();
-	                        c2y = c1y + stack.shift();
-	                        y = c2y + stack.shift();
-	                        x = c2x + (stack.length === 1 ? stack.shift() : 0);
-	                        p.curveTo(c1x, c1y, c2x, c2y, x, y);
-	                    }
-	
-	                    break;
-	                case 31: // hvcurveto
-	                    while (stack.length > 0) {
-	                        c1x = x + stack.shift();
-	                        c1y = y;
-	                        c2x = c1x + stack.shift();
-	                        c2y = c1y + stack.shift();
-	                        y = c2y + stack.shift();
-	                        x = c2x + (stack.length === 1 ? stack.shift() : 0);
-	                        p.curveTo(c1x, c1y, c2x, c2y, x, y);
-	                        if (stack.length === 0) {
-	                            break;
-	                        }
-	
-	                        c1x = x;
-	                        c1y = y + stack.shift();
-	                        c2x = c1x + stack.shift();
-	                        c2y = c1y + stack.shift();
-	                        x = c2x + stack.shift();
-	                        y = c2y + (stack.length === 1 ? stack.shift() : 0);
-	                        p.curveTo(c1x, c1y, c2x, c2y, x, y);
-	                    }
-	
+	                    p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
+	                    p.curveTo(c3x, c3y, c4x, c4y, x, y);
 	                    break;
 	                default:
-	                    if (v < 32) {
-	                        console.log('Glyph ' + glyph.index + ': unknown operator ' + v);
-	                    } else if (v < 247) {
-	                        stack.push(v - 139);
-	                    } else if (v < 251) {
-	                        b1 = code[i];
-	                        i += 1;
-	                        stack.push((v - 247) * 256 + b1 + 108);
-	                    } else if (v < 255) {
-	                        b1 = code[i];
-	                        i += 1;
-	                        stack.push(-(v - 251) * 256 - b1 - 108);
-	                    } else {
-	                        b1 = code[i];
-	                        b2 = code[i + 1];
-	                        b3 = code[i + 2];
-	                        b4 = code[i + 3];
-	                        i += 4;
-	                        stack.push(((b1 << 24) | (b2 << 16) | (b3 << 8) | b4) / 65536);
+	                    console.log('Glyph ' + glyph.index + ': unknown operator ' + 1200 + v);
+	                    stack.length = 0;
+	                }
+	                break;
+	            case 14: // endchar
+	                if (stack.length > 0 && !haveWidth) {
+	                    width = stack.shift() + font.nominalWidthX;
+	                    haveWidth = true;
+	                }
+	
+	                if (open) {
+	                    p.closePath();
+	                    open = false;
+	                }
+	
+	                break;
+	            case 18: // hstemhm
+	                parseStems();
+	                break;
+	            case 19: // hintmask
+	            case 20: // cntrmask
+	                parseStems();
+	                i += (nStems + 7) >> 3;
+	                break;
+	            case 21: // rmoveto
+	                if (stack.length > 2 && !haveWidth) {
+	                    width = stack.shift() + font.nominalWidthX;
+	                    haveWidth = true;
+	                }
+	
+	                y += stack.pop();
+	                x += stack.pop();
+	                newContour(x, y);
+	                break;
+	            case 22: // hmoveto
+	                if (stack.length > 1 && !haveWidth) {
+	                    width = stack.shift() + font.nominalWidthX;
+	                    haveWidth = true;
+	                }
+	
+	                x += stack.pop();
+	                newContour(x, y);
+	                break;
+	            case 23: // vstemhm
+	                parseStems();
+	                break;
+	            case 24: // rcurveline
+	                while (stack.length > 2) {
+	                    c1x = x + stack.shift();
+	                    c1y = y + stack.shift();
+	                    c2x = c1x + stack.shift();
+	                    c2y = c1y + stack.shift();
+	                    x = c2x + stack.shift();
+	                    y = c2y + stack.shift();
+	                    p.curveTo(c1x, c1y, c2x, c2y, x, y);
+	                }
+	
+	                x += stack.shift();
+	                y += stack.shift();
+	                p.lineTo(x, y);
+	                break;
+	            case 25: // rlinecurve
+	                while (stack.length > 6) {
+	                    x += stack.shift();
+	                    y += stack.shift();
+	                    p.lineTo(x, y);
+	                }
+	
+	                c1x = x + stack.shift();
+	                c1y = y + stack.shift();
+	                c2x = c1x + stack.shift();
+	                c2y = c1y + stack.shift();
+	                x = c2x + stack.shift();
+	                y = c2y + stack.shift();
+	                p.curveTo(c1x, c1y, c2x, c2y, x, y);
+	                break;
+	            case 26: // vvcurveto
+	                if (stack.length % 2) {
+	                    x += stack.shift();
+	                }
+	
+	                while (stack.length > 0) {
+	                    c1x = x;
+	                    c1y = y + stack.shift();
+	                    c2x = c1x + stack.shift();
+	                    c2y = c1y + stack.shift();
+	                    x = c2x;
+	                    y = c2y + stack.shift();
+	                    p.curveTo(c1x, c1y, c2x, c2y, x, y);
+	                }
+	
+	                break;
+	            case 27: // hhcurveto
+	                if (stack.length % 2) {
+	                    y += stack.shift();
+	                }
+	
+	                while (stack.length > 0) {
+	                    c1x = x + stack.shift();
+	                    c1y = y;
+	                    c2x = c1x + stack.shift();
+	                    c2y = c1y + stack.shift();
+	                    x = c2x + stack.shift();
+	                    y = c2y;
+	                    p.curveTo(c1x, c1y, c2x, c2y, x, y);
+	                }
+	
+	                break;
+	            case 28: // shortint
+	                b1 = code[i];
+	                b2 = code[i + 1];
+	                stack.push(((b1 << 24) | (b2 << 16)) >> 16);
+	                i += 2;
+	                break;
+	            case 29: // callgsubr
+	                codeIndex = stack.pop() + font.gsubrsBias;
+	                subrCode = font.gsubrs[codeIndex];
+	                if (subrCode) {
+	                    parse(subrCode);
+	                }
+	
+	                break;
+	            case 30: // vhcurveto
+	                while (stack.length > 0) {
+	                    c1x = x;
+	                    c1y = y + stack.shift();
+	                    c2x = c1x + stack.shift();
+	                    c2y = c1y + stack.shift();
+	                    x = c2x + stack.shift();
+	                    y = c2y + (stack.length === 1 ? stack.shift() : 0);
+	                    p.curveTo(c1x, c1y, c2x, c2y, x, y);
+	                    if (stack.length === 0) {
+	                        break;
 	                    }
+	
+	                    c1x = x + stack.shift();
+	                    c1y = y;
+	                    c2x = c1x + stack.shift();
+	                    c2y = c1y + stack.shift();
+	                    y = c2y + stack.shift();
+	                    x = c2x + (stack.length === 1 ? stack.shift() : 0);
+	                    p.curveTo(c1x, c1y, c2x, c2y, x, y);
+	                }
+	
+	                break;
+	            case 31: // hvcurveto
+	                while (stack.length > 0) {
+	                    c1x = x + stack.shift();
+	                    c1y = y;
+	                    c2x = c1x + stack.shift();
+	                    c2y = c1y + stack.shift();
+	                    y = c2y + stack.shift();
+	                    x = c2x + (stack.length === 1 ? stack.shift() : 0);
+	                    p.curveTo(c1x, c1y, c2x, c2y, x, y);
+	                    if (stack.length === 0) {
+	                        break;
+	                    }
+	
+	                    c1x = x;
+	                    c1y = y + stack.shift();
+	                    c2x = c1x + stack.shift();
+	                    c2y = c1y + stack.shift();
+	                    x = c2x + stack.shift();
+	                    y = c2y + (stack.length === 1 ? stack.shift() : 0);
+	                    p.curveTo(c1x, c1y, c2x, c2y, x, y);
+	                }
+	
+	                break;
+	            default:
+	                if (v < 32) {
+	                    console.log('Glyph ' + glyph.index + ': unknown operator ' + v);
+	                } else if (v < 247) {
+	                    stack.push(v - 139);
+	                } else if (v < 251) {
+	                    b1 = code[i];
+	                    i += 1;
+	                    stack.push((v - 247) * 256 + b1 + 108);
+	                } else if (v < 255) {
+	                    b1 = code[i];
+	                    i += 1;
+	                    stack.push(-(v - 251) * 256 - b1 - 108);
+	                } else {
+	                    b1 = code[i];
+	                    b2 = code[i + 1];
+	                    b3 = code[i + 2];
+	                    b4 = code[i + 3];
+	                    i += 4;
+	                    stack.push(((b1 << 24) | (b2 << 16) | (b3 << 8) | b4) / 65536);
+	                }
 	            }
 	        }
 	    }
@@ -4335,31 +4321,26 @@ return /******/ (function(modules) { // webpackBootstrap
 	// x - Horizontal position of the glyph. (default: 0)
 	// y - Vertical position of the *baseline* of the glyph. (default: 0)
 	// fontSize - Font size, in pixels (default: 72).
-	// options - xScale and yScale to strech the glyph.
-	Glyph.prototype.getPath = function(x, y, fontSize, options) {
+	Glyph.prototype.getPath = function(x, y, fontSize) {
 	    x = x !== undefined ? x : 0;
 	    y = y !== undefined ? y : 0;
-	    options = options !== undefined ? options : {xScale: 1.0, yScale: 1.0};
 	    fontSize = fontSize !== undefined ? fontSize : 72;
 	    var scale = 1 / this.path.unitsPerEm * fontSize;
-	    var xScale = options.xScale * scale;
-	    var yScale = options.yScale * scale;
-	
 	    var p = new path.Path();
 	    var commands = this.path.commands;
 	    for (var i = 0; i < commands.length; i += 1) {
 	        var cmd = commands[i];
 	        if (cmd.type === 'M') {
-	            p.moveTo(x + (cmd.x * xScale), y + (-cmd.y * yScale));
+	            p.moveTo(x + (cmd.x * scale), y + (-cmd.y * scale));
 	        } else if (cmd.type === 'L') {
-	            p.lineTo(x + (cmd.x * xScale), y + (-cmd.y * yScale));
+	            p.lineTo(x + (cmd.x * scale), y + (-cmd.y * scale));
 	        } else if (cmd.type === 'Q') {
-	            p.quadraticCurveTo(x + (cmd.x1 * xScale), y + (-cmd.y1 * yScale),
-	                               x + (cmd.x * xScale), y + (-cmd.y * yScale));
+	            p.quadraticCurveTo(x + (cmd.x1 * scale), y + (-cmd.y1 * scale),
+	                               x + (cmd.x * scale), y + (-cmd.y * scale));
 	        } else if (cmd.type === 'C') {
-	            p.curveTo(x + (cmd.x1 * xScale), y + (-cmd.y1 * yScale),
-	                      x + (cmd.x2 * xScale), y + (-cmd.y2 * yScale),
-	                      x + (cmd.x * xScale), y + (-cmd.y * yScale));
+	            p.curveTo(x + (cmd.x1 * scale), y + (-cmd.y1 * scale),
+	                      x + (cmd.x2 * scale), y + (-cmd.y2 * scale),
+	                      x + (cmd.x * scale), y + (-cmd.y * scale));
 	        } else if (cmd.type === 'Z') {
 	            p.closePath();
 	        }
@@ -4448,9 +4429,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	// x - Horizontal position of the glyph. (default: 0)
 	// y - Vertical position of the *baseline* of the glyph. (default: 0)
 	// fontSize - Font size, in pixels (default: 72).
-	// options - xScale, yScale to strech the glyph
-	Glyph.prototype.draw = function(ctx, x, y, fontSize, options) {
-	    this.getPath(x, y, fontSize, options).draw(ctx);
+	Glyph.prototype.draw = function(ctx, x, y, fontSize) {
+	    this.getPath(x, y, fontSize).draw(ctx);
 	};
 	
 	// Draw the points of the glyph.
@@ -4606,14 +4586,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 	
 	function makeHeadTable(options) {
-	    // Apple Mac timestamp epoch is 01/01/1904 not 01/01/1970
-	    var timestamp = Math.round(new Date().getTime() / 1000) + 2082844800;
-	    var createdTimestamp = timestamp;
-	
-	    if (options.createdTimestamp) {
-	        createdTimestamp = options.createdTimestamp + 2082844800;
-	    }
-	
 	    return new table.Table('head', [
 	        {name: 'version', type: 'FIXED', value: 0x00010000},
 	        {name: 'fontRevision', type: 'FIXED', value: 0x00010000},
@@ -4621,8 +4593,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        {name: 'magicNumber', type: 'ULONG', value: 0x5F0F3CF5},
 	        {name: 'flags', type: 'USHORT', value: 0},
 	        {name: 'unitsPerEm', type: 'USHORT', value: 1000},
-	        {name: 'created', type: 'LONGDATETIME', value: createdTimestamp},
-	        {name: 'modified', type: 'LONGDATETIME', value: timestamp},
+	        {name: 'created', type: 'LONGDATETIME', value: 0},
+	        {name: 'modified', type: 'LONGDATETIME', value: 0},
 	        {name: 'xMin', type: 'SHORT', value: 0},
 	        {name: 'yMin', type: 'SHORT', value: 0},
 	        {name: 'xMax', type: 'SHORT', value: 0},
@@ -5397,20 +5369,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	// for 'Chinese in the traditional script'.
 	function getLanguageCode(platformID, languageID, ltag) {
 	    switch (platformID) {
-	        case 0:  // Unicode
-	            if (languageID === 0xFFFF) {
-	                return 'und';
-	            } else if (ltag) {
-	                return ltag[languageID];
-	            }
+	    case 0:  // Unicode
+	        if (languageID === 0xFFFF) {
+	            return 'und';
+	        } else if (ltag) {
+	            return ltag[languageID];
+	        }
 	
-	            break;
+	        break;
 	
-	        case 1:  // Macintosh
-	            return macLanguages[languageID];
+	    case 1:  // Macintosh
+	        return macLanguages[languageID];
 	
-	        case 3:  // Windows
-	            return windowsLanguages[languageID];
+	    case 3:  // Windows
+	        return windowsLanguages[languageID];
 	    }
 	
 	    return undefined;
@@ -5478,18 +5450,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	function getEncoding(platformID, encodingID, languageID) {
 	    switch (platformID) {
-	        case 0:  // Unicode
+	    case 0:  // Unicode
+	        return utf16;
+	
+	    case 1:  // Apple Macintosh
+	        return macLanguageEncodings[languageID] || macScriptEncodings[encodingID];
+	
+	    case 3:  // Microsoft Windows
+	        if (encodingID === 1 || encodingID === 10) {
 	            return utf16;
+	        }
 	
-	        case 1:  // Apple Macintosh
-	            return macLanguageEncodings[languageID] || macScriptEncodings[encodingID];
-	
-	        case 3:  // Microsoft Windows
-	            if (encodingID === 1 || encodingID === 10) {
-	                return utf16;
-	            }
-	
-	            break;
+	        break;
 	    }
 	
 	    return undefined;
@@ -5986,33 +5958,33 @@ return /******/ (function(modules) { // webpackBootstrap
 	    post.minMemType1 = p.parseULong();
 	    post.maxMemType1 = p.parseULong();
 	    switch (post.version) {
-	        case 1:
-	            post.names = encoding.standardNames.slice();
-	            break;
-	        case 2:
-	            post.numberOfGlyphs = p.parseUShort();
-	            post.glyphNameIndex = new Array(post.numberOfGlyphs);
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
-	                post.glyphNameIndex[i] = p.parseUShort();
-	            }
+	    case 1:
+	        post.names = encoding.standardNames.slice();
+	        break;
+	    case 2:
+	        post.numberOfGlyphs = p.parseUShort();
+	        post.glyphNameIndex = new Array(post.numberOfGlyphs);
+	        for (i = 0; i < post.numberOfGlyphs; i++) {
+	            post.glyphNameIndex[i] = p.parseUShort();
+	        }
 	
-	            post.names = [];
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
-	                if (post.glyphNameIndex[i] >= encoding.standardNames.length) {
-	                    var nameLength = p.parseChar();
-	                    post.names.push(p.parseString(nameLength));
-	                }
+	        post.names = [];
+	        for (i = 0; i < post.numberOfGlyphs; i++) {
+	            if (post.glyphNameIndex[i] >= encoding.standardNames.length) {
+	                var nameLength = p.parseChar();
+	                post.names.push(p.parseString(nameLength));
 	            }
+	        }
 	
-	            break;
-	        case 2.5:
-	            post.numberOfGlyphs = p.parseUShort();
-	            post.offset = new Array(post.numberOfGlyphs);
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
-	                post.offset[i] = p.parseChar();
-	            }
+	        break;
+	    case 2.5:
+	        post.numberOfGlyphs = p.parseUShort();
+	        post.offset = new Array(post.numberOfGlyphs);
+	        for (i = 0; i < post.numberOfGlyphs; i++) {
+	            post.offset[i] = p.parseChar();
+	        }
 	
-	            break;
+	        break;
 	    }
 	    return post;
 	}
@@ -6220,7 +6192,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        instances.push(parseFvarInstance(data, instanceStart + j * instanceSize, axes, names));
 	    }
 	
-	    return {axes: axes, instances: instances};
+	    return {axes:axes, instances:instances};
 	}
 	
 	exports.make = makeFvarTable;
@@ -6568,7 +6540,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var count =  p.parseUShort();
 	    if (format === 1) {
 	        return p.parseUShortList(count);
-	    } else if (format === 2) {
+	    }
+	    else if (format === 2) {
 	        var coverage = [];
 	        for (; count--;) {
 	            var begin = p.parseUShort();
@@ -6596,7 +6569,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        return function(glyphID) {
 	            return classes[glyphID - startGlyph] || 0;
 	        };
-	    } else if (format === 2) {
+	    }
+	    else if (format === 2) {
 	        // Format 2 defines multiple groups of glyph indices that belong to the same class.
 	        var rangeCount = p.parseUShort();
 	        var startGlyphs = [];
@@ -6676,7 +6650,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	            var pairs = pairSet[leftGlyph];
 	            if (pairs) return pairs[rightGlyph];
 	        };
-	    } else if (format === 2) {
+	    }
+	    else if (format === 2) {
 	        // Pair Positioning Adjustment: Format 2
 	        var classDef1Offset = p.parseUShort();
 	        var classDef2Offset = p.parseUShort();
@@ -6871,7 +6846,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 *
 	 * All rights reserved.
 	 *
-	 * Date: Wed Jun 29 10:05:57 2016 +0200
+	 * Date: Thu Jul 7 06:39:28 2016 +0200
 	 *
 	 ***
 	 *
@@ -7834,6 +7809,25 @@ return /******/ (function(modules) { // webpackBootstrap
 			return value < min ? min : value > max ? max : value;
 		}
 	
+		function splitDouble(X) {
+			var bigX = X * 134217729,
+				Y = X - bigX,
+				Xh = Y + bigX;
+			return [Xh, X - Xh];
+		}
+	
+		function higherPrecisionDiscriminant(a, b, c) {
+			var ad = splitDouble(a),
+				bd = splitDouble(b),
+				cd = splitDouble(c),
+				p = b * b,
+				dp = (bd[0] * bd[0] - p + 2 * bd[0] * bd[1]) + bd[1] * bd[1],
+				q = a * c,
+				dq = (ad[0] * cd[0] - q + ad[0] * cd[1] + ad[1] * cd[0])
+						+ ad[1] * cd[1];
+			return (p - q) + (dp - dq);
+		}
+	
 		return {
 			TOLERANCE: 1e-6,
 			EPSILON: EPSILON,
@@ -7890,18 +7884,24 @@ return /******/ (function(modules) { // webpackBootstrap
 					eMax = max + EPSILON,
 					x1, x2 = Infinity,
 					B = b,
-					D;
+					D, E, pi = 3;
 				b /= -2;
 				D = b * b - a * c;
+				E = b * b + a * c;
+				if (pi * abs(D) < E) {
+					D = higherPrecisionDiscriminant(a, b, c);
+				}
 				if (D !== 0 && abs(D) < MACHINE_EPSILON) {
-					var gmC = pow(abs(a * b * c), 1 / 3);
-					if (gmC < 1e-8) {
-						var mult = gmC === 0 ? 0 : pow(10,
-							abs(Math.floor(Math.log(gmC) * Math.LOG10E)));
-						a *= mult;
-						b *= mult;
-						c *= mult;
-						D = b * b - a * c;
+					var sc = (abs(a) + abs(b) + abs(c)) || MACHINE_EPSILON;
+					sc = pow(2, -Math.floor(Math.log(sc) * Math.LOG2E + 0.5));
+					a *= sc;
+					b *= sc;
+					c *= sc;
+					D = b * b - a * c;
+					E = b * b + a * c;
+					B = - 2.0 * b;
+					if (pi * abs(D) < E) {
+						D = higherPrecisionDiscriminant(a, b, c);
 					}
 				}
 				if (abs(a) < EPSILON) {
@@ -7928,8 +7928,15 @@ return /******/ (function(modules) { // webpackBootstrap
 			},
 	
 			solveCubic: function(a, b, c, d, roots, min, max) {
-				var count = 0,
-					x, b1, c2;
+				var count = 0, x, b1, c2,
+					s = Math.max(abs(a), abs(b), abs(c), abs(d));
+				if ((s < 1e-7 && s > 0) || s > 1e7) {
+					var p = pow(2, -Math.floor(Math.log(s) * Math.LOG2E));
+					a *= p;
+					b *= p;
+					c *= p;
+					d *= p;
+				}
 				if (abs(a) < EPSILON) {
 					a = b;
 					b1 = c;
@@ -7952,7 +7959,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					r = pow(abs(t), 1/3);
 					s = t < 0 ? -1 : 1;
 					t = -qd / a;
-					r = t > 0 ? 1.3247179572 * Math.max(r, sqrt(t)) : r;
+					r = t > 0 ? 1.324717957244746 * Math.max(r, sqrt(t)) : r;
 					x0 = x - s * r;
 					if (x0 !== x) {
 						do {
@@ -7971,8 +7978,8 @@ return /******/ (function(modules) { // webpackBootstrap
 					}
 				}
 				var count = Numerical.solveQuadratic(a, b1, c2, roots, min, max);
-				if (isFinite(x) && count >= 0
-						&& (count === 0 || x !== roots[count - 1])
+				if (isFinite(x) && (count === 0
+						|| count > 0 && x !== roots[0] && x !== roots[1])
 						&& (min == null || x > min - EPSILON && x < max + EPSILON))
 					roots[count++] = min == null ? x : clamp(x, min, max);
 				return count;
@@ -12285,7 +12292,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				} else {
 					point = arg0;
 				}
-			} else if (typeof arg0 === 'object') {
+			} else if (arg0 == null || typeof arg0 === 'object') {
 				point = arg0;
 				handleIn = arg1;
 				handleOut = arg2;
@@ -18183,7 +18190,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					var old = this._values[key];
 					if (old !== value) {
 						if (isColor) {
-							if (old)
+							if (old && old._owner !== undefined)
 								old._owner = undefined;
 							if (value && value.constructor === Color) {
 								if (value._owner)
@@ -21066,7 +21073,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 	
 	return paper;
-	}(typeof self === 'object' ? self : null);
+	}.call(this, typeof self === 'object' ? self : null);
 
 
 /***/ },
@@ -21427,26 +21434,31 @@ return /******/ (function(modules) { // webpackBootstrap
 		};
 	
 		Font.prototype.download = function( arrayBuffer, merged, name, user ) {
-			if ( merged ) {
-				// TODO: replace that with client-side font merging
-				fetch('https://merge.prototypo.io/' +
-					name.family + '/' +
-					name.style + '/' + user, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/otf' },
-						body: arrayBuffer
-				})
-				.then(function( response ) {
-					return response.arrayBuffer();
-				})
-				.then(function( bufferToDownload ) {
-					triggerDownload( this, bufferToDownload );
-				}.bind(this));
-	
-			} else {
+			if ( !merged ) {
 				triggerDownload(
-					this, arrayBuffer, name && ( name.family + ' ' + name.style ) );
+					this,
+					arrayBuffer,
+					name && ( name.family + ' ' + name.style ) );
 			}
+			// TODO: replace that with client-side font merging
+			fetch('http://localhost:3000/' +
+				name.family + '/' +
+				name.style + '/' +
+				user +
+				(name.template ? '/' + name.template : '') +
+				(merged ? '/overlap' : ''), {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/otf' },
+					body: arrayBuffer
+			})
+			.then(function( response ) {
+				return response.arrayBuffer();
+			})
+			.then(function( bufferToDownload ) {
+				if ( merged ) {
+					triggerDownload( this, bufferToDownload );
+				}
+			}.bind(this));
 	
 			return this;
 		};
@@ -21526,7 +21538,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			this.ot.advanceWidth = value;
 		},
 		get: function() {
-			return this.ot.advanceWidth;
+			return this.ot.advanceWidth || 0;
 		}
 	});
 	
