@@ -347,7 +347,7 @@ if ( typeof window === 'object' && window.document ) {
 				name && ( name.family + ' ' + name.style ) );
 		}
 		// TODO: replace that with client-side font merging
-		fetch('http://merge.prototypo.io/' +
+		fetch('https://merge.prototypo.io/' +
 			name.family + '/' +
 			name.style + '/' +
 			user +
