@@ -6846,7 +6846,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 *
 	 * All rights reserved.
 	 *
-	 * Date: Sun Jun 19 11:02:54 2016 +0200
+	 * Date: Thu Jul 7 06:39:28 2016 +0200
 	 *
 	 ***
 	 *
@@ -7809,6 +7809,25 @@ return /******/ (function(modules) { // webpackBootstrap
 			return value < min ? min : value > max ? max : value;
 		}
 	
+		function splitDouble(X) {
+			var bigX = X * 134217729,
+				Y = X - bigX,
+				Xh = Y + bigX;
+			return [Xh, X - Xh];
+		}
+	
+		function higherPrecisionDiscriminant(a, b, c) {
+			var ad = splitDouble(a),
+				bd = splitDouble(b),
+				cd = splitDouble(c),
+				p = b * b,
+				dp = (bd[0] * bd[0] - p + 2 * bd[0] * bd[1]) + bd[1] * bd[1],
+				q = a * c,
+				dq = (ad[0] * cd[0] - q + ad[0] * cd[1] + ad[1] * cd[0])
+						+ ad[1] * cd[1];
+			return (p - q) + (dp - dq);
+		}
+	
 		return {
 			TOLERANCE: 1e-6,
 			EPSILON: EPSILON,
@@ -7865,18 +7884,24 @@ return /******/ (function(modules) { // webpackBootstrap
 					eMax = max + EPSILON,
 					x1, x2 = Infinity,
 					B = b,
-					D;
+					D, E, pi = 3;
 				b /= -2;
 				D = b * b - a * c;
+				E = b * b + a * c;
+				if (pi * abs(D) < E) {
+					D = higherPrecisionDiscriminant(a, b, c);
+				}
 				if (D !== 0 && abs(D) < MACHINE_EPSILON) {
-					var gmC = pow(abs(a * b * c), 1 / 3);
-					if (gmC < 1e-8) {
-						var mult = gmC === 0 ? 0 : pow(10,
-							abs(Math.floor(Math.log(gmC) * Math.LOG10E)));
-						a *= mult;
-						b *= mult;
-						c *= mult;
-						D = b * b - a * c;
+					var sc = (abs(a) + abs(b) + abs(c)) || MACHINE_EPSILON;
+					sc = pow(2, -Math.floor(Math.log(sc) * Math.LOG2E + 0.5));
+					a *= sc;
+					b *= sc;
+					c *= sc;
+					D = b * b - a * c;
+					E = b * b + a * c;
+					B = - 2.0 * b;
+					if (pi * abs(D) < E) {
+						D = higherPrecisionDiscriminant(a, b, c);
 					}
 				}
 				if (abs(a) < EPSILON) {
@@ -7903,8 +7928,15 @@ return /******/ (function(modules) { // webpackBootstrap
 			},
 	
 			solveCubic: function(a, b, c, d, roots, min, max) {
-				var count = 0,
-					x, b1, c2;
+				var count = 0, x, b1, c2,
+					s = Math.max(abs(a), abs(b), abs(c), abs(d));
+				if ((s < 1e-7 && s > 0) || s > 1e7) {
+					var p = pow(2, -Math.floor(Math.log(s) * Math.LOG2E));
+					a *= p;
+					b *= p;
+					c *= p;
+					d *= p;
+				}
 				if (abs(a) < EPSILON) {
 					a = b;
 					b1 = c;
@@ -7927,7 +7959,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					r = pow(abs(t), 1/3);
 					s = t < 0 ? -1 : 1;
 					t = -qd / a;
-					r = t > 0 ? 1.3247179572 * Math.max(r, sqrt(t)) : r;
+					r = t > 0 ? 1.324717957244746 * Math.max(r, sqrt(t)) : r;
 					x0 = x - s * r;
 					if (x0 !== x) {
 						do {
@@ -7946,8 +7978,8 @@ return /******/ (function(modules) { // webpackBootstrap
 					}
 				}
 				var count = Numerical.solveQuadratic(a, b1, c2, roots, min, max);
-				if (isFinite(x) && count >= 0
-						&& (count === 0 || x !== roots[count - 1])
+				if (isFinite(x) && (count === 0
+						|| count > 0 && x !== roots[0] && x !== roots[1])
 						&& (min == null || x > min - EPSILON && x < max + EPSILON))
 					roots[count++] = min == null ? x : clamp(x, min, max);
 				return count;
@@ -12260,7 +12292,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				} else {
 					point = arg0;
 				}
-			} else if (typeof arg0 === 'object') {
+			} else if (arg0 == null || typeof arg0 === 'object') {
 				point = arg0;
 				handleIn = arg1;
 				handleOut = arg2;
@@ -18158,7 +18190,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					var old = this._values[key];
 					if (old !== value) {
 						if (isColor) {
-							if (old)
+							if (old && old._owner !== undefined)
 								old._owner = undefined;
 							if (value && value.constructor === Color) {
 								if (value._owner)
@@ -19313,7 +19345,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			keyMap = {},
 			charMap = {},
 			metaFixMap,
-			downKey;
+			downKey,
 	
 			modifiers = new Base({
 				shift: false,
@@ -21041,7 +21073,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 	
 	return paper;
-	}(typeof self === 'object' ? self : null);
+	}.call(this, typeof self === 'object' ? self : null);
 
 
 /***/ },
@@ -21402,30 +21434,12 @@ return /******/ (function(modules) { // webpackBootstrap
 		};
 	
 		Font.prototype.download = function( arrayBuffer, merged, name, user ) {
-			/*
-			if ( merged ) {
-				// TODO: replace that with client-side font merging
-				fetch('http://localhost:3000/' +
-					name.family + '/' +
-					name.style + '/' +
-					user +
-					(name.template ? '/' + name.template : ''), {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/otf' },
-						body: arrayBuffer
-				})
-				.then(function( response ) {
-					return response.arrayBuffer();
-				})
-				.then(function( bufferToDownload ) {
-					triggerDownload( this, bufferToDownload );
-				}.bind(this));
-	
-			} else {
+			if ( !merged ) {
 				triggerDownload(
-					this, arrayBuffer, name && ( name.family + ' ' + name.style ) );
+					this,
+					arrayBuffer,
+					name && ( name.family + ' ' + name.style ) );
 			}
-			*/
 			// TODO: replace that with client-side font merging
 			fetch('http://localhost:3000/' +
 				name.family + '/' +
@@ -21441,11 +21455,8 @@ return /******/ (function(modules) { // webpackBootstrap
 				return response.arrayBuffer();
 			})
 			.then(function( bufferToDownload ) {
-				if( merged ) {
+				if ( merged ) {
 					triggerDownload( this, bufferToDownload );
-				} else {
-					triggerDownload(
-						this, arrayBuffer, name && ( name.family + ' ' + name.style ) );
 				}
 			}.bind(this));
 	
