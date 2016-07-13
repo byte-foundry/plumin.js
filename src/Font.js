@@ -351,7 +351,7 @@ if ( typeof window === 'object' && window.document ) {
 			name.family + '/' +
 			name.style + '/' +
 			user +
-			(name.template ? '/' + name.template : '') +
+			'/' + (name.template ? name.template : 'notemplate') +
 			(merged ? '/overlap' : ''), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/otf' },
