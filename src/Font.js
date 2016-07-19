@@ -339,7 +339,7 @@ if ( typeof window === 'object' && window.document ) {
 		));
 	};
 
-	Font.prototype.download = function( arrayBuffer, merged, name, user ) {
+	Font.prototype.download = function( arrayBuffer, name, user, merged ) {
 		if ( !merged ) {
 			triggerDownload(
 				this,
