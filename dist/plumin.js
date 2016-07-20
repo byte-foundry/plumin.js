@@ -21434,27 +21434,29 @@ return /******/ (function(modules) { // webpackBootstrap
 					name && ( name.family + ' ' + name.style ) );
 			}
 			// TODO: replace that with client-side font merging
-			fetch(
-				[
-					'https://merge.prototypo.io',
-					name.family,
-					name.style,
-					user,
-					name.template || 'unknown'
-				].join('/') +
-				(merged ? '/overlap' : ''), {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/otf' },
-					body: arrayBuffer
-			})
-			.then(function( response ) {
-				return response.arrayBuffer();
-			})
-			.then(function( bufferToDownload ) {
-				if ( merged ) {
-					triggerDownload( this, bufferToDownload );
-				}
-			}.bind(this));
+			if (name && user) {
+				fetch(
+					[
+						'https://merge.prototypo.io',
+						name.family,
+						name.style,
+						user,
+						name.template || 'unknown'
+					].join('/') +
+					(merged ? '/overlap' : ''), {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/otf' },
+						body: arrayBuffer
+				})
+				.then(function( response ) {
+					return response.arrayBuffer();
+				})
+				.then(function( bufferToDownload ) {
+					if ( merged ) {
+						triggerDownload( this, bufferToDownload );
+					}
+				}.bind(this));
+			}
 	
 			return this;
 		};
