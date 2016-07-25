@@ -339,7 +339,7 @@ if ( typeof window === 'object' && window.document ) {
 		));
 	};
 
-	Font.prototype.download = function( arrayBuffer, merged, name, user ) {
+	Font.prototype.download = function( arrayBuffer, name, user, merged ) {
 		if ( !merged ) {
 			triggerDownload(
 				this,
@@ -347,27 +347,29 @@ if ( typeof window === 'object' && window.document ) {
 				name && ( name.family + ' ' + name.style ) );
 		}
 		// TODO: replace that with client-side font merging
-		fetch(
-			[
-				'https://merge.prototypo.io',
-				name.family,
-				name.style,
-				user,
-				name.template || 'unknown'
-			].join('/') +
-			(merged ? '/overlap' : ''), {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/otf' },
-				body: arrayBuffer
-		})
-		.then(function( response ) {
-			return response.arrayBuffer();
-		})
-		.then(function( bufferToDownload ) {
-			if ( merged ) {
-				triggerDownload( this, bufferToDownload );
-			}
-		}.bind(this));
+		if (name && user) {
+			fetch(
+				[
+					'https://merge.prototypo.io',
+					name.family,
+					name.style,
+					user,
+					name.template || 'unknown'
+				].join('/') +
+				(merged ? '/overlap' : ''), {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/otf' },
+					body: arrayBuffer
+			})
+			.then(function( response ) {
+				return response.arrayBuffer();
+			})
+			.then(function( bufferToDownload ) {
+				if ( merged ) {
+					triggerDownload( this, bufferToDownload );
+				}
+			}.bind(this));
+		}
 
 		return this;
 	};
