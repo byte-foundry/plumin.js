@@ -62,12 +62,12 @@ return /******/ (function(modules) { // webpackBootstrap
 /***/ function(module, exports, __webpack_require__) {
 
 	var opentype = __webpack_require__(2);
-	var paper = __webpack_require__(33);
-	var Font = __webpack_require__(36);
-	var Glyph = __webpack_require__(37);
-	var Outline = __webpack_require__(38);
-	var Path = __webpack_require__(40);
-	var Node = __webpack_require__(41);
+	var paper = __webpack_require__(35);
+	var Font = __webpack_require__(38);
+	var Glyph = __webpack_require__(39);
+	var Outline = __webpack_require__(40);
+	var Path = __webpack_require__(42);
+	var Node = __webpack_require__(43);
 	
 	paper.PaperScope.prototype.Font = Font;
 	paper.PaperScope.prototype.Glyph = Glyph;
@@ -100,20 +100,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	var glyph = __webpack_require__(15);
 	var parse = __webpack_require__(12);
 	var path = __webpack_require__(6);
-	var util = __webpack_require__(25);
+	var util = __webpack_require__(28);
 	
 	var cmap = __webpack_require__(11);
 	var cff = __webpack_require__(13);
-	var fvar = __webpack_require__(27);
-	var glyf = __webpack_require__(28);
-	var gpos = __webpack_require__(29);
-	var gsub = __webpack_require__(30);
+	var fvar = __webpack_require__(30);
+	var glyf = __webpack_require__(31);
+	var gpos = __webpack_require__(32);
+	var gsub = __webpack_require__(25);
 	var head = __webpack_require__(17);
 	var hhea = __webpack_require__(18);
 	var hmtx = __webpack_require__(19);
-	var kern = __webpack_require__(31);
+	var kern = __webpack_require__(33);
 	var ltag = __webpack_require__(20);
-	var loca = __webpack_require__(32);
+	var loca = __webpack_require__(34);
 	var maxp = __webpack_require__(21);
 	var _name = __webpack_require__(22);
 	var os2 = __webpack_require__(23);
@@ -122,7 +122,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	// File loaders /////////////////////////////////////////////////////////
 	
 	function loadFromFile(path, callback) {
-	    var fs = __webpack_require__(26);
+	    var fs = __webpack_require__(29);
 	    fs.readFile(path, function(err, buffer) {
 	        if (err) {
 	            return callback(err.message);
@@ -397,7 +397,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	// Synchronously load the font from a URL or file.
 	// When done, return the font object or throw an error.
 	function loadSync(url) {
-	    var fs = __webpack_require__(26);
+	    var fs = __webpack_require__(29);
 	    var buffer = fs.readFileSync(url);
 	    return parseBuffer(util.nodeBufferToArrayBuffer(buffer));
 	}
@@ -1016,7 +1016,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        glyph = font.glyphs.get(i);
 	        if (font.cffEncoding) {
 	            glyph.name = font.cffEncoding.charset[i];
-	        } else {
+	        } else if (font.glyphNames.names) {
 	            glyph.name = font.glyphNames.glyphIndexToName(i);
 	        }
 	    }
@@ -1045,7 +1045,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	var sfnt = __webpack_require__(7);
 	var encoding = __webpack_require__(4);
 	var glyphset = __webpack_require__(14);
-	var util = __webpack_require__(25);
+	var Substitution = __webpack_require__(26);
+	var util = __webpack_require__(28);
 	
 	// A Font represents a loaded OpenType font file.
 	// It contains a set of glyphs and methods to draw text on a drawing context,
@@ -1093,6 +1094,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.supported = true; // Deprecated: parseBuffer will throw an error if font is not supported.
 	    this.glyphs = new glyphset.GlyphSet(this, options.glyphs || []);
 	    this.encoding = new encoding.DefaultEncoding(this);
+	    this.substitution = new Substitution(this);
 	    this.tables = this.tables || {};
 	}
 	
@@ -1367,7 +1369,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            throw err;
 	        });
 	    } else {
-	        var fs = __webpack_require__(26);
+	        var fs = __webpack_require__(29);
 	        var buffer = util.arrayBufferToNodeBuffer(arrayBuffer);
 	        fs.writeFileSync(fileName, buffer);
 	    }
@@ -1612,6 +1614,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	var _name = __webpack_require__(22);
 	var os2 = __webpack_require__(23);
 	var post = __webpack_require__(24);
+	var gsub = __webpack_require__(25);
 	
 	function log2(v) {
 	    return Math.log(v) / Math.log(2) | 0;
@@ -1896,6 +1899,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    if (ltagTable) {
 	        tables.push(ltagTable);
 	    }
+	    // Optional tables
+	    if (font.tables.gsub) {
+	        tables.push(gsub.make(font.tables.gsub));
+	    }
 	
 	    var sfntTable = makeSfntTable(tables);
 	
@@ -1953,6 +1960,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	'use strict';
 	
+	var check = __webpack_require__(8);
 	var encode = __webpack_require__(10).encode;
 	var sizeOf = __webpack_require__(10).sizeOf;
 	
@@ -1985,7 +1993,91 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return sizeOf.TABLE(this);
 	};
 	
+	function ushortList(itemName, list, count) {
+	    if (count === undefined) {
+	        count = list.length;
+	    }
+	    var fields = new Array(list.length + 1);
+	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
+	    for (var i = 0; i < list.length; i++) {
+	        fields[i + 1] = {name: itemName + i, type: 'USHORT', value: list[i]};
+	    }
+	    return fields;
+	}
+	
+	function tableList(itemName, records, itemCallback) {
+	    var count = records.length;
+	    var fields = new Array(count + 1);
+	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
+	    for (var i = 0; i < count; i++) {
+	        fields[i + 1] = {name: itemName + i, type: 'TABLE', value: itemCallback(records[i], i)};
+	    }
+	    return fields;
+	}
+	
+	function recordList(itemName, records, itemCallback) {
+	    var count = records.length;
+	    var fields = [];
+	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
+	    for (var i = 0; i < count; i++) {
+	        fields = fields.concat(itemCallback(records[i], i));
+	    }
+	    return fields;
+	}
+	
+	// Common Layout Tables
+	function Coverage(coverageTable) {
+	    if (coverageTable.format === 1) {
+	        Table.call(this, 'coverageTable',
+	            [{name: 'coverageFormat', type: 'USHORT', value: 1}]
+	            .concat(ushortList('glyph', coverageTable.glyphs))
+	        );
+	    } else {
+	        check.assert(false, 'Can\'t create coverage table format 2 yet.');
+	    }
+	}
+	Coverage.prototype = Object.create(Table.prototype);
+	Coverage.prototype.constructor = Coverage;
+	
+	// Missing: script list. See gsub.js
+	
+	function FeatureList(featureListTable) {
+	    Table.call(this, 'featureListTable',
+	        recordList('featureRecord', featureListTable, function(featureRecord, i) {
+	            var feature = featureRecord.feature;
+	            return [
+	                {name: 'featureTag' + i, type: 'TAG', value: featureRecord.tag},
+	                {name: 'feature' + i, type: 'TABLE', value: new Table('featureTable', [
+	                    {name: 'featureParams', type: 'USHORT', value: feature.featureParams},
+	                    ].concat(ushortList('lookupListIndex', feature.lookupListIndexes)))}
+	            ];
+	        })
+	    );
+	}
+	FeatureList.prototype = Object.create(Table.prototype);
+	FeatureList.prototype.constructor = FeatureList;
+	
+	function LookupList(lookupListTable, subtableMakers) {
+	    Table.call(this, 'lookupListTable', tableList('lookup', lookupListTable, function(lookupTable) {
+	        return new Table('lookupTable', [
+	            {name: 'lookupType', type: 'USHORT', value: lookupTable.lookupType},
+	            {name: 'lookupFlag', type: 'USHORT', value: lookupTable.lookupFlag}
+	        ].concat(tableList('subtable', lookupTable.subtables, subtableMakers[lookupTable.lookupType])));
+	    }));
+	}
+	LookupList.prototype = Object.create(Table.prototype);
+	LookupList.prototype.constructor = LookupList;
+	
+	// Record = same as Table, but inlined (a Table has an offset and its data is further in the stream)
+	// Don't use offsets inside Records (probable bug), only in Tables.
 	exports.Record = exports.Table = Table;
+	exports.Coverage = Coverage;
+	exports.FeatureList = FeatureList;
+	exports.LookupList = LookupList;
+	
+	exports.ushortList = ushortList;
+	exports.tableList = tableList;
+	exports.recordList = recordList;
 
 
 /***/ },
@@ -4411,6 +4503,22 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _glyph = __webpack_require__(15);
 	
+	// Define a property on the glyph that depends on the path being loaded.
+	function defineDependentProperty(glyph, externalName, internalName) {
+	    Object.defineProperty(glyph, externalName, {
+	        get: function() {
+	            // Request the path property to make sure the path is loaded.
+	            glyph.path; // jshint ignore:line
+	            return glyph[internalName];
+	        },
+	        set: function(newValue) {
+	            glyph[internalName] = newValue;
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	}
+	
 	// A GlyphSet represents all glyphs available in the font, but modelled using
 	// a deferred glyph loader, for retrieving glyphs only once they are absolutely
 	// necessary, to keep the memory footprint down.
@@ -4459,6 +4567,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	            path.unitsPerEm = font.unitsPerEm;
 	            return path;
 	        };
+	
+	        defineDependentProperty(glyph, 'xMin', '_xMin');
+	        defineDependentProperty(glyph, 'xMax', '_xMax');
+	        defineDependentProperty(glyph, 'yMin', '_yMin');
+	        defineDependentProperty(glyph, 'yMax', '_yMax');
 	
 	        return glyph;
 	    };
@@ -6277,6 +6390,665 @@ return /******/ (function(modules) { // webpackBootstrap
 
 /***/ },
 /* 25 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// The `GSUB` table contains ligatures, among other things.
+	// https://www.microsoft.com/typography/OTSPEC/gsub.htm
+	
+	'use strict';
+	
+	var check = __webpack_require__(8);
+	var Parser = __webpack_require__(12).Parser;
+	var subtableParsers = new Array(9);         // subtableParsers[0] is unused
+	var table = __webpack_require__(9);
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#SS
+	subtableParsers[1] = function parseLookup1() {
+	    var start = this.offset + this.relativeOffset;
+	    var substFormat = this.parseUShort();
+	    if (substFormat === 1) {
+	        return {
+	            substFormat: 1,
+	            coverage: this.parsePointer(Parser.coverage),
+	            deltaGlyphId: this.parseUShort()
+	        };
+	    } else if (substFormat === 2) {
+	        return {
+	            substFormat: 2,
+	            coverage: this.parsePointer(Parser.coverage),
+	            substitute: this.parseOffset16List()
+	        };
+	    }
+	    check.assert(false, '0x' + start.toString(16) + ': lookup type 1 format must be 1 or 2.');
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#MS
+	subtableParsers[2] = function parseLookup2() {
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB Multiple Substitution Subtable identifier-format must be 1');
+	    return {
+	        substFormat: substFormat,
+	        coverage: this.parsePointer(Parser.coverage),
+	        sequences: this.parseListOfLists()
+	    };
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#AS
+	subtableParsers[3] = function parseLookup3() {
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB Alternate Substitution Subtable identifier-format must be 1');
+	    return {
+	        substFormat: substFormat,
+	        coverage: this.parsePointer(Parser.coverage),
+	        alternateSets: this.parseListOfLists()
+	    };
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#LS
+	subtableParsers[4] = function parseLookup4() {
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB ligature table identifier-format must be 1');
+	    return {
+	        substFormat: substFormat,
+	        coverage: this.parsePointer(Parser.coverage),
+	        ligatureSets: this.parseListOfLists(function() {
+	            return {
+	                ligGlyph: this.parseUShort(),
+	                components: this.parseUShortList(this.parseUShort() - 1)
+	            };
+	        })
+	    };
+	};
+	
+	var lookupRecordDesc = {
+	    sequenceIndex: Parser.uShort,
+	    lookupListIndex: Parser.uShort
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#CSF
+	subtableParsers[5] = function parseLookup5() {
+	    var start = this.offset + this.relativeOffset;
+	    var substFormat = this.parseUShort();
+	
+	    if (substFormat === 1) {
+	        return {
+	            substFormat: substFormat,
+	            coverage: this.parsePointer(Parser.coverage),
+	            ruleSets: this.parseListOfLists(function() {
+	                var glyphCount = this.parseUShort();
+	                var substCount = this.parseUShort();
+	                return {
+	                    input: this.parseUShortList(glyphCount - 1),
+	                    lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
+	                };
+	            })
+	        };
+	    } else if (substFormat === 2) {
+	        return {
+	            substFormat: substFormat,
+	            coverage: this.parsePointer(Parser.coverage),
+	            classDef: this.parsePointer(Parser.classDef),
+	            classSets: this.parseListOfLists(function() {
+	                var glyphCount = this.parseUShort();
+	                var substCount = this.parseUShort();
+	                return {
+	                    classes: this.parseUShortList(glyphCount - 1),
+	                    lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
+	                };
+	            })
+	        };
+	    } else if (substFormat === 3) {
+	        var glyphCount = this.parseUShort();
+	        var substCount = this.parseUShort();
+	        return {
+	            substFormat: substFormat,
+	            coverages: this.parseList(glyphCount, Parser.pointer(Parser.coverage)),
+	            lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
+	        };
+	    }
+	    check.assert(false, '0x' + start.toString(16) + ': lookup type 5 format must be 1, 2 or 3.');
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#CC
+	subtableParsers[6] = function parseLookup6() {
+	    // TODO add automated tests for lookup 6 : no examples in the MS doc.
+	    var start = this.offset + this.relativeOffset;
+	    var substFormat = this.parseUShort();
+	    if (substFormat === 1) {
+	        return {
+	            substFormat: 1,
+	            coverage: this.parsePointer(Parser.coverage),
+	            chainRuleSets: this.parseListOfLists(function() {
+	                return {
+	                    backtrack: this.parseUShortList(),
+	                    input: this.parseUShortList(this.parseShort() - 1),
+	                    lookahead: this.parseUShortList(),
+	                    lookupRecords: this.parseRecordList(lookupRecordDesc)
+	                };
+	            })
+	        };
+	    } else if (substFormat === 2) {
+	        return {
+	            substFormat: 2,
+	            coverage: this.parsePointer(Parser.coverage),
+	            backtrackClassDef: this.parsePointer(Parser.classDef),
+	            inputClassDef: this.parsePointer(Parser.classDef),
+	            lookaheadClassDef: this.parsePointer(Parser.classDef),
+	            chainClassSet: this.parseListOfLists(function() {
+	                return {
+	                    backtrack: this.parseUShortList(),
+	                    input: this.parseUShortList(this.parseShort() - 1),
+	                    lookahead: this.parseUShortList(),
+	                    lookupRecords: this.parseRecordList(lookupRecordDesc)
+	                };
+	            })
+	        };
+	    } else if (substFormat === 3) {
+	        return {
+	            substFormat: 3,
+	            backtrackCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	            inputCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	            lookaheadCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	            lookupRecords: this.parseRecordList(lookupRecordDesc)
+	        };
+	    }
+	    check.assert(false, '0x' + start.toString(16) + ': lookup type 6 format must be 1, 2 or 3.');
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#ES
+	subtableParsers[7] = function parseLookup7() {
+	    // Extension Substitution subtable
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB Extension Substitution subtable identifier-format must be 1');
+	    var extensionLookupType = this.parseUShort();
+	    var extensionParser = new Parser(this.data, this.offset + this.parseULong());
+	    return {
+	        substFormat: 1,
+	        lookupType: extensionLookupType,
+	        extension: subtableParsers[extensionLookupType].call(extensionParser)
+	    };
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#RCCS
+	subtableParsers[8] = function parseLookup8() {
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB Reverse Chaining Contextual Single Substitution Subtable identifier-format must be 1');
+	    return {
+	        substFormat: substFormat,
+	        coverage: this.parsePointer(Parser.coverage),
+	        backtrackCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	        lookaheadCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	        substitutes: this.parseUShortList()
+	    };
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/gsub.htm
+	function parseGsubTable(data, start) {
+	    start = start || 0;
+	    var p = new Parser(data, start);
+	    var tableVersion = p.parseVersion();
+	    check.argument(tableVersion === 1, 'Unsupported GSUB table version.');
+	    return {
+	        version: tableVersion,
+	        scripts: p.parseScriptList(),
+	        features: p.parseFeatureList(),
+	        lookups: p.parseLookupList(subtableParsers)
+	    };
+	}
+	
+	// GSUB Writing //////////////////////////////////////////////
+	var subtableMakers = new Array(9);
+	
+	subtableMakers[1] = function makeLookup1(subtable) {
+	    if (subtable.substFormat === 1) {
+	        return new table.Table('substitutionTable', [
+	            {name: 'substFormat', type: 'USHORT', value: 1},
+	            {name: 'coverage', type: 'TABLE', value: new table.Coverage(subtable.coverage)},
+	            {name: 'deltaGlyphID', type: 'USHORT', value: subtable.deltaGlyphId}
+	        ]);
+	    } else {
+	        check.assert(false, 'Can\'t write lookup type 1 subtable format 2.');
+	    }
+	    check.assert(false, 'Lookup type 1 substFormat must be 1 or 2.');
+	};
+	
+	subtableMakers[4] = function makeLookup4(subtable) {
+	    check.assert(subtable.substFormat === 1, 'Lookup type 4 substFormat must be 1.');
+	    return new table.Table('substitutionTable', [
+	        {name: 'substFormat', type: 'USHORT', value: 1},
+	        {name: 'coverage', type: 'TABLE', value: new table.Coverage(subtable.coverage)}
+	    ].concat(table.tableList('ligSet', subtable.ligatureSets, function(ligatureSet) {
+	        return new table.Table('ligatureSetTable', table.tableList('ligature', ligatureSet, function(ligature) {
+	            return new table.Table('ligatureTable',
+	                [{name: 'ligGlyph', type: 'USHORT', value: ligature.ligGlyph}]
+	                .concat(table.ushortList('component', ligature.components, ligature.components.length + 1))
+	            );
+	        }));
+	    })));
+	};
+	
+	function makeGsubTable(gsub) {
+	    // Feature limitation - we can only write the table in the most simple cases.
+	    var onlyDfltScript = (gsub.scripts.length === 1 && gsub.scripts[0].tag === 'DFLT');
+	    check.assert(onlyDfltScript, 'Unable to write: GSUB table must contain only the DFLT script.');
+	    var dfltScript = gsub.scripts[0].script;
+	    var onlyDfltLang = (dfltScript.defaultLangSys && dfltScript.langSysRecords.length === 0);
+	    check.assert(onlyDfltLang, 'Unable to write: GSUB table must contain only the default language system.');
+	
+	    for (var i = 0; i < gsub.lookups.length; i++) {
+	        var lookup = gsub.lookups[i];
+	        var canWriteLookup = (lookup.lookupType === 4);
+	        check.assert(canWriteLookup, 'Unable to write: GSUB table must contain only type 4 lookup tables');
+	    }
+	
+	    var scriptList = new table.Table('scriptList', [
+	        {name: 'scriptCount', type: 'USHORT', value: 1},
+	        {name: 'scriptTag_0', type: 'TAG', value: 'DFLT'},
+	        {name: 'script_0', type: 'TABLE', value: new table.Table('scriptTable', [
+	            {name: 'defaultLangSys', type: 'TABLE', value: new table.Table('langSysTable', [
+	                {name: 'lookupOrder', type: 'USHORT', value: 0},
+	                {name: 'reqFeatureIndex', type: 'USHORT', value: 0xffff},
+	                {name: 'featureCount', type: 'USHORT', value: gsub.features.length},
+	                {name: 'featureIndex_0', type: 'USHORT', value: 0}
+	            ])},
+	            {name: 'langSysCount', type: 'USHORT', value: 0}
+	        ])},
+	    ]);
+	
+	    var featureList = new table.FeatureList(gsub.features);
+	    var lookupList = new table.LookupList(gsub.lookups, subtableMakers);
+	
+	    var gsubTable = new table.Table('GSUB', [
+	        {name: 'version', type: 'ULONG', value: 0x10000},
+	        {name: 'scripts', type: 'TABLE', value: scriptList},
+	        {name: 'features', type: 'TABLE', value: featureList},
+	        {name: 'lookups', type: 'TABLE', value: lookupList}
+	    ]);
+	
+	    return gsubTable;
+	}
+	
+	exports.parse = parseGsubTable;
+	exports.make = makeGsubTable;
+
+
+/***/ },
+/* 26 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// The Substitution object provides utility methods to manipulate
+	// the GSUB substitution table.
+	
+	'use strict';
+	
+	var check = __webpack_require__(8);
+	var Layout = __webpack_require__(27);
+	
+	var Substitution = function(font) {
+	    this.font = font;
+	};
+	
+	// Check if 2 arrays of primitives are equal.
+	function arraysEqual(ar1, ar2) {
+	    var n = ar1.length;
+	    if (n !== ar2.length) { return false; }
+	    for (var i = 0; i < n; i++) {
+	        if (ar1[i] !== ar2[i]) { return false; }
+	    }
+	    return true;
+	}
+	
+	Substitution.prototype = Layout;
+	
+	// Get or create the GSUB table.
+	Substitution.prototype.getGsubTable = function(create) {
+	    var gsub = this.font.tables.gsub;
+	    if (!gsub && create) {
+	        // Generate a default empty GSUB table with just a DFLT script and dflt lang sys.
+	        this.font.tables.gsub = gsub = {
+	            version: 1,
+	            scripts: [{
+	                tag: 'DFLT',
+	                script: {
+	                    defaultLangSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] },
+	                    langSysRecords: []
+	                }
+	            }],
+	            features: [],
+	            lookups: []
+	        };
+	    }
+	    return gsub;
+	};
+	
+	/**
+	 * List all ligatures (lookup type 4) for a given script, language, and feature.
+	 * The result is an array of ligature objects like { sub: [ids], by: id }
+	 * @param {string} script
+	 * @param {string} language
+	 * @param {string} feature - 4-letter feature name (liga, rlig, dlig...)
+	 */
+	Substitution.prototype.getLigatures = function(script, language, feature) {
+	    var lookupTable = this.getLookupTable(script, language, feature, 4);
+	    if (!lookupTable) { return []; }
+	    var subtable = lookupTable.subtables[0];
+	    if (!subtable) { return []; }
+	    var glyphs = this.expandCoverage(subtable.coverage);
+	    var ligatureSets = subtable.ligatureSets;
+	    var ligatures = [];
+	    for (var i = 0; i < glyphs.length; i++) {
+	        var startGlyph = glyphs[i];
+	        var ligSet = ligatureSets[i];
+	        for (var j = 0; j < ligSet.length; j++) {
+	            var lig = ligSet[j];
+	            ligatures.push({
+	                sub: [startGlyph].concat(lig.components),
+	                by: lig.ligGlyph
+	            });
+	        }
+	    }
+	    return ligatures;
+	};
+	
+	/**
+	 * Add a ligature (lookup type 4)
+	 * Ligatures with more components must be stored ahead of those with fewer components in order to be found
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='DFLT']
+	 * @param {object} ligature - { sub: [ids], by: id }
+	 */
+	Substitution.prototype.addLigature = function(script, language, feature, ligature) {
+	    var lookupTable = this.getLookupTable(script, language, feature, 4, true);
+	    var subtable = lookupTable.subtables[0];
+	    if (!subtable) {
+	        subtable = {                // lookup type 4 subtable, format 1, coverage format 1
+	            substFormat: 1,
+	            coverage: { format: 1, glyphs: [] },
+	            ligatureSets: []
+	        };
+	        lookupTable.subtables[0] = subtable;
+	    }
+	    check.assert(subtable.coverage.format === 1, 'Ligature: unable to modify coverage table format ' + subtable.coverage.format);
+	    var coverageGlyph = ligature.sub[0];
+	    var ligComponents = ligature.sub.slice(1);
+	    var ligatureTable = {
+	        ligGlyph: ligature.by,
+	        components: ligComponents
+	    };
+	    var pos = this.binSearch(subtable.coverage.glyphs, coverageGlyph);
+	    if (pos >= 0) {
+	        // ligatureSet already exists
+	        var ligatureSet = subtable.ligatureSets[pos];
+	        for (var i = 0; i < ligatureSet.length; i++) {
+	            // If ligature already exists, return.
+	            if (arraysEqual(ligatureSet[i].components, ligComponents)) {
+	                return;
+	            }
+	        }
+	        // ligature does not exist: add it.
+	        ligatureSet.push(ligatureTable);
+	    } else {
+	        // Create a new ligatureSet and add coverage for the first glyph.
+	        pos = -1 - pos;
+	        subtable.coverage.glyphs.splice(pos, 0, coverageGlyph);
+	        subtable.ligatureSets.splice(pos, 0, [ligatureTable]);
+	    }
+	};
+	
+	/**
+	 * List all feature data for a given script and language.
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='DFLT']
+	 * @param {string} feature - 4-letter feature name
+	 */
+	Substitution.prototype.getFeature = function(script, language, feature) {
+	    if (arguments.length === 1) {
+	        feature = arguments[0];
+	        script = language = 'DFLT';
+	    }
+	    switch (feature) {
+	        case 'dlig':
+	        case 'liga':
+	        case 'rlig': return this.getLigatures(script, language, feature);
+	    }
+	};
+	
+	/**
+	 * Add a substitution to a feature for a given script and language.
+	 * The result is an array of ligature objects like { sub: [ids], by: id }
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='DFLT']
+	 * @param {string} feature - 4-letter feature name
+	 * @param {object} sub - the substitution to add
+	 */
+	Substitution.prototype.add = function(script, language, feature, sub) {
+	    if (arguments.length === 2) {
+	        feature = arguments[0];
+	        sub = arguments[1];
+	        script = language = 'DFLT';
+	    }
+	    switch (feature) {
+	        case 'dlig':
+	        case 'liga':
+	        case 'rlig': return this.addLigature(script, language, feature, sub);
+	    }
+	};
+	
+	module.exports = Substitution;
+
+
+/***/ },
+/* 27 */
+/***/ function(module, exports) {
+
+	// The Layout object is the prototype of Substition objects, and provides utility methods to manipulate
+	// common layout tables (GPOS, GSUB, GDEF...)
+	
+	'use strict';
+	
+	function searchTag(arr, tag) {
+	    /* jshint bitwise: false */
+	    var imin = 0;
+	    var imax = arr.length - 1;
+	    while (imin <= imax) {
+	        var imid = (imin + imax) >>> 1;
+	        var val = arr[imid].tag;
+	        if (val === tag) {
+	            return imid;
+	        } else if (val < tag) {
+	            imin = imid + 1;
+	        } else { imax = imid - 1; }
+	    }
+	    // Not found: return -1-insertion point
+	    return -imin - 1;
+	}
+	
+	function binSearch(arr, value) {
+	    /* jshint bitwise: false */
+	    var imin = 0;
+	    var imax = arr.length - 1;
+	    while (imin <= imax) {
+	        var imid = (imin + imax) >>> 1;
+	        var val = arr[imid];
+	        if (val === value) {
+	            return imid;
+	        } else if (val < value) {
+	            imin = imid + 1;
+	        } else { imax = imid - 1; }
+	    }
+	    // Not found: return -1-insertion point
+	    return -imin - 1;
+	}
+	
+	var Layout = {
+	    // Binary search an object by "tag" property
+	    searchTag: searchTag,
+	
+	    // Binary search in a list of numbers
+	    binSearch: binSearch,
+	
+	    // Returns all scripts in the substitution table.
+	    getScriptNames: function() {
+	        var gsub = this.getGsubTable();
+	        if (!gsub) { return []; }
+	        return gsub.scripts.map(function(script) {
+	            return script.tag;
+	        });
+	    },
+	
+	    /**
+	     * Returns all LangSysRecords in the given script.
+	     * @param {string} script - Use 'DFLT' for default script
+	     * @param {boolean} create - forces the creation of this script table if it doesn't exist.
+	     */
+	    getScriptTable: function(script, create) {
+	        var gsub = this.getGsubTable(create);
+	        if (gsub) {
+	            var scripts = gsub.scripts;
+	            var pos = searchTag(gsub.scripts, script);
+	            if (pos >= 0) {
+	                return scripts[pos].script;
+	            } else {
+	                var scr = {
+	                    tag: script,
+	                    script: {
+	                        defaultLangSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] },
+	                        langSysRecords: []
+	                    }
+	                };
+	                scripts.splice(-1 - pos, 0, scr.script);
+	                return scr;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Returns a language system table
+	     * @param {string} script - Use 'DFLT' for default script
+	     * @param {string} language - Use 'DFLT' for default language
+	     * @param {boolean} create - forces the creation of this langSysTable if it doesn't exist.
+	     */
+	    getLangSysTable: function(script, language, create) {
+	        var scriptTable = this.getScriptTable(script, create);
+	        if (scriptTable) {
+	            if (language === 'DFLT') {
+	                return scriptTable.defaultLangSys;
+	            }
+	            var pos = searchTag(scriptTable.langSysRecords, language);
+	            if (pos >= 0) {
+	                return scriptTable.langSysRecords[pos].langSys;
+	            } else if (create) {
+	                var langSysRecord = {
+	                    tag: language,
+	                    langSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] }
+	                };
+	                scriptTable.langSysRecords.splice(-1 - pos, 0, langSysRecord);
+	                return langSysRecord.langSys;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Get a specific feature table.
+	     *
+	     * @param {string} script - Use 'DFLT' for default script
+	     * @param {string} language - Use 'DFLT' for default language
+	     * @param {string} feature - One of the codes listed at https://www.microsoft.com/typography/OTSPEC/featurelist.htm
+	     * @param {boolean} create - forces the creation of the feature table if it doesn't exist.
+	     */
+	    getFeatureTable: function(script, language, feature, create) {
+	        var langSysTable = this.getLangSysTable(script, language, create);
+	        if (langSysTable) {
+	            var featureRecord;
+	            var featIndexes = langSysTable.featureIndexes;
+	            var allFeatures = this.font.tables.gsub.features;
+	            // The FeatureIndex array of indices is in arbitrary order,
+	            // even if allFeatures is sorted alphabetically by feature tag.
+	            for (var i = 0; i < featIndexes.length; i++) {
+	                featureRecord = allFeatures[featIndexes[i]];
+	                if (featureRecord.tag === feature) {
+	                    return featureRecord.feature;
+	                }
+	            }
+	            if (create) {
+	                featureRecord = {
+	                    tag: feature,
+	                    feature: { params: 0, lookupListIndexes: [] }
+	                };
+	                var index = allFeatures.length;
+	                allFeatures.push(featureRecord);
+	                featIndexes.push(index);
+	                return featureRecord.feature;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Get the first lookup table of a given type for a script/language/feature.
+	     * @param {string} script - Use 'DFLT' for default script
+	     * @param {string} language - Use 'DFLT' for default language
+	     * @param {string} feature - 4-letter feature code
+	     * @param {number} lookupType - 1 to 8
+	     * @param {boolean} create - forces the creation of the lookup table if it doesn't exist, with no subtables.
+	     */
+	    getLookupTable: function(script, language, feature, lookupType, create) {
+	        var featureTable = this.getFeatureTable(script, language, feature, create);
+	        if (featureTable) {
+	            var lookupTable;
+	            var lookupListIndexes = featureTable.lookupListIndexes;
+	            var allLookups = this.font.tables.gsub.lookups;
+	            // lookupListIndexes are in no particular order, so use naïve search.
+	            for (var i = 0; i < lookupListIndexes.length; i++) {
+	                lookupTable = allLookups[lookupListIndexes[i]];
+	                if (lookupTable.lookupType === lookupType) {
+	                    return lookupTable;
+	                }
+	            }
+	            if (create) {
+	                lookupTable = {
+	                    lookupType: lookupType,
+	                    lookupFlag: 0,
+	                    subtables: [],
+	                    markFilteringSet: undefined
+	                };
+	                var index = allLookups.length;
+	                allLookups.push(lookupTable);
+	                lookupListIndexes.push(index);
+	                return lookupTable;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Returns the list of glyph indexes of a coverage table.
+	     * Format 1: the list is stored raw
+	     * Format 2: compact list as range records.
+	     */
+	    expandCoverage: function(coverageTable) {
+	        if (coverageTable.format === 1) {
+	            return coverageTable.glyphs;
+	        } else {
+	            var glyphs = [];
+	            var ranges = coverageTable.ranges;
+	            for (var i = 0; i < ranges; i++) {
+	                var range = ranges[i];
+	                var start = range.start;
+	                var end = range.end;
+	                for (var j = start; j <= end; j++) {
+	                    glyphs.push(j);
+	                }
+	            }
+	            return glyphs;
+	        }
+	    }
+	
+	};
+	
+	module.exports = Layout;
+
+
+/***/ },
+/* 28 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -6317,13 +7089,13 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 26 */
+/* 29 */
 /***/ function(module, exports) {
 
 	/* (ignored) */
 
 /***/ },
-/* 27 */
+/* 30 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `fvar` table stores font variation axes and instances.
@@ -6468,7 +7240,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 28 */
+/* 31 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `glyf` table describes the glyphs in TrueType outline format.
@@ -6511,10 +7283,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	function parseGlyph(glyph, data, start) {
 	    var p = new parse.Parser(data, start);
 	    glyph.numberOfContours = p.parseShort();
-	    glyph.xMin = p.parseShort();
-	    glyph.yMin = p.parseShort();
-	    glyph.xMax = p.parseShort();
-	    glyph.yMax = p.parseShort();
+	    glyph._xMin = p.parseShort();
+	    glyph._yMin = p.parseShort();
+	    glyph._xMax = p.parseShort();
+	    glyph._yMax = p.parseShort();
 	    var flags;
 	    var flag;
 	    if (glyph.numberOfContours > 0) {
@@ -6775,7 +7547,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 29 */
+/* 32 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `GPOS` table contains kerning pairs, among other things.
@@ -7017,217 +7789,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 30 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// The `GSUB` table contains ligatures, among other things.
-	// https://www.microsoft.com/typography/OTSPEC/gsub.htm
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var Parser = __webpack_require__(12).Parser;
-	var subtableParsers = new Array(9);         // subtableParsers[0] is unused
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#SS
-	subtableParsers[1] = function parseLookup1() {
-	    var start = this.offset + this.relativeOffset;
-	    var substFormat = this.parseUShort();
-	    if (substFormat === 1) {
-	        return {
-	            substFormat: 1,
-	            coverage: this.parsePointer(Parser.coverage),
-	            deltaGlyphId: this.parseUShort()
-	        };
-	    } else if (substFormat === 2) {
-	        return {
-	            substFormat: 2,
-	            coverage: this.parsePointer(Parser.coverage),
-	            substitute: this.parseOffset16List()
-	        };
-	    }
-	    check.assert(false, '0x' + start.toString(16) + ': lookup type 1 format must be 1 or 2.');
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#MS
-	subtableParsers[2] = function parseLookup2() {
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB Multiple Substitution Subtable identifier-format must be 1');
-	    return {
-	        substFormat: substFormat,
-	        coverage: this.parsePointer(Parser.coverage),
-	        sequences: this.parseListOfLists()
-	    };
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#AS
-	subtableParsers[3] = function parseLookup3() {
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB Alternate Substitution Subtable identifier-format must be 1');
-	    return {
-	        substFormat: substFormat,
-	        coverage: this.parsePointer(Parser.coverage),
-	        alternateSets: this.parseListOfLists()
-	    };
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#LS
-	subtableParsers[4] = function parseLookup4() {
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB ligature table identifier-format must be 1');
-	    return {
-	        substFormat: substFormat,
-	        coverage: this.parsePointer(Parser.coverage),
-	        ligatureSets: this.parseListOfLists(function() {
-	            return {
-	                ligGlyph: this.parseUShort(),
-	                components: this.parseUShortList(this.parseUShort() - 1)
-	            };
-	        })
-	    };
-	};
-	
-	var lookupRecordDesc = {
-	    sequenceIndex: Parser.uShort,
-	    lookupListIndex: Parser.uShort
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#CSF
-	subtableParsers[5] = function parseLookup5() {
-	    var start = this.offset + this.relativeOffset;
-	    var substFormat = this.parseUShort();
-	
-	    if (substFormat === 1) {
-	        return {
-	            substFormat: substFormat,
-	            coverage: this.parsePointer(Parser.coverage),
-	            ruleSets: this.parseListOfLists(function() {
-	                var glyphCount = this.parseUShort();
-	                var substCount = this.parseUShort();
-	                return {
-	                    input: this.parseUShortList(glyphCount - 1),
-	                    lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
-	                };
-	            })
-	        };
-	    } else if (substFormat === 2) {
-	        return {
-	            substFormat: substFormat,
-	            coverage: this.parsePointer(Parser.coverage),
-	            classDef: this.parsePointer(Parser.classDef),
-	            classSets: this.parseListOfLists(function() {
-	                var glyphCount = this.parseUShort();
-	                var substCount = this.parseUShort();
-	                return {
-	                    classes: this.parseUShortList(glyphCount - 1),
-	                    lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
-	                };
-	            })
-	        };
-	    } else if (substFormat === 3) {
-	        var glyphCount = this.parseUShort();
-	        var substCount = this.parseUShort();
-	        return {
-	            substFormat: substFormat,
-	            coverages: this.parseList(glyphCount, Parser.pointer(Parser.coverage)),
-	            lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
-	        };
-	    }
-	    check.assert(false, '0x' + start.toString(16) + ': lookup type 5 format must be 1, 2 or 3.');
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#CC
-	subtableParsers[6] = function parseLookup6() {
-	    // TODO add automated tests for lookup 6 : no examples in the MS doc.
-	    var start = this.offset + this.relativeOffset;
-	    var substFormat = this.parseUShort();
-	    if (substFormat === 1) {
-	        return {
-	            substFormat: 1,
-	            coverage: this.parsePointer(Parser.coverage),
-	            chainRuleSets: this.parseListOfLists(function() {
-	                return {
-	                    backtrack: this.parseUShortList(),
-	                    input: this.parseUShortList(this.parseShort() - 1),
-	                    lookahead: this.parseUShortList(),
-	                    lookupRecords: this.parseRecordList(lookupRecordDesc)
-	                };
-	            })
-	        };
-	    } else if (substFormat === 2) {
-	        return {
-	            substFormat: 2,
-	            coverage: this.parsePointer(Parser.coverage),
-	            backtrackClassDef: this.parsePointer(Parser.classDef),
-	            inputClassDef: this.parsePointer(Parser.classDef),
-	            lookaheadClassDef: this.parsePointer(Parser.classDef),
-	            chainClassSet: this.parseListOfLists(function() {
-	                return {
-	                    backtrack: this.parseUShortList(),
-	                    input: this.parseUShortList(this.parseShort() - 1),
-	                    lookahead: this.parseUShortList(),
-	                    lookupRecords: this.parseRecordList(lookupRecordDesc)
-	                };
-	            })
-	        };
-	    } else if (substFormat === 3) {
-	        return {
-	            substFormat: 3,
-	            backtrackCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	            inputCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	            lookaheadCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	            lookupRecords: this.parseRecordList(lookupRecordDesc)
-	        };
-	    }
-	    check.assert(false, '0x' + start.toString(16) + ': lookup type 6 format must be 1, 2 or 3.');
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#ES
-	subtableParsers[7] = function parseLookup7() {
-	    // Extension Substitution subtable
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB Extension Substitution subtable identifier-format must be 1');
-	    var extensionLookupType = this.parseUShort();
-	    var extensionParser = new Parser(this.data, this.offset + this.parseULong());
-	    return {
-	        substFormat: 1,
-	        lookupType: extensionLookupType,
-	        extension: subtableParsers[extensionLookupType].call(extensionParser)
-	    };
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#RCCS
-	subtableParsers[8] = function parseLookup8() {
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB Reverse Chaining Contextual Single Substitution Subtable identifier-format must be 1');
-	    return {
-	        substFormat: substFormat,
-	        coverage: this.parsePointer(Parser.coverage),
-	        backtrackCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	        lookaheadCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	        substitutes: this.parseUShortList()
-	    };
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/gsub.htm
-	function parseGsubTable(data, start) {
-	    start = start || 0;
-	    var p = new Parser(data, start);
-	    var tableVersion = p.parseVersion();
-	    check.argument(tableVersion === 1, 'Unsupported GSUB table version.');
-	    return {
-	        version: tableVersion,
-	        scripts: p.parseScriptList(),
-	        features: p.parseFeatureList(),
-	        lookups: p.parseLookupList(subtableParsers)
-	    };
-	}
-	
-	exports.parse = parseGsubTable;
-
-
-/***/ },
-/* 31 */
+/* 33 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `kern` table contains kerning pairs.
@@ -7268,7 +7830,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 32 */
+/* 34 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `loca` table stores the offsets to the locations of the glyphs in the font.
@@ -7307,7 +7869,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 33 */
+/* 35 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*!
@@ -7321,7 +7883,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 *
 	 * All rights reserved.
 	 *
-	 * Date: Sat Jul 23 18:50:58 2016 +0200
+	 * Date: Tue Jul 26 10:25:32 2016 +0200
 	 *
 	 ***
 	 *
@@ -7344,7 +7906,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var paper = function(self, undefined) {
 	
-	self = self || __webpack_require__(34);
+	self = self || __webpack_require__(36);
 	
 	var window = self.window,
 		document = self.document;
@@ -7574,9 +8136,10 @@ return /******/ (function(modules) { // webpackBootstrap
 			return Base.serialize(this);
 		},
 	
-		_set: function(props) {
-			if (props && Base.isPlainObject(props))
-				return Base.filter(this, props);
+		set: function(props, exclude) {
+			if (props)
+				Base.filter(this, props, exclude, this._prioritize);
+			return this;
 		},
 	
 		statics: {
@@ -7645,7 +8208,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						list.__index = begin + 1;
 					return obj && options && options.clone ? obj.clone() : obj;
 				}
-				obj = Base.create(this.prototype);
+				obj = Base.create(proto);
 				if (readIndex)
 					obj.__read = true;
 				obj = obj.initialize.apply(obj, begin > 0 || begin + amount < length
@@ -7686,7 +8249,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					var filtered = list._filtered;
 					if (!filtered) {
 						filtered = list._filtered = Base.create(list[0]);
-						filtered._filtering = list[0];
+						filtered._unfiltered = list[0];
 					}
 					filtered[name] = undefined;
 				}
@@ -7705,21 +8268,35 @@ return /******/ (function(modules) { // webpackBootstrap
 				return !!this.getNamed(list, name);
 			},
 	
-			filter: function(dest, source, exclude) {
-				var keys = Object.keys(source._filtering || source);
-				for (var i = 0, l = keys.length; i < l; i++) {
-					var key = keys[i];
-					if (!(exclude && exclude[key])) {
+			filter: function(dest, source, exclude, prioritize) {
+				var processed;
+	
+				function handleKey(key) {
+					if (!(exclude && key in exclude) &&
+						!(processed && key in processed)) {
 						var value = source[key];
 						if (value !== undefined)
 							dest[key] = value;
 					}
 				}
+	
+				if (prioritize) {
+					var keys = {};
+					for (var i = 0, key, l = prioritize.length; i < l; i++) {
+						if ((key = prioritize[i]) in source) {
+							handleKey(key);
+							keys[key] = true;
+						}
+					}
+					processed = keys;
+				}
+	
+				Object.keys(source._unfiltered || source).forEach(handleKey);
 				return dest;
 			},
 	
 			isPlainValue: function(obj, asString) {
-				return this.isPlainObject(obj) || Array.isArray(obj)
+				return Base.isPlainObject(obj) || Array.isArray(obj)
 						|| asString && typeof obj === 'string';
 			},
 	
@@ -10202,7 +10779,8 @@ return /******/ (function(modules) { // webpackBootstrap
 			clipMask: false,
 			selected: false,
 			data: {}
-		}
+		},
+		_prioritize: ['applyMatrix']
 	},
 	new function() {
 		var handlers = ['onMouseDown', 'onMouseUp', 'onMouseDrag', 'onClick',
@@ -10263,7 +10841,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						._insertItem(undefined, this, true);
 			}
 			if (hasProps && props !== Item.NO_INSERT) {
-				Base.filter(this, props, {
+				this.set(props, {
 					internal: true, insert: true, project: true, parent: true
 				});
 			}
@@ -10310,12 +10888,6 @@ return /******/ (function(modules) { // webpackBootstrap
 				project._changed(flags, this);
 			if (symbol)
 				symbol._changed(flags);
-		},
-	
-		set: function(props) {
-			if (props)
-				this._set(props);
-			return this;
 		},
 	
 		getId: function() {
@@ -12223,6 +12795,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			crossOrigin: null,
 			source: null
 		},
+		_prioritize: ['crossOrigin'],
 	
 		initialize: function Raster(object, position) {
 			if (!this._initialize(object,
@@ -18510,7 +19083,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						: color;
 				return col === this || col && this._class === col._class
 						&& this._type === col._type
-						&& this._alpha === col._alpha
+						&& this.getAlpha() === col.getAlpha()
 						&& Base.equals(this._components, col._components)
 						|| false;
 			},
@@ -18648,7 +19221,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		initialize: function Gradient(stops, radial) {
 			this._id = UID.get();
-			if (stops && this._set(stops)) {
+			if (stops && Base.isPlainObject(stops)) {
+				this.set(stops);
 				stops = radial = null;
 			}
 			if (this._stops == null) {
@@ -18977,8 +19551,23 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		equals: function(style) {
+			function compare(style1, style2, secondary) {
+				var values1 = style1._values,
+					values2 = style2._values,
+					defaults2 = style2._defaults;
+				for (var key in values1) {
+					var value1 = values1[key],
+						value2 = values2[key];
+					if (!(secondary && key in values2) && !Base.equals(value1,
+							value2 === undefined ? defaults2[key] : value2))
+						return false;
+				}
+				return true;
+			}
+	
 			return style === this || style && this._class === style._class
-					&& Base.equals(this._values, style._values)
+					&& compare(this, style)
+					&& compare(style, this, true)
 					|| false;
 		},
 	
@@ -20328,7 +20917,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			PaperScopeItem.call(this);
 			this._moveCount = -1;
 			this._downCount = -1;
-			this._set(props);
+			this.set(props);
 		},
 	
 		getMinDistance: function() {
@@ -21799,7 +22388,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	}))();
 	
 	if (paper.agent.node)
-		__webpack_require__(35)(paper);
+		__webpack_require__(37)(paper);
 	
 	if (true) {
 		!(__WEBPACK_AMD_DEFINE_FACTORY__ = (paper), __WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ? (__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) : __WEBPACK_AMD_DEFINE_FACTORY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
@@ -21812,25 +22401,25 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 34 */
-/***/ function(module, exports) {
-
-	/* (ignored) */
-
-/***/ },
-/* 35 */
-/***/ function(module, exports) {
-
-	/* (ignored) */
-
-/***/ },
 /* 36 */
+/***/ function(module, exports) {
+
+	/* (ignored) */
+
+/***/ },
+/* 37 */
+/***/ function(module, exports) {
+
+	/* (ignored) */
+
+/***/ },
+/* 38 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var opentype = __webpack_require__(2),
-		paper = __webpack_require__(33),
-		Glyph = __webpack_require__(37),
-		assign = __webpack_require__(39).assign;
+		paper = __webpack_require__(35),
+		Glyph = __webpack_require__(39),
+		assign = __webpack_require__(41).assign;
 	
 	function Font( args ) {
 		paper.Group.prototype.constructor.apply( this );
@@ -22209,12 +22798,12 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 37 */
+/* 39 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var opentype = __webpack_require__(2),
-		paper = __webpack_require__(33),
-		Outline = __webpack_require__(38);
+		paper = __webpack_require__(35),
+		Outline = __webpack_require__(40);
 	
 	function Glyph( args ) {
 		paper.Group.prototype.constructor.apply( this );
@@ -22418,7 +23007,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			path = this.ot.path;
 		}
 	
-		var combined = this.combineTo( new Outline() );
+		var combined = this.combineTo();
 	
 		if ( combined ) {
 			// prototypo.js will make all contours clockwise without this
@@ -22430,10 +23019,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	};
 	
 	Glyph.prototype.combineTo = function( outline ) {
-		if ( !outline ) {
-			outline = new Outline();
-		}
-	
 		outline = this.children[0].combineTo( outline );
 	
 		return this.children[1].children.reduce(function( outline, component ) {
@@ -22493,10 +23078,10 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 38 */
+/* 40 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var paper = __webpack_require__(33);
+	var paper = __webpack_require__(35);
 	
 	var Outline = paper.CompoundPath;
 	
@@ -22580,7 +23165,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				return reducing;
 			}
 	
-			var tmp = ( reducing == undefined  ?
+			var tmp = ( reducing == undefined  || reducing.isEmpty() ?
 				// when the initial value doesn't exist, use the first path
 				// (clone it otherwise it's removed from this.children)
 				path.clone( false ) :
@@ -22601,7 +23186,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 39 */
+/* 41 */
 /***/ function(module, exports) {
 
 	/**
@@ -22653,13 +23238,13 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 40 */
+/* 42 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* Extend the Path prototype to add OpenType conversion
 	 * and alias *segments methods and properties to *nodes
 	 */
-	var paper = __webpack_require__(33);
+	var paper = __webpack_require__(35);
 	
 	var proto = paper.PaperScope.prototype.Path.prototype;
 	
@@ -22788,10 +23373,10 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 41 */
+/* 43 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var paper = __webpack_require__(33);
+	var paper = __webpack_require__(35);
 	
 	Object.defineProperty( paper.Segment.prototype, 'x', {
 		get: function() {
