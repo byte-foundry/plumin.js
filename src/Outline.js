@@ -82,7 +82,7 @@ Outline.prototype.combineTo = function( outline ) {
 			return reducing;
 		}
 
-		var tmp = ( reducing == undefined  ?
+		var tmp = ( reducing == undefined  || reducing.isEmpty() ?
 			// when the initial value doesn't exist, use the first path
 			// (clone it otherwise it's removed from this.children)
 			path.clone( false ) :
