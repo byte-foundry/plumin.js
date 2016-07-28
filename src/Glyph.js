@@ -204,7 +204,7 @@ Glyph.prototype.combineOTCommands = function( path ) {
 		path = this.ot.path;
 	}
 
-	var combined = this.combineTo( new Outline() );
+	var combined = this.combineTo();
 
 	if ( combined ) {
 		// prototypo.js will make all contours clockwise without this
@@ -216,10 +216,6 @@ Glyph.prototype.combineOTCommands = function( path ) {
 };
 
 Glyph.prototype.combineTo = function( outline ) {
-	if ( !outline ) {
-		outline = new Outline();
-	}
-
 	outline = this.children[0].combineTo( outline );
 
 	return this.children[1].children.reduce(function( outline, component ) {
