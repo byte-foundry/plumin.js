@@ -3,6 +3,26 @@ var opentype = require('opentype.js'),
 	Glyph = require('./Glyph.js'),
 	assign = require('es6-object-assign').assign;
 
+function mergeFont(url, name, user, arrayBuffer, merged, cb) {
+	fetch(
+		[
+			url,
+			name.family,
+			name.style,
+			user,
+			name.template || 'unknown'
+		].join('/') +
+		(merged ? '/overlap' : ''), {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/otf' },
+			body: arrayBuffer
+	})
+	.then(function( response ) {
+		return response.arrayBuffer();
+	})
+	.then(cb);
+}
+
 function Font( args ) {
 	paper.Group.prototype.constructor.apply( this );
 
@@ -265,7 +285,10 @@ if ( typeof window === 'object' && window.document ) {
 	var _URL = window.URL || window.webkitURL;
 	Font.prototype.addToFonts = document.fonts ?
 		// CSS font loading, lightning fast
-		function( buffer, enFamilyName ) {
+		function( buffer, enFamilyName, noMerge) {
+			//cancelling in browser merge
+			clearTimeout(this.mergeTimeout);
+
 			if ( !enFamilyName ) {
 				enFamilyName = this.ot.getEnglishName('fontFamily');
 			}
@@ -286,6 +309,28 @@ if ( typeof window === 'object' && window.document ) {
 			}
 
 			document.fonts.add( fontface );
+
+			//we merge font that haven't been merge
+			if ( !noMerge ) {
+				var timeoutRef = this.mergeTimeout = setTimeout(function() {
+				mergeFont(
+					'https://merge.prototypo.io',
+					{
+						style: 'forbrowserdisplay',
+						template: 'noidea',
+						family: 'forbrowserdisplay'
+					},
+					'plumin',
+					buffer,
+					true,
+					function(mergedBuffer) {
+						if (timeoutRef === this.mergeTimeout) {
+							this.addToFonts(mergedBuffer, enFamilyName, true);
+						}
+					}.bind(this)
+				);
+				}.bind(this), 300);
+			}
 
 			return this;
 		} :
@@ -348,27 +393,18 @@ if ( typeof window === 'object' && window.document ) {
 		}
 		// TODO: replace that with client-side font merging
 		if (name && user) {
-			fetch(
-				[
-					'https://merge.prototypo.io',
-					name.family,
-					name.style,
-					user,
-					name.template || 'unknown'
-				].join('/') +
-				(merged ? '/overlap' : ''), {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/otf' },
-					body: arrayBuffer
-			})
-			.then(function( response ) {
-				return response.arrayBuffer();
-			})
-			.then(function( bufferToDownload ) {
-				if ( merged ) {
-					triggerDownload( this, bufferToDownload );
-				}
-			}.bind(this));
+			mergeFont(
+				'https://merge.prototypo.io',
+				name,
+				user,
+				arrayBuffer,
+				merged,
+				function(bufferToDownload) {
+					if ( merged ) {
+						triggerDownload( this, bufferToDownload );
+					}
+				}.bind(this)
+			);
 		}
 
 		return this;

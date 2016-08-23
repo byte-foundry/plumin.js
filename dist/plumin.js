@@ -62,12 +62,12 @@ return /******/ (function(modules) { // webpackBootstrap
 /***/ function(module, exports, __webpack_require__) {
 
 	var opentype = __webpack_require__(2);
-	var paper = __webpack_require__(33);
-	var Font = __webpack_require__(36);
-	var Glyph = __webpack_require__(37);
-	var Outline = __webpack_require__(38);
-	var Path = __webpack_require__(40);
-	var Node = __webpack_require__(41);
+	var paper = __webpack_require__(36);
+	var Font = __webpack_require__(39);
+	var Glyph = __webpack_require__(40);
+	var Outline = __webpack_require__(41);
+	var Path = __webpack_require__(43);
+	var Node = __webpack_require__(44);
 	
 	paper.PaperScope.prototype.Font = Font;
 	paper.PaperScope.prototype.Glyph = Glyph;
@@ -100,29 +100,40 @@ return /******/ (function(modules) { // webpackBootstrap
 	var glyph = __webpack_require__(15);
 	var parse = __webpack_require__(12);
 	var path = __webpack_require__(6);
-	var util = __webpack_require__(25);
+	var util = __webpack_require__(29);
 	
 	var cmap = __webpack_require__(11);
 	var cff = __webpack_require__(13);
-	var fvar = __webpack_require__(27);
-	var glyf = __webpack_require__(28);
-	var gpos = __webpack_require__(29);
-	var gsub = __webpack_require__(30);
+	var fvar = __webpack_require__(31);
+	var glyf = __webpack_require__(32);
+	var gpos = __webpack_require__(33);
+	var gsub = __webpack_require__(25);
 	var head = __webpack_require__(17);
 	var hhea = __webpack_require__(18);
 	var hmtx = __webpack_require__(19);
-	var kern = __webpack_require__(31);
+	var kern = __webpack_require__(34);
 	var ltag = __webpack_require__(20);
-	var loca = __webpack_require__(32);
+	var loca = __webpack_require__(35);
 	var maxp = __webpack_require__(21);
 	var _name = __webpack_require__(22);
 	var os2 = __webpack_require__(23);
 	var post = __webpack_require__(24);
+	var meta = __webpack_require__(26);
+	
+	/**
+	 * The opentype library.
+	 * @namespace opentype
+	 */
 	
 	// File loaders /////////////////////////////////////////////////////////
-	
+	/**
+	 * Loads a font from a file. The callback throws an error message as the first parameter if it fails
+	 * and the font as an ArrayBuffer in the second parameter if it succeeds.
+	 * @param  {string} path - The path of the file
+	 * @param  {Function} callback - The function to call when the font load completes
+	 */
 	function loadFromFile(path, callback) {
-	    var fs = __webpack_require__(26);
+	    var fs = __webpack_require__(30);
 	    fs.readFile(path, function(err, buffer) {
 	        if (err) {
 	            return callback(err.message);
@@ -131,7 +142,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	        callback(null, util.nodeBufferToArrayBuffer(buffer));
 	    });
 	}
-	
+	/**
+	 * Loads a font from a URL. The callback throws an error message as the first parameter if it fails
+	 * and the font as an ArrayBuffer in the second parameter if it succeeds.
+	 * @param  {string} url - The URL of the font file.
+	 * @param  {Function} callback - The function to call when the font load completes
+	 */
 	function loadFromUrl(url, callback) {
 	    var request = new XMLHttpRequest();
 	    request.open('get', url, true);
@@ -148,7 +164,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 	
 	// Table Directory Entries //////////////////////////////////////////////
-	
+	/**
+	 * Parses OpenType table entries.
+	 * @param  {DataView}
+	 * @param  {Number}
+	 * @return {Object[]}
+	 */
 	function parseOpenTypeTableEntries(data, numTables) {
 	    var tableEntries = [];
 	    var p = 12;
@@ -164,6 +185,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return tableEntries;
 	}
 	
+	/**
+	 * Parses WOFF table entries.
+	 * @param  {DataView}
+	 * @param  {Number}
+	 * @return {Object[]}
+	 */
 	function parseWOFFTableEntries(data, numTables) {
 	    var tableEntries = [];
 	    var p = 44; // offset to the first table directory entry.
@@ -187,6 +214,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return tableEntries;
 	}
 	
+	/**
+	 * @typedef TableData
+	 * @type Object
+	 * @property {DataView} data - The DataView
+	 * @property {number} offset - The data offset.
+	 */
+	
+	/**
+	 * @param  {DataView}
+	 * @param  {Object}
+	 * @return {TableData}
+	 */
 	function uncompressTable(data, tableEntry) {
 	    if (tableEntry.compression === 'WOFF') {
 	        var inBuffer = new Uint8Array(data.buffer, tableEntry.offset + 2, tableEntry.compressedLength - 2);
@@ -205,8 +244,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	// Public API ///////////////////////////////////////////////////////////
 	
-	// Parse the OpenType file data (as an ArrayBuffer) and return a Font object.
-	// Throws an error if the font could not be parsed.
+	/**
+	 * Parse the OpenType file data (as an ArrayBuffer) and return a Font object.
+	 * Throws an error if the font could not be parsed.
+	 * @param  {ArrayBuffer}
+	 * @return {opentype.Font}
+	 */
 	function parseBuffer(buffer) {
 	    var indexToLocFormat;
 	    var ltagTable;
@@ -255,6 +298,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var kernTableEntry;
 	    var locaTableEntry;
 	    var nameTableEntry;
+	    var metaTableEntry;
 	
 	    for (var i = 0; i < numTables; i += 1) {
 	        var tableEntry = tableEntries[i];
@@ -323,6 +367,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	            case 'GSUB':
 	                gsubTableEntry = tableEntry;
 	                break;
+	            case 'meta':
+	                metaTableEntry = tableEntry;
+	                break;
 	        }
 	    }
 	
@@ -358,6 +405,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var gposTable = uncompressTable(data, gposTableEntry);
 	        gpos.parse(gposTable.data, gposTable.offset, font);
 	    }
+	
 	    if (gsubTableEntry) {
 	        var gsubTable = uncompressTable(data, gsubTableEntry);
 	        font.tables.gsub = gsub.parse(gsubTable.data, gsubTable.offset);
@@ -368,15 +416,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	        font.tables.fvar = fvar.parse(fvarTable.data, fvarTable.offset, font.names);
 	    }
 	
+	    if (metaTableEntry) {
+	        var metaTable = uncompressTable(data, metaTableEntry);
+	        font.tables.meta = meta.parse(metaTable.data, metaTable.offset);
+	        font.metas = font.tables.meta;
+	    }
+	
 	    return font;
 	}
 	
-	// Asynchronously load the font from a URL or a filesystem. When done, call the callback
-	// with two arguments `(err, font)`. The `err` will be null on success,
-	// the `font` is a Font object.
-	//
-	// We use the node.js callback convention so that
-	// opentype.js can integrate with frameworks like async.js.
+	/**
+	 * Asynchronously load the font from a URL or a filesystem. When done, call the callback
+	 * with two arguments `(err, font)`. The `err` will be null on success,
+	 * the `font` is a Font object.
+	 * We use the node.js callback convention so that
+	 * opentype.js can integrate with frameworks like async.js.
+	 * @alias opentype.load
+	 * @param  {string} url - The URL of the font to load.
+	 * @param  {Function} callback - The callback.
+	 */
 	function load(url, callback) {
 	    var isNode = typeof window === 'undefined';
 	    var loadFn = isNode ? loadFromFile : loadFromUrl;
@@ -394,10 +452,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	    });
 	}
 	
-	// Synchronously load the font from a URL or file.
-	// When done, return the font object or throw an error.
+	/**
+	 * Synchronously load the font from a URL or file.
+	 * When done, returns the font object or throws an error.
+	 * @alias opentype.loadSync
+	 * @param  {string} url - The URL of the font to load.
+	 * @return {opentype.Font}
+	 */
 	function loadSync(url) {
-	    var fs = __webpack_require__(26);
+	    var fs = __webpack_require__(30);
 	    var buffer = fs.readFileSync(url);
 	    return parseBuffer(util.nodeBufferToArrayBuffer(buffer));
 	}
@@ -919,9 +982,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	    'onehalf', 'onequarter', 'threequarters', 'franc', 'Gbreve', 'gbreve', 'Idotaccent', 'Scedilla', 'scedilla',
 	    'Cacute', 'cacute', 'Ccaron', 'ccaron', 'dcroat'];
 	
-	// This is the encoding used for fonts created from scratch.
-	// It loops through all glyphs and finds the appropriate unicode value.
-	// Since it's linear time, other encodings will be faster.
+	/**
+	 * This is the encoding used for fonts created from scratch.
+	 * It loops through all glyphs and finds the appropriate unicode value.
+	 * Since it's linear time, other encodings will be faster.
+	 * @exports opentype.DefaultEncoding
+	 * @class
+	 * @constructor
+	 * @param {opentype.Font}
+	 */
 	function DefaultEncoding(font) {
 	    this.font = font;
 	}
@@ -943,25 +1012,52 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	};
 	
+	/**
+	 * @exports opentype.CmapEncoding
+	 * @class
+	 * @constructor
+	 * @param {Object} cmap - a object with the cmap encoded data
+	 */
 	function CmapEncoding(cmap) {
 	    this.cmap = cmap;
 	}
 	
+	/**
+	 * @param  {string} c - the character
+	 * @return {number} The glyph index.
+	 */
 	CmapEncoding.prototype.charToGlyphIndex = function(c) {
 	    return this.cmap.glyphIndexMap[c.charCodeAt(0)] || 0;
 	};
 	
+	/**
+	 * @exports opentype.CffEncoding
+	 * @class
+	 * @constructor
+	 * @param {string} encoding - The encoding
+	 * @param {Array} charset - The charcater set.
+	 */
 	function CffEncoding(encoding, charset) {
 	    this.encoding = encoding;
 	    this.charset = charset;
 	}
 	
+	/**
+	 * @param  {string} s - The character
+	 * @return {number} The index.
+	 */
 	CffEncoding.prototype.charToGlyphIndex = function(s) {
 	    var code = s.charCodeAt(0);
 	    var charName = this.encoding[code];
 	    return this.charset.indexOf(charName);
 	};
 	
+	/**
+	 * @exports opentype.GlyphNames
+	 * @class
+	 * @constructor
+	 * @param {Object} post
+	 */
 	function GlyphNames(post) {
 	    var i;
 	    switch (post.version) {
@@ -992,14 +1088,27 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	}
 	
+	/**
+	 * Gets the index of a glyph by name.
+	 * @param  {string} name - The glyph name
+	 * @return {number} The index
+	 */
 	GlyphNames.prototype.nameToGlyphIndex = function(name) {
 	    return this.names.indexOf(name);
 	};
 	
+	/**
+	 * @param  {number} gid
+	 * @return {string}
+	 */
 	GlyphNames.prototype.glyphIndexToName = function(gid) {
 	    return this.names[gid];
 	};
 	
+	/**
+	 * @alias opentype.addGlyphNames
+	 * @param {opentype.Font}
+	 */
 	function addGlyphNames(font) {
 	    var glyph;
 	    var glyphIndexMap = font.tables.cmap.glyphIndexMap;
@@ -1016,7 +1125,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        glyph = font.glyphs.get(i);
 	        if (font.cffEncoding) {
 	            glyph.name = font.cffEncoding.charset[i];
-	        } else {
+	        } else if (font.glyphNames.names) {
 	            glyph.name = font.glyphNames.glyphIndexToName(i);
 	        }
 	    }
@@ -1045,11 +1154,45 @@ return /******/ (function(modules) { // webpackBootstrap
 	var sfnt = __webpack_require__(7);
 	var encoding = __webpack_require__(4);
 	var glyphset = __webpack_require__(14);
-	var util = __webpack_require__(25);
+	var Substitution = __webpack_require__(27);
+	var util = __webpack_require__(29);
 	
-	// A Font represents a loaded OpenType font file.
-	// It contains a set of glyphs and methods to draw text on a drawing context,
-	// or to get a path representing the text.
+	/**
+	 * @typedef FontOptions
+	 * @type Object
+	 * @property {Boolean} empty - whether to create a new empty font
+	 * @property {string} familyName
+	 * @property {string} styleName
+	 * @property {string=} fullName
+	 * @property {string=} postScriptName
+	 * @property {string=} designer
+	 * @property {string=} designerURL
+	 * @property {string=} manufacturer
+	 * @property {string=} manufacturerURL
+	 * @property {string=} license
+	 * @property {string=} licenseURL
+	 * @property {string=} version
+	 * @property {string=} description
+	 * @property {string=} copyright
+	 * @property {string=} trademark
+	 * @property {Number} unitsPerEm
+	 * @property {Number} ascender
+	 * @property {Number} descender
+	 * @property {Number} createdTimestamp
+	 * @property {string=} weightClass
+	 * @property {string=} widthClass
+	 * @property {string=} fsSelection
+	 */
+	
+	/**
+	 * A Font represents a loaded OpenType font file.
+	 * It contains a set of glyphs and methods to draw text on a drawing context,
+	 * or to get a path representing the text.
+	 * @exports opentype.Font
+	 * @class
+	 * @param {FontOptions}
+	 * @constructor
+	 */
 	function Font(options) {
 	    options = options || {};
 	
@@ -1093,24 +1236,37 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.supported = true; // Deprecated: parseBuffer will throw an error if font is not supported.
 	    this.glyphs = new glyphset.GlyphSet(this, options.glyphs || []);
 	    this.encoding = new encoding.DefaultEncoding(this);
+	    this.substitution = new Substitution(this);
 	    this.tables = this.tables || {};
 	}
 	
-	// Check if the font has a glyph for the given character.
+	/**
+	 * Check if the font has a glyph for the given character.
+	 * @param  {string}
+	 * @return {Boolean}
+	 */
 	Font.prototype.hasChar = function(c) {
 	    return this.encoding.charToGlyphIndex(c) !== null;
 	};
 	
-	// Convert the given character to a single glyph index.
-	// Note that this function assumes that there is a one-to-one mapping between
-	// the given character and a glyph; for complex scripts this might not be the case.
+	/**
+	 * Convert the given character to a single glyph index.
+	 * Note that this function assumes that there is a one-to-one mapping between
+	 * the given character and a glyph; for complex scripts this might not be the case.
+	 * @param  {string}
+	 * @return {Number}
+	 */
 	Font.prototype.charToGlyphIndex = function(s) {
 	    return this.encoding.charToGlyphIndex(s);
 	};
 	
-	// Convert the given character to a single Glyph object.
-	// Note that this function assumes that there is a one-to-one mapping between
-	// the given character and a glyph; for complex scripts this might not be the case.
+	/**
+	 * Convert the given character to a single Glyph object.
+	 * Note that this function assumes that there is a one-to-one mapping between
+	 * the given character and a glyph; for complex scripts this might not be the case.
+	 * @param  {string}
+	 * @return {opentype.Glyph}
+	 */
 	Font.prototype.charToGlyph = function(c) {
 	    var glyphIndex = this.charToGlyphIndex(c);
 	    var glyph = this.glyphs.get(glyphIndex);
@@ -1122,10 +1278,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return glyph;
 	};
 	
-	// Convert the given text to a list of Glyph objects.
-	// Note that there is no strict one-to-one mapping between characters and
-	// glyphs, so the list of returned glyphs can be larger or smaller than the
-	// length of the given string.
+	/**
+	 * Convert the given text to a list of Glyph objects.
+	 * Note that there is no strict one-to-one mapping between characters and
+	 * glyphs, so the list of returned glyphs can be larger or smaller than the
+	 * length of the given string.
+	 * @param  {string}
+	 * @return {opentype.Glyph[]}
+	 */
 	Font.prototype.stringToGlyphs = function(s) {
 	    var glyphs = [];
 	    for (var i = 0; i < s.length; i += 1) {
@@ -1136,10 +1296,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return glyphs;
 	};
 	
+	/**
+	 * @param  {string}
+	 * @return {Number}
+	 */
 	Font.prototype.nameToGlyphIndex = function(name) {
 	    return this.glyphNames.nameToGlyphIndex(name);
 	};
 	
+	/**
+	 * @param  {string}
+	 * @return {opentype.Glyph}
+	 */
 	Font.prototype.nameToGlyph = function(name) {
 	    var glyphIndex = this.nametoGlyphIndex(name);
 	    var glyph = this.glyphs.get(glyphIndex);
@@ -1151,6 +1319,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return glyph;
 	};
 	
+	/**
+	 * @param  {Number}
+	 * @return {String}
+	 */
 	Font.prototype.glyphIndexToName = function(gid) {
 	    if (!this.glyphNames.glyphIndexToName) {
 	        return '';
@@ -1159,10 +1331,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return this.glyphNames.glyphIndexToName(gid);
 	};
 	
-	// Retrieve the value of the kerning pair between the left glyph (or its index)
-	// and the right glyph (or its index). If no kerning pair is found, return 0.
-	// The kerning value gets added to the advance width when calculating the spacing
-	// between glyphs.
+	/**
+	 * Retrieve the value of the kerning pair between the left glyph (or its index)
+	 * and the right glyph (or its index). If no kerning pair is found, return 0.
+	 * The kerning value gets added to the advance width when calculating the spacing
+	 * between glyphs.
+	 * @param  {opentype.Glyph} leftGlyph
+	 * @param  {opentype.Glyph} rightGlyph
+	 * @return {Number}
+	 */
 	Font.prototype.getKerningValue = function(leftGlyph, rightGlyph) {
 	    leftGlyph = leftGlyph.index || leftGlyph;
 	    rightGlyph = rightGlyph.index || rightGlyph;
@@ -1171,8 +1348,22 @@ return /******/ (function(modules) { // webpackBootstrap
 	        (this.kerningPairs[leftGlyph + ',' + rightGlyph] || 0);
 	};
 	
-	// Helper function that invokes the given callback for each glyph in the given text.
-	// The callback gets `(glyph, x, y, fontSize, options)`.
+	/**
+	 * @typedef GlyphRenderOptions
+	 * @type Object
+	 * @property {boolean} [kerning] - whether to include kerning values
+	 */
+	
+	/**
+	 * Helper function that invokes the given callback for each glyph in the given text.
+	 * The callback gets `(glyph, x, y, fontSize, options)`.* @param  {string} text
+	 * @param {string} text - The text to apply.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {GlyphRenderOptions=} options
+	 * @param  {Function} callback
+	 */
 	Font.prototype.forEachGlyph = function(text, x, y, fontSize, options, callback) {
 	    x = x !== undefined ? x : 0;
 	    y = y !== undefined ? y : 0;
@@ -1195,16 +1386,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	};
 	
-	// Create a Path object that represents the given text.
-	//
-	// text - The text to create.
-	// x - Horizontal position of the beginning of the text. (default: 0)
-	// y - Vertical position of the *baseline* of the text. (default: 0)
-	// fontSize - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`. (default: 72)
-	// Options is an optional object that contains:
-	// - kerning - Whether to take kerning information into account. (default: true)
-	//
-	// Returns a Path object.
+	/**
+	 * Create a Path object that represents the given text.
+	 * @param  {string} text - The text to create.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {GlyphRenderOptions=} options
+	 * @return {opentype.Path}
+	 */
 	Font.prototype.getPath = function(text, x, y, fontSize, options) {
 	    var fullPath = new path.Path();
 	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
@@ -1215,16 +1405,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return fullPath;
 	};
 	
-	// Create an array of Path objects that represent the glyps of a given text.
-	//
-	// text - The text to create.
-	// x - Horizontal position of the beginning of the text. (default: 0)
-	// y - Vertical position of the *baseline* of the text. (default: 0)
-	// fontSize - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`. (default: 72)
-	// Options is an optional object that contains:
-	// - kerning - Whether to take kerning information into account. (default: true)
-	//
-	// Returns an array of Path objects.
+	/**
+	 * Create an array of Path objects that represent the glyps of a given text.
+	 * @param  {string} text - The text to create.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {GlyphRenderOptions=} options
+	 * @return {opentype.Path[]}
+	 */
 	Font.prototype.getPaths = function(text, x, y, fontSize, options) {
 	    var glyphPaths = [];
 	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
@@ -1235,53 +1424,57 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return glyphPaths;
 	};
 	
-	// Draw the text on the given drawing context.
-	//
-	// ctx - A 2D drawing context, like Canvas.
-	// text - The text to create.
-	// x - Horizontal position of the beginning of the text. (default: 0)
-	// y - Vertical position of the *baseline* of the text. (default: 0)
-	// fontSize - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`. (default: 72)
-	// Options is an optional object that contains:
-	// - kerning - Whether to take kerning information into account. (default: true)
+	/**
+	 * Draw the text on the given drawing context.
+	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param  {string} text - The text to create.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {GlyphRenderOptions=} options
+	 */
 	Font.prototype.draw = function(ctx, text, x, y, fontSize, options) {
 	    this.getPath(text, x, y, fontSize, options).draw(ctx);
 	};
 	
-	// Draw the points of all glyphs in the text.
-	// On-curve points will be drawn in blue, off-curve points will be drawn in red.
-	//
-	// ctx - A 2D drawing context, like Canvas.
-	// text - The text to create.
-	// x - Horizontal position of the beginning of the text. (default: 0)
-	// y - Vertical position of the *baseline* of the text. (default: 0)
-	// fontSize - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`. (default: 72)
-	// Options is an optional object that contains:
-	// - kerning - Whether to take kerning information into account. (default: true)
+	/**
+	 * Draw the points of all glyphs in the text.
+	 * On-curve points will be drawn in blue, off-curve points will be drawn in red.
+	 * @param {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param {string} text - The text to create.
+	 * @param {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param {GlyphRenderOptions=} options
+	 */
 	Font.prototype.drawPoints = function(ctx, text, x, y, fontSize, options) {
 	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
 	        glyph.drawPoints(ctx, gX, gY, gFontSize);
 	    });
 	};
 	
-	// Draw lines indicating important font measurements for all glyphs in the text.
-	// Black lines indicate the origin of the coordinate system (point 0,0).
-	// Blue lines indicate the glyph bounding box.
-	// Green line indicates the advance width of the glyph.
-	//
-	// ctx - A 2D drawing context, like Canvas.
-	// text - The text to create.
-	// x - Horizontal position of the beginning of the text. (default: 0)
-	// y - Vertical position of the *baseline* of the text. (default: 0)
-	// fontSize - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`. (default: 72)
-	// Options is an optional object that contains:
-	// - kerning - Whether to take kerning information into account. (default: true)
+	/**
+	 * Draw lines indicating important font measurements for all glyphs in the text.
+	 * Black lines indicate the origin of the coordinate system (point 0,0).
+	 * Blue lines indicate the glyph bounding box.
+	 * Green line indicates the advance width of the glyph.
+	 * @param {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param {string} text - The text to create.
+	 * @param {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param {GlyphRenderOptions=} options
+	 */
 	Font.prototype.drawMetrics = function(ctx, text, x, y, fontSize, options) {
 	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
 	        glyph.drawMetrics(ctx, gX, gY, gFontSize);
 	    });
 	};
 	
+	/**
+	 * @param  {string}
+	 * @return {string}
+	 */
 	Font.prototype.getEnglishName = function(name) {
 	    var translations = this.names[name];
 	    if (translations) {
@@ -1289,7 +1482,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	};
 	
-	// Validate
+	/**
+	 * Validate
+	 */
 	Font.prototype.validate = function() {
 	    var warnings = [];
 	    var _this = this;
@@ -1317,17 +1512,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	    assert(this.unitsPerEm > 0, 'No unitsPerEm specified.');
 	};
 	
-	// Convert the font object to a SFNT data structure.
-	// This structure contains all the necessary tables and metadata to create a binary OTF file.
+	/**
+	 * Convert the font object to a SFNT data structure.
+	 * This structure contains all the necessary tables and metadata to create a binary OTF file.
+	 * @return {opentype.Table}
+	 */
 	Font.prototype.toTables = function() {
 	    return sfnt.fontToTable(this);
 	};
-	
+	/**
+	 * @deprecated Font.toBuffer is deprecated. Use Font.toArrayBuffer instead.
+	 */
 	Font.prototype.toBuffer = function() {
 	    console.warn('Font.toBuffer is deprecated. Use Font.toArrayBuffer instead.');
 	    return this.toArrayBuffer();
 	};
-	
+	/**
+	 * Converts a `opentype.Font` into an `ArrayBuffer`
+	 * @return {ArrayBuffer}
+	 */
 	Font.prototype.toArrayBuffer = function() {
 	    var sfntTable = this.toTables();
 	    var bytes = sfntTable.encode();
@@ -1340,7 +1543,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return buffer;
 	};
 	
-	// Initiate a download of the OpenType font.
+	/**
+	 * Initiate a download of the OpenType font.
+	 */
 	Font.prototype.download = function() {
 	    var familyName = this.getEnglishName('fontFamily');
 	    var styleName = this.getEnglishName('fontSubfamily');
@@ -1364,15 +1569,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	            });
 	        },
 	        function(err) {
-	            throw err;
+	            throw new Error(err.name + ': ' + err.message);
 	        });
 	    } else {
-	        var fs = __webpack_require__(26);
+	        var fs = __webpack_require__(30);
 	        var buffer = util.arrayBufferToNodeBuffer(arrayBuffer);
 	        fs.writeFileSync(fileName, buffer);
 	    }
 	};
-	
+	/**
+	 * @private
+	 */
 	Font.prototype.fsSelectionValues = {
 	    ITALIC:              0x001, //1
 	    UNDERSCORE:          0x002, //2
@@ -1386,6 +1593,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    OBLIQUE:             0x200  //512
 	};
 	
+	/**
+	 * @private
+	 */
 	Font.prototype.usWidthClasses = {
 	    ULTRA_CONDENSED: 1,
 	    EXTRA_CONDENSED: 2,
@@ -1398,6 +1608,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    ULTRA_EXPANDED: 9
 	};
 	
+	/**
+	 * @private
+	 */
 	Font.prototype.usWeightClasses = {
 	    THIN: 100,
 	    EXTRA_LIGHT: 200,
@@ -1421,8 +1634,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	'use strict';
 	
-	// A bézier path containing a set of path commands similar to a SVG path.
-	// Paths can be drawn on a context using `draw`.
+	/**
+	 * A bézier path containing a set of path commands similar to a SVG path.
+	 * Paths can be drawn on a context using `draw`.
+	 * @exports opentype.Path
+	 * @class
+	 * @constructor
+	 */
 	function Path() {
 	    this.commands = [];
 	    this.fill = 'black';
@@ -1430,6 +1648,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.strokeWidth = 1;
 	}
 	
+	/**
+	 * @param  {number} x
+	 * @param  {number} y
+	 */
 	Path.prototype.moveTo = function(x, y) {
 	    this.commands.push({
 	        type: 'M',
@@ -1438,6 +1660,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    });
 	};
 	
+	/**
+	 * @param  {number} x
+	 * @param  {number} y
+	 */
 	Path.prototype.lineTo = function(x, y) {
 	    this.commands.push({
 	        type: 'L',
@@ -1446,6 +1672,32 @@ return /******/ (function(modules) { // webpackBootstrap
 	    });
 	};
 	
+	/**
+	 * Draws cubic curve
+	 * @function
+	 * curveTo
+	 * @memberof opentype.Path.prototype
+	 * @param  {number} x1 - x of control 1
+	 * @param  {number} y1 - y of control 1
+	 * @param  {number} x2 - x of control 2
+	 * @param  {number} y2 - y of control 2
+	 * @param  {number} x - x of path point
+	 * @param  {number} y - y of path point
+	 */
+	
+	/**
+	 * Draws cubic curve
+	 * @function
+	 * bezierCurveTo
+	 * @memberof opentype.Path.prototype
+	 * @param  {number} x1 - x of control 1
+	 * @param  {number} y1 - y of control 1
+	 * @param  {number} x2 - x of control 2
+	 * @param  {number} y2 - y of control 2
+	 * @param  {number} x - x of path point
+	 * @param  {number} y - y of path point
+	 * @see curveTo
+	 */
 	Path.prototype.curveTo = Path.prototype.bezierCurveTo = function(x1, y1, x2, y2, x, y) {
 	    this.commands.push({
 	        type: 'C',
@@ -1458,6 +1710,27 @@ return /******/ (function(modules) { // webpackBootstrap
 	    });
 	};
 	
+	/**
+	 * Draws quadratic curve
+	 * @function
+	 * quadraticCurveTo
+	 * @memberof opentype.Path.prototype
+	 * @param  {number} x1 - x of control
+	 * @param  {number} y1 - y of control
+	 * @param  {number} x - x of path point
+	 * @param  {number} y - y of path point
+	 */
+	
+	/**
+	 * Draws quadratic curve
+	 * @function
+	 * quadTo
+	 * @memberof opentype.Path.prototype
+	 * @param  {number} x1 - x of control
+	 * @param  {number} y1 - y of control
+	 * @param  {number} x - x of path point
+	 * @param  {number} y - y of path point
+	 */
 	Path.prototype.quadTo = Path.prototype.quadraticCurveTo = function(x1, y1, x, y) {
 	    this.commands.push({
 	        type: 'Q',
@@ -1468,13 +1741,27 @@ return /******/ (function(modules) { // webpackBootstrap
 	    });
 	};
 	
+	/**
+	 * Closes the path
+	 * @function closePath
+	 * @memberof opentype.Path.prototype
+	 */
+	
+	/**
+	 * Close the path
+	 * @function close
+	 * @memberof opentype.Path.prototype
+	 */
 	Path.prototype.close = Path.prototype.closePath = function() {
 	    this.commands.push({
 	        type: 'Z'
 	    });
 	};
 	
-	// Add the given path or list of commands to the commands of this path.
+	/**
+	 * Add the given path or list of commands to the commands of this path.
+	 * @param  {Array}
+	 */
 	Path.prototype.extend = function(pathOrCommands) {
 	    if (pathOrCommands.commands) {
 	        pathOrCommands = pathOrCommands.commands;
@@ -1483,7 +1770,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    Array.prototype.push.apply(this.commands, pathOrCommands);
 	};
 	
-	// Draw the path to a 2D context.
+	/**
+	 * Draw the path to a 2D context.
+	 * @param {CanvasRenderingContext2D} ctx - A 2D drawing context.
+	 */
 	Path.prototype.draw = function(ctx) {
 	    ctx.beginPath();
 	    for (var i = 0; i < this.commands.length; i += 1) {
@@ -1513,10 +1803,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	};
 	
-	// Convert the Path to a string of path data instructions
-	// See http://www.w3.org/TR/SVG/paths.html#PathData
-	// Parameters:
-	// - decimalPlaces: The amount of decimal places for floating-point values (default: 2)
+	/**
+	 * Convert the Path to a string of path data instructions
+	 * See http://www.w3.org/TR/SVG/paths.html#PathData
+	 * @param  {number} [decimalPlaces=2] - The amount of decimal places for floating-point values
+	 * @return {string}
+	 */
 	Path.prototype.toPathData = function(decimalPlaces) {
 	    decimalPlaces = decimalPlaces !== undefined ? decimalPlaces : 2;
 	
@@ -1561,14 +1853,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return d;
 	};
 	
-	// Convert the path to a SVG <path> element, as a string.
-	// Parameters:
-	// - decimalPlaces: The amount of decimal places for floating-point values (default: 2)
+	/**
+	 * Convert the path to an SVG <path> element, as a string.
+	 * @param  {number} [decimalPlaces=2] - The amount of decimal places for floating-point values
+	 * @return {string}
+	 */
 	Path.prototype.toSVG = function(decimalPlaces) {
 	    var svg = '<path d="';
 	    svg += this.toPathData(decimalPlaces);
 	    svg += '"';
-	    if (this.fill & this.fill !== 'black') {
+	    if (this.fill && this.fill !== 'black') {
 	        if (this.fill === null) {
 	            svg += ' fill="none"';
 	        } else {
@@ -1612,6 +1906,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	var _name = __webpack_require__(22);
 	var os2 = __webpack_require__(23);
 	var post = __webpack_require__(24);
+	var gsub = __webpack_require__(25);
+	var meta = __webpack_require__(26);
 	
 	function log2(v) {
 	    return Math.log(v) / Math.log(2) | 0;
@@ -1891,10 +2187,19 @@ return /******/ (function(modules) { // webpackBootstrap
 	        fontBBox: [0, globals.yMin, globals.ascender, globals.advanceWidthMax]
 	    });
 	
+	    var metaTable = (font.metas && Object.keys(font.metas).length > 0) ? meta.make(font.metas) : undefined;
+	
 	    // The order does not matter because makeSfntTable() will sort them.
 	    var tables = [headTable, hheaTable, maxpTable, os2Table, nameTable, cmapTable, postTable, cffTable, hmtxTable];
 	    if (ltagTable) {
 	        tables.push(ltagTable);
+	    }
+	    // Optional tables
+	    if (font.tables.gsub) {
+	        tables.push(gsub.make(font.tables.gsub));
+	    }
+	    if (metaTable) {
+	        tables.push(metaTable);
 	    }
 	
 	    var sfntTable = makeSfntTable(tables);
@@ -1932,11 +2237,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	'use strict';
 	
+	exports.fail = function(message) {
+	    throw new Error(message);
+	};
+	
 	// Precondition function that checks if the given predicate is true.
 	// If not, it will throw an error.
 	exports.argument = function(predicate, message) {
 	    if (!predicate) {
-	        throw new Error(message);
+	        exports.fail(message);
 	    }
 	};
 	
@@ -1953,9 +2262,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	'use strict';
 	
+	var check = __webpack_require__(8);
 	var encode = __webpack_require__(10).encode;
 	var sizeOf = __webpack_require__(10).sizeOf;
-	
+	/**
+	 * @exports opentype.Table
+	 * @class
+	 * @param {string} tableName
+	 * @param {Array} fields
+	 * @param {Object} options
+	 * @constructor
+	 */
 	function Table(tableName, fields, options) {
 	    var i;
 	    for (i = 0; i < fields.length; i += 1) {
@@ -1977,15 +2294,170 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	}
 	
+	/**
+	 * Encodes the table and returns an array of bytes
+	 * @return {Array}
+	 */
 	Table.prototype.encode = function() {
 	    return encode.TABLE(this);
 	};
 	
+	/**
+	 * Get the size of the table.
+	 * @return {number}
+	 */
 	Table.prototype.sizeOf = function() {
 	    return sizeOf.TABLE(this);
 	};
 	
+	/**
+	 * @private
+	 */
+	function ushortList(itemName, list, count) {
+	    if (count === undefined) {
+	        count = list.length;
+	    }
+	    var fields = new Array(list.length + 1);
+	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
+	    for (var i = 0; i < list.length; i++) {
+	        fields[i + 1] = {name: itemName + i, type: 'USHORT', value: list[i]};
+	    }
+	    return fields;
+	}
+	
+	/**
+	 * @private
+	 */
+	function tableList(itemName, records, itemCallback) {
+	    var count = records.length;
+	    var fields = new Array(count + 1);
+	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
+	    for (var i = 0; i < count; i++) {
+	        fields[i + 1] = {name: itemName + i, type: 'TABLE', value: itemCallback(records[i], i)};
+	    }
+	    return fields;
+	}
+	
+	/**
+	 * @private
+	 */
+	function recordList(itemName, records, itemCallback) {
+	    var count = records.length;
+	    var fields = [];
+	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
+	    for (var i = 0; i < count; i++) {
+	        fields = fields.concat(itemCallback(records[i], i));
+	    }
+	    return fields;
+	}
+	
+	// Common Layout Tables
+	
+	/**
+	 * @exports opentype.Coverage
+	 * @class
+	 * @param {opentype.Table}
+	 * @constructor
+	 * @extends opentype.Table
+	 */
+	function Coverage(coverageTable) {
+	    if (coverageTable.format === 1) {
+	        Table.call(this, 'coverageTable',
+	            [{name: 'coverageFormat', type: 'USHORT', value: 1}]
+	            .concat(ushortList('glyph', coverageTable.glyphs))
+	        );
+	    } else {
+	        check.assert(false, 'Can\'t create coverage table format 2 yet.');
+	    }
+	}
+	Coverage.prototype = Object.create(Table.prototype);
+	Coverage.prototype.constructor = Coverage;
+	
+	function ScriptList(scriptListTable) {
+	    Table.call(this, 'scriptListTable',
+	        recordList('scriptRecord', scriptListTable, function(scriptRecord, i) {
+	            var script = scriptRecord.script;
+	            var defaultLangSys = script.defaultLangSys;
+	            check.assert(!!defaultLangSys, 'Unable to write GSUB: script ' + scriptRecord.tag + ' has no default language system.');
+	            return [
+	                {name: 'scriptTag' + i, type: 'TAG', value: scriptRecord.tag},
+	                {name: 'script' + i, type: 'TABLE', value: new Table('scriptTable', [
+	                    {name: 'defaultLangSys', type: 'TABLE', value: new Table('defaultLangSys', [
+	                        {name: 'lookupOrder', type: 'USHORT', value: 0},
+	                        {name: 'reqFeatureIndex', type: 'USHORT', value: defaultLangSys.reqFeatureIndex}]
+	                        .concat(ushortList('featureIndex', defaultLangSys.featureIndexes)))}
+	                    ].concat(recordList('langSys', script.langSysRecords, function(langSysRecord, i) {
+	                        var langSys = langSysRecord.langSys;
+	                        return [
+	                            {name: 'langSysTag' + i, type: 'TAG', value: langSysRecord.tag},
+	                            {name: 'langSys' + i, type: 'TABLE', value: new Table('langSys', [
+	                                {name: 'lookupOrder', type: 'USHORT', value: 0},
+	                                {name: 'reqFeatureIndex', type: 'USHORT', value: langSys.reqFeatureIndex}
+	                                ].concat(ushortList('featureIndex', langSys.featureIndexes)))}
+	                        ];
+	                    })))}
+	            ];
+	        })
+	    );
+	}
+	ScriptList.prototype = Object.create(Table.prototype);
+	ScriptList.prototype.constructor = ScriptList;
+	
+	/**
+	 * @exports opentype.FeatureList
+	 * @class
+	 * @param {opentype.Table}
+	 * @constructor
+	 * @extends opentype.Table
+	 */
+	function FeatureList(featureListTable) {
+	    Table.call(this, 'featureListTable',
+	        recordList('featureRecord', featureListTable, function(featureRecord, i) {
+	            var feature = featureRecord.feature;
+	            return [
+	                {name: 'featureTag' + i, type: 'TAG', value: featureRecord.tag},
+	                {name: 'feature' + i, type: 'TABLE', value: new Table('featureTable', [
+	                    {name: 'featureParams', type: 'USHORT', value: feature.featureParams},
+	                    ].concat(ushortList('lookupListIndex', feature.lookupListIndexes)))}
+	            ];
+	        })
+	    );
+	}
+	FeatureList.prototype = Object.create(Table.prototype);
+	FeatureList.prototype.constructor = FeatureList;
+	
+	/**
+	 * @exports opentype.LookupList
+	 * @class
+	 * @param {opentype.Table}
+	 * @param {Object}
+	 * @constructor
+	 * @extends opentype.Table
+	 */
+	function LookupList(lookupListTable, subtableMakers) {
+	    Table.call(this, 'lookupListTable', tableList('lookup', lookupListTable, function(lookupTable) {
+	        var subtableCallback = subtableMakers[lookupTable.lookupType];
+	        check.assert(!!subtableCallback, 'Unable to write GSUB lookup type ' + lookupTable.lookupType + ' tables.');
+	        return new Table('lookupTable', [
+	            {name: 'lookupType', type: 'USHORT', value: lookupTable.lookupType},
+	            {name: 'lookupFlag', type: 'USHORT', value: lookupTable.lookupFlag}
+	        ].concat(tableList('subtable', lookupTable.subtables, subtableCallback)));
+	    }));
+	}
+	LookupList.prototype = Object.create(Table.prototype);
+	LookupList.prototype.constructor = LookupList;
+	
+	// Record = same as Table, but inlined (a Table has an offset and its data is further in the stream)
+	// Don't use offsets inside Records (probable bug), only in Tables.
 	exports.Record = exports.Table = Table;
+	exports.Coverage = Coverage;
+	exports.ScriptList = ScriptList;
+	exports.FeatureList = FeatureList;
+	exports.LookupList = LookupList;
+	
+	exports.ushortList = ushortList;
+	exports.tableList = tableList;
+	exports.recordList = recordList;
 
 
 /***/ },
@@ -2004,8 +2476,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	var LIMIT16 = 32768; // The limit at which a 16-bit number switches signs == 2^15
 	var LIMIT32 = 2147483648; // The limit at which a 32-bit number switches signs == 2 ^ 31
 	
+	/**
+	 * @exports opentype.decode
+	 * @class
+	 */
 	var decode = {};
+	/**
+	 * @exports opentype.encode
+	 * @class
+	 */
 	var encode = {};
+	/**
+	 * @exports opentype.sizeOf
+	 * @class
+	 */
 	var sizeOf = {};
 	
 	// Return a function that always returns the same value.
@@ -2017,43 +2501,78 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	// OpenType data types //////////////////////////////////////////////////////
 	
-	// Convert an 8-bit unsigned integer to a list of 1 byte.
+	/**
+	 * Convert an 8-bit unsigned integer to a list of 1 byte.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.BYTE = function(v) {
 	    check.argument(v >= 0 && v <= 255, 'Byte value should be between 0 and 255.');
 	    return [v];
 	};
-	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.BYTE = constant(1);
 	
-	// Convert a 8-bit signed integer to a list of 1 byte.
+	/**
+	 * Convert a 8-bit signed integer to a list of 1 byte.
+	 * @param {string}
+	 * @returns {Array}
+	 */
 	encode.CHAR = function(v) {
 	    return [v.charCodeAt(0)];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.CHAR = constant(1);
 	
-	// Convert an ASCII string to a list of bytes.
+	/**
+	 * Convert an ASCII string to a list of bytes.
+	 * @param {string}
+	 * @returns {Array}
+	 */
 	encode.CHARARRAY = function(v) {
 	    var b = [];
 	    for (var i = 0; i < v.length; i += 1) {
-	        b.push(v.charCodeAt(i));
+	        b[i] = v.charCodeAt(i);
 	    }
 	
 	    return b;
 	};
 	
+	/**
+	 * @param {Array}
+	 * @returns {number}
+	 */
 	sizeOf.CHARARRAY = function(v) {
 	    return v.length;
 	};
 	
-	// Convert a 16-bit unsigned integer to a list of 2 bytes.
+	/**
+	 * Convert a 16-bit unsigned integer to a list of 2 bytes.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.USHORT = function(v) {
 	    return [(v >> 8) & 0xFF, v & 0xFF];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.USHORT = constant(2);
 	
-	// Convert a 16-bit signed integer to a list of 2 bytes.
+	/**
+	 * Convert a 16-bit signed integer to a list of 2 bytes.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.SHORT = function(v) {
 	    // Two's complement
 	    if (v >= LIMIT16) {
@@ -2063,23 +2582,47 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return [(v >> 8) & 0xFF, v & 0xFF];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.SHORT = constant(2);
 	
-	// Convert a 24-bit unsigned integer to a list of 3 bytes.
+	/**
+	 * Convert a 24-bit unsigned integer to a list of 3 bytes.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.UINT24 = function(v) {
 	    return [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.UINT24 = constant(3);
 	
-	// Convert a 32-bit unsigned integer to a list of 4 bytes.
+	/**
+	 * Convert a 32-bit unsigned integer to a list of 4 bytes.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.ULONG = function(v) {
 	    return [(v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.ULONG = constant(4);
 	
-	// Convert a 32-bit unsigned integer to a list of 4 bytes.
+	/**
+	 * Convert a 32-bit unsigned integer to a list of 4 bytes.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.LONG = function(v) {
 	    // Two's complement
 	    if (v >= LIMIT32) {
@@ -2089,6 +2632,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return [(v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.LONG = constant(4);
 	
 	encode.FIXED = encode.ULONG;
@@ -2100,15 +2647,26 @@ return /******/ (function(modules) { // webpackBootstrap
 	encode.UFWORD = encode.USHORT;
 	sizeOf.UFWORD = sizeOf.USHORT;
 	
-	// FIXME Implement LONGDATETIME
-	// Convert a 32-bit Apple Mac timestamp integer to a list of 8 bytes, 64-bit timestamp.
+	/**
+	 * Convert a 32-bit Apple Mac timestamp integer to a list of 8 bytes, 64-bit timestamp.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.LONGDATETIME = function(v) {
 	    return [0, 0, 0, 0, (v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.LONGDATETIME = constant(8);
 	
-	// Convert a 4-char tag to a list of 4 bytes.
+	/**
+	 * Convert a 4-char tag to a list of 4 bytes.
+	 * @param {string}
+	 * @returns {Array}
+	 */
 	encode.TAG = function(v) {
 	    check.argument(v.length === 4, 'Tag should be exactly 4 ASCII characters.');
 	    return [v.charCodeAt(0),
@@ -2117,6 +2675,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	            v.charCodeAt(3)];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.TAG = constant(4);
 	
 	// CFF data types ///////////////////////////////////////////////////////////
@@ -2134,6 +2696,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	sizeOf.SID = sizeOf.USHORT;
 	
 	// Convert a numeric operand or charstring number to a variable-size list of bytes.
+	/**
+	 * Convert a numeric operand or charstring number to a variable-size list of bytes.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.NUMBER = function(v) {
 	    if (v >= -107 && v <= 107) {
 	        return [v + 139];
@@ -2150,27 +2717,51 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	};
 	
+	/**
+	 * @param {number}
+	 * @returns {number}
+	 */
 	sizeOf.NUMBER = function(v) {
 	    return encode.NUMBER(v).length;
 	};
 	
-	// Convert a signed number between -32768 and +32767 to a three-byte value.
-	// This ensures we always use three bytes, but is not the most compact format.
+	/**
+	 * Convert a signed number between -32768 and +32767 to a three-byte value.
+	 * This ensures we always use three bytes, but is not the most compact format.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.NUMBER16 = function(v) {
 	    return [28, (v >> 8) & 0xFF, v & 0xFF];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.NUMBER16 = constant(3);
 	
-	// Convert a signed number between -(2^31) and +(2^31-1) to a five-byte value.
-	// This is useful if you want to be sure you always use four bytes,
-	// at the expense of wasting a few bytes for smaller numbers.
+	/**
+	 * Convert a signed number between -(2^31) and +(2^31-1) to a five-byte value.
+	 * This is useful if you want to be sure you always use four bytes,
+	 * at the expense of wasting a few bytes for smaller numbers.
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.NUMBER32 = function(v) {
 	    return [29, (v >> 24) & 0xFF, (v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF];
 	};
 	
+	/**
+	 * @constant
+	 * @type {number}
+	 */
 	sizeOf.NUMBER32 = constant(5);
 	
+	/**
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.REAL = function(v) {
 	    var value = v.toString();
 	
@@ -2207,6 +2798,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return out;
 	};
 	
+	/**
+	 * @param {number}
+	 * @returns {number}
+	 */
 	sizeOf.REAL = function(v) {
 	    return encode.REAL(v).length;
 	};
@@ -2217,6 +2812,28 @@ return /******/ (function(modules) { // webpackBootstrap
 	encode.STRING = encode.CHARARRAY;
 	sizeOf.STRING = sizeOf.CHARARRAY;
 	
+	/**
+	 * @param {DataView} data
+	 * @param {number} offset
+	 * @param {number} numBytes
+	 * @returns {string}
+	 */
+	decode.UTF8 = function(data, offset, numBytes) {
+	    var codePoints = [];
+	    var numChars = numBytes;
+	    for (var j = 0; j < numChars; j++, offset += 1) {
+	        codePoints[j] = data.getUint8(offset);
+	    }
+	
+	    return String.fromCharCode.apply(null, codePoints);
+	};
+	
+	/**
+	 * @param {DataView} data
+	 * @param {number} offset
+	 * @param {number} numBytes
+	 * @returns {string}
+	 */
 	decode.UTF16 = function(data, offset, numBytes) {
 	    var codePoints = [];
 	    var numChars = numBytes / 2;
@@ -2227,18 +2844,26 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return String.fromCharCode.apply(null, codePoints);
 	};
 	
-	// Convert a JavaScript string to UTF16-BE.
+	/**
+	 * Convert a JavaScript string to UTF16-BE.
+	 * @param {string}
+	 * @returns {Array}
+	 */
 	encode.UTF16 = function(v) {
 	    var b = [];
 	    for (var i = 0; i < v.length; i += 1) {
 	        var codepoint = v.charCodeAt(i);
-	        b.push((codepoint >> 8) & 0xFF);
-	        b.push(codepoint & 0xFF);
+	        b[b.length] = (codepoint >> 8) & 0xFF;
+	        b[b.length] = codepoint & 0xFF;
 	    }
 	
 	    return b;
 	};
 	
+	/**
+	 * @param {string}
+	 * @returns {number}
+	 */
 	sizeOf.UTF16 = function(v) {
 	    return v.length * 2;
 	};
@@ -2253,6 +2878,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	//
 	//     s = u''.join([chr(c).decode('mac_greek') for c in range(128, 256)])
 	//     print(s.encode('utf-8'))
+	/**
+	 * @private
+	 */
 	var eightBitMacEncodings = {
 	    'x-mac-croatian':  // Python: 'mac_croatian'
 	        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®Š™´¨≠ŽØ∞±≤≥∆µ∂∑∏š∫ªºΩžø' +
@@ -2288,10 +2916,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	        '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸĞğİıŞş‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙˆ˜¯˘˙˚¸˝˛ˇ'
 	};
 	
-	// Decodes an old-style Macintosh string. Returns either a Unicode JavaScript
-	// string, or 'undefined' if the encoding is unsupported. For example, we do
-	// not support Chinese, Japanese or Korean because these would need large
-	// mapping tables.
+	/**
+	 * Decodes an old-style Macintosh string. Returns either a Unicode JavaScript
+	 * string, or 'undefined' if the encoding is unsupported. For example, we do
+	 * not support Chinese, Japanese or Korean because these would need large
+	 * mapping tables.
+	 * @param {DataView} dataView
+	 * @param {number} offset
+	 * @param {number} dataLength
+	 * @param {string} encoding
+	 * @returns {string}
+	 */
 	decode.MACSTRING = function(dataView, offset, dataLength, encoding) {
 	    var table = eightBitMacEncodings[encoding];
 	    if (table === undefined) {
@@ -2364,10 +2999,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return encodingTable;
 	};
 	
-	// Encodes an old-style Macintosh string. Returns a byte array upon success.
-	// If the requested encoding is unsupported, or if the input string contains
-	// a character that cannot be expressed in the encoding, the function returns
-	// 'undefined'.
+	/**
+	 * Encodes an old-style Macintosh string. Returns a byte array upon success.
+	 * If the requested encoding is unsupported, or if the input string contains
+	 * a character that cannot be expressed in the encoding, the function returns
+	 * 'undefined'.
+	 * @param {string} str
+	 * @param {string} encoding
+	 * @returns {Array}
+	 */
 	encode.MACSTRING = function(str, encoding) {
 	    var table = getMacEncodingTable(encoding);
 	    if (table === undefined) {
@@ -2388,13 +3028,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	                return undefined;
 	            }
 	        }
-	
-	        result.push(c);
+	        result[i] = c;
+	        // result.push(c);
 	    }
 	
 	    return result;
 	};
 	
+	/**
+	 * @param {string} str
+	 * @param {string} encoding
+	 * @returns {number}
+	 */
 	sizeOf.MACSTRING = function(str, encoding) {
 	    var b = encode.MACSTRING(str, encoding);
 	    if (b !== undefined) {
@@ -2406,6 +3051,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	// Convert a list of values to a CFF INDEX structure.
 	// The values should be objects containing name / type / value.
+	/**
+	 * @param {Array} l
+	 * @returns {Array}
+	 */
 	encode.INDEX = function(l) {
 	    var i;
 	    //var offset, offsets, offsetEncoder, encodedOffsets, encodedOffset, data,
@@ -2441,13 +3090,21 @@ return /******/ (function(modules) { // webpackBootstrap
 	                           data);
 	};
 	
+	/**
+	 * @param {Array}
+	 * @returns {number}
+	 */
 	sizeOf.INDEX = function(v) {
 	    return encode.INDEX(v).length;
 	};
 	
-	// Convert an object to a CFF DICT structure.
-	// The keys should be numeric.
-	// The values should be objects containing name / type / value.
+	/**
+	 * Convert an object to a CFF DICT structure.
+	 * The keys should be numeric.
+	 * The values should be objects containing name / type / value.
+	 * @param {Object} m
+	 * @returns {Array}
+	 */
 	encode.DICT = function(m) {
 	    var d = [];
 	    var keys = Object.keys(m);
@@ -2465,10 +3122,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return d;
 	};
 	
+	/**
+	 * @param {Object}
+	 * @returns {number}
+	 */
 	sizeOf.DICT = function(m) {
 	    return encode.DICT(m).length;
 	};
 	
+	/**
+	 * @param {number}
+	 * @returns {Array}
+	 */
 	encode.OPERATOR = function(v) {
 	    if (v < 1200) {
 	        return [v];
@@ -2477,6 +3142,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	};
 	
+	/**
+	 * @param {Array} v
+	 * @param {string}
+	 * @returns {Array}
+	 */
 	encode.OPERAND = function(v, type) {
 	    var d = [];
 	    if (Array.isArray(type)) {
@@ -2509,7 +3179,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	// memoize charstring encoding using WeakMap if available
 	var wmm = typeof WeakMap === 'function' && new WeakMap();
-	// Convert a list of CharString operations to bytes.
+	
+	/**
+	 * Convert a list of CharString operations to bytes.
+	 * @param {Array}
+	 * @returns {Array}
+	 */
 	encode.CHARSTRING = function(ops) {
 	    // See encode.MACSTRING for why we don't do "if (wmm && wmm.has(ops))".
 	    if (wmm) {
@@ -2534,28 +3209,44 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return d;
 	};
 	
+	/**
+	 * @param {Array}
+	 * @returns {number}
+	 */
 	sizeOf.CHARSTRING = function(ops) {
 	    return encode.CHARSTRING(ops).length;
 	};
 	
 	// Utility functions ////////////////////////////////////////////////////////
 	
-	// Convert an object containing name / type / value to bytes.
+	/**
+	 * Convert an object containing name / type / value to bytes.
+	 * @param {Object}
+	 * @returns {Array}
+	 */
 	encode.OBJECT = function(v) {
 	    var encodingFunction = encode[v.type];
 	    check.argument(encodingFunction !== undefined, 'No encoding function for type ' + v.type);
 	    return encodingFunction(v.value);
 	};
 	
+	/**
+	 * @param {Object}
+	 * @returns {number}
+	 */
 	sizeOf.OBJECT = function(v) {
 	    var sizeOfFunction = sizeOf[v.type];
 	    check.argument(sizeOfFunction !== undefined, 'No sizeOf function for type ' + v.type);
 	    return sizeOfFunction(v.value);
 	};
 	
-	// Convert a table object to bytes.
-	// A table contains a list of fields containing the metadata (name, type and default value).
-	// The table itself has the field values set as attributes.
+	/**
+	 * Convert a table object to bytes.
+	 * A table contains a list of fields containing the metadata (name, type and default value).
+	 * The table itself has the field values set as attributes.
+	 * @param {opentype.Table}
+	 * @returns {Array}
+	 */
 	encode.TABLE = function(table) {
 	    var d = [];
 	    var length = table.fields.length;
@@ -2595,6 +3286,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return d;
 	};
 	
+	/**
+	 * @param {opentype.Table}
+	 * @returns {number}
+	 */
 	sizeOf.TABLE = function(table) {
 	    var numBytes = 0;
 	    var length = table.fields.length;
@@ -2649,37 +3344,34 @@ return /******/ (function(modules) { // webpackBootstrap
 	var parse = __webpack_require__(12);
 	var table = __webpack_require__(9);
 	
-	// Parse the `cmap` table. This table stores the mappings from characters to glyphs.
-	// There are many available formats, but we only support the Windows format 4.
-	// This function returns a `CmapEncoding` object or null if no supported format could be found.
-	function parseCmapTable(data, start) {
+	function parseCmapTableFormat12(cmap, p) {
 	    var i;
-	    var cmap = {};
-	    cmap.version = parse.getUShort(data, start);
-	    check.argument(cmap.version === 0, 'cmap table version should be 0.');
 	
-	    // The cmap table can contain many sub-tables, each with their own format.
-	    // We're only interested in a "platform 3" table. This is a Windows format.
-	    cmap.numTables = parse.getUShort(data, start + 2);
-	    var offset = -1;
-	    for (i = 0; i < cmap.numTables; i += 1) {
-	        var platformId = parse.getUShort(data, start + 4 + (i * 8));
-	        var encodingId = parse.getUShort(data, start + 4 + (i * 8) + 2);
-	        if (platformId === 3 && (encodingId === 1 || encodingId === 0)) {
-	            offset = parse.getULong(data, start + 4 + (i * 8) + 4);
-	            break;
+	    //Skip reserved.
+	    p.parseUShort();
+	
+	    // Length in bytes of the sub-tables.
+	    cmap.length = p.parseULong();
+	    cmap.language = p.parseULong();
+	
+	    var groupCount;
+	    cmap.groupCount = groupCount = p.parseULong();
+	    cmap.glyphIndexMap = {};
+	
+	    for (i = 0; i < groupCount; i += 1) {
+	        var startCharCode = p.parseULong();
+	        var endCharCode = p.parseULong();
+	        var startGlyphId = p.parseULong();
+	
+	        for (var c = startCharCode; c <= endCharCode; c += 1) {
+	            cmap.glyphIndexMap[c] = startGlyphId;
+	            startGlyphId++;
 	        }
 	    }
+	}
 	
-	    if (offset === -1) {
-	        // There is no cmap table in the font that we support, so return null.
-	        // This font will be marked as unsupported.
-	        return null;
-	    }
-	
-	    var p = new parse.Parser(data, start + offset);
-	    cmap.format = p.parseUShort();
-	    check.argument(cmap.format === 4, 'Only format 4 cmap tables are supported.');
+	function parseCmapTableFormat4(cmap, p, data, start, offset) {
+	    var i;
 	
 	    // Length in bytes of the sub-tables.
 	    cmap.length = p.parseUShort();
@@ -2694,7 +3386,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    // The "unrolled" mapping from character codes to glyph indices.
 	    cmap.glyphIndexMap = {};
-	
 	    var endCountParser = new parse.Parser(data, start + offset + 14);
 	    var startCountParser = new parse.Parser(data, start + offset + 16 + segCount * 2);
 	    var idDeltaParser = new parse.Parser(data, start + offset + 16 + segCount * 4);
@@ -2727,6 +3418,46 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	            cmap.glyphIndexMap[c] = glyphIndex;
 	        }
+	    }
+	}
+	
+	// Parse the `cmap` table. This table stores the mappings from characters to glyphs.
+	// There are many available formats, but we only support the Windows format 4 and 12.
+	// This function returns a `CmapEncoding` object or null if no supported format could be found.
+	function parseCmapTable(data, start) {
+	    var i;
+	    var cmap = {};
+	    cmap.version = parse.getUShort(data, start);
+	    check.argument(cmap.version === 0, 'cmap table version should be 0.');
+	
+	    // The cmap table can contain many sub-tables, each with their own format.
+	    // We're only interested in a "platform 3" table. This is a Windows format.
+	    cmap.numTables = parse.getUShort(data, start + 2);
+	    var offset = -1;
+	    for (i = cmap.numTables - 1; i >= 0; i -= 1) {
+	        var platformId = parse.getUShort(data, start + 4 + (i * 8));
+	        var encodingId = parse.getUShort(data, start + 4 + (i * 8) + 2);
+	        if (platformId === 3 && (encodingId === 0 || encodingId === 1 || encodingId === 10)) {
+	            offset = parse.getULong(data, start + 4 + (i * 8) + 4);
+	            break;
+	        }
+	    }
+	
+	    if (offset === -1) {
+	        // There is no cmap table in the font that we support, so return null.
+	        // This font will be marked as unsupported.
+	        return null;
+	    }
+	
+	    var p = new parse.Parser(data, start + offset);
+	    cmap.format = p.parseUShort();
+	
+	    if (cmap.format === 12) {
+	        parseCmapTableFormat12(cmap, p);
+	    } else if (cmap.format === 4) {
+	        parseCmapTableFormat4(cmap, p, data, start, offset);
+	    } else {
+	        throw new Error('Only format 4 and 12 cmap tables are supported.');
 	    }
 	
 	    return cmap;
@@ -4411,9 +5142,31 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var _glyph = __webpack_require__(15);
 	
-	// A GlyphSet represents all glyphs available in the font, but modelled using
-	// a deferred glyph loader, for retrieving glyphs only once they are absolutely
-	// necessary, to keep the memory footprint down.
+	// Define a property on the glyph that depends on the path being loaded.
+	function defineDependentProperty(glyph, externalName, internalName) {
+	    Object.defineProperty(glyph, externalName, {
+	        get: function() {
+	            // Request the path property to make sure the path is loaded.
+	            glyph.path; // jshint ignore:line
+	            return glyph[internalName];
+	        },
+	        set: function(newValue) {
+	            glyph[internalName] = newValue;
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	}
+	
+	/**
+	 * A GlyphSet represents all glyphs available in the font, but modelled using
+	 * a deferred glyph loader, for retrieving glyphs only once they are absolutely
+	 * necessary, to keep the memory footprint down.
+	 * @exports opentype.GlyphSet
+	 * @class
+	 * @param {opentype.Font}
+	 * @param {Array}
+	 */
 	function GlyphSet(font, glyphs) {
 	    this.font = font;
 	    this.glyphs = {};
@@ -4426,6 +5179,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.length = (glyphs && glyphs.length) || 0;
 	}
 	
+	/**
+	 * @param  {number} index
+	 * @return {opentype.Glyph}
+	 */
 	GlyphSet.prototype.get = function(index) {
 	    if (typeof this.glyphs[index] === 'function') {
 	        this.glyphs[index] = this.glyphs[index]();
@@ -4434,11 +5191,21 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return this.glyphs[index];
 	};
 	
+	/**
+	 * @param  {number} index
+	 * @param  {Object}
+	 */
 	GlyphSet.prototype.push = function(index, loader) {
 	    this.glyphs[index] = loader;
 	    this.length++;
 	};
 	
+	/**
+	 * @alias opentype.glyphLoader
+	 * @param  {opentype.Font} font
+	 * @param  {number} index
+	 * @return {opentype.Glyph}
+	 */
 	function glyphLoader(font, index) {
 	    return new _glyph.Glyph({index: index, font: font});
 	}
@@ -4447,8 +5214,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * Generate a stub glyph that can be filled with all metadata *except*
 	 * the "points" and "path" properties, which must be loaded only once
 	 * the glyph's path is actually requested for text shaping.
+	 * @alias opentype.ttfGlyphLoader
+	 * @param  {opentype.Font} font
+	 * @param  {number} index
+	 * @param  {Function} parseGlyph
+	 * @param  {Object} data
+	 * @param  {number} position
+	 * @param  {Function} buildPath
+	 * @return {opentype.Glyph}
 	 */
-	
 	function ttfGlyphLoader(font, index, parseGlyph, data, position, buildPath) {
 	    return function() {
 	        var glyph = new _glyph.Glyph({index: index, font: font});
@@ -4460,10 +5234,22 @@ return /******/ (function(modules) { // webpackBootstrap
 	            return path;
 	        };
 	
+	        defineDependentProperty(glyph, 'xMin', '_xMin');
+	        defineDependentProperty(glyph, 'xMax', '_xMax');
+	        defineDependentProperty(glyph, 'yMin', '_yMin');
+	        defineDependentProperty(glyph, 'yMax', '_yMax');
+	
 	        return glyph;
 	    };
 	}
-	
+	/**
+	 * @alias opentype.cffGlyphLoader
+	 * @param  {opentype.Font} font
+	 * @param  {number} index
+	 * @param  {Function} parseCFFCharstring
+	 * @param  {string} charstring
+	 * @return {opentype.Glyph}
+	 */
 	function cffGlyphLoader(font, index, parseCFFCharstring, charstring) {
 	    return function() {
 	        var glyph = new _glyph.Glyph({index: index, font: font});
@@ -4514,18 +5300,39 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	    };
 	}
+	/**
+	 * @typedef GlyphOptions
+	 * @type Object
+	 * @property {string} [name] - The glyph name
+	 * @property {number} [unicode]
+	 * @property {Array} [unicodes]
+	 * @property {number} [xMin]
+	 * @property {number} [yMin]
+	 * @property {number} [xMax]
+	 * @property {number} [yMax]
+	 * @property {number} [advanceWidth]
+	 */
 	
 	// A Glyph is an individual mark that often corresponds to a character.
 	// Some glyphs, such as ligatures, are a combination of many characters.
 	// Glyphs are the basic building blocks of a font.
 	//
 	// The `Glyph` class contains utility methods for drawing the path and its points.
+	/**
+	 * @exports opentype.Glyph
+	 * @class
+	 * @param {GlyphOptions}
+	 * @constructor
+	 */
 	function Glyph(options) {
 	    // By putting all the code on a prototype function (which is only declared once)
 	    // we reduce the memory requirements for larger fonts by some 2%
 	    this.bindConstructorValues(options);
 	}
 	
+	/**
+	 * @param  {GlyphOptions}
+	 */
 	Glyph.prototype.bindConstructorValues = function(options) {
 	    this.index = options.index || 0;
 	
@@ -4562,6 +5369,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    Object.defineProperty(this, 'path', getPathDefinition(this, options.path));
 	};
 	
+	/**
+	 * @param {number}
+	 */
 	Glyph.prototype.addUnicode = function(unicode) {
 	    if (this.unicodes.length === 0) {
 	        this.unicode = unicode;
@@ -4570,12 +5380,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	    this.unicodes.push(unicode);
 	};
 	
-	// Convert the glyph to a Path we can draw on a drawing context.
-	//
-	// x - Horizontal position of the glyph. (default: 0)
-	// y - Vertical position of the *baseline* of the glyph. (default: 0)
-	// fontSize - Font size, in pixels (default: 72).
-	// options - xScale and yScale to strech the glyph.
+	/**
+	 * Convert the glyph to a Path we can draw on a drawing context.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {Object=} options - xScale, yScale to strech the glyph.
+	 * @return {opentype.Path}
+	 */
 	Glyph.prototype.getPath = function(x, y, fontSize, options) {
 	    x = x !== undefined ? x : 0;
 	    y = y !== undefined ? y : 0;
@@ -4608,9 +5420,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return p;
 	};
 	
-	// Split the glyph into contours.
-	// This function is here for backwards compatibility, and to
-	// provide raw access to the TrueType glyph outlines.
+	/**
+	 * Split the glyph into contours.
+	 * This function is here for backwards compatibility, and to
+	 * provide raw access to the TrueType glyph outlines.
+	 * @return {Array}
+	 */
 	Glyph.prototype.getContours = function() {
 	    if (this.points === undefined) {
 	        return [];
@@ -4631,7 +5446,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return contours;
 	};
 	
-	// Calculate the xMin/yMin/xMax/yMax/lsb/rsb for a Glyph.
+	/**
+	 * Calculate the xMin/yMin/xMax/yMax/lsb/rsb for a Glyph.
+	 * @return {Object}
+	 */
 	Glyph.prototype.getMetrics = function() {
 	    var commands = this.path.commands;
 	    var xCoords = [];
@@ -4682,24 +5500,26 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return metrics;
 	};
 	
-	// Draw the glyph on the given context.
-	//
-	// ctx - The drawing context.
-	// x - Horizontal position of the glyph. (default: 0)
-	// y - Vertical position of the *baseline* of the glyph. (default: 0)
-	// fontSize - Font size, in pixels (default: 72).
-	// options - xScale, yScale to strech the glyph
+	/**
+	 * Draw the glyph on the given context.
+	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {Object=} options - xScale, yScale to strech the glyph.
+	 */
 	Glyph.prototype.draw = function(ctx, x, y, fontSize, options) {
 	    this.getPath(x, y, fontSize, options).draw(ctx);
 	};
 	
-	// Draw the points of the glyph.
-	// On-curve points will be drawn in blue, off-curve points will be drawn in red.
-	//
-	// ctx - The drawing context.
-	// x - Horizontal position of the glyph. (default: 0)
-	// y - Vertical position of the *baseline* of the glyph. (default: 0)
-	// fontSize - Font size, in pixels (default: 72).
+	/**
+	 * Draw the points of the glyph.
+	 * On-curve points will be drawn in blue, off-curve points will be drawn in red.
+	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 */
 	Glyph.prototype.drawPoints = function(ctx, x, y, fontSize) {
 	
 	    function drawCircles(l, x, y, scale) {
@@ -4743,15 +5563,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	    drawCircles(redCircles, x, y, scale);
 	};
 	
-	// Draw lines indicating important font measurements.
-	// Black lines indicate the origin of the coordinate system (point 0,0).
-	// Blue lines indicate the glyph bounding box.
-	// Green line indicates the advance width of the glyph.
-	//
-	// ctx - The drawing context.
-	// x - Horizontal position of the glyph. (default: 0)
-	// y - Vertical position of the *baseline* of the glyph. (default: 0)
-	// fontSize - Font size, in pixels (default: 72).
+	/**
+	 * Draw lines indicating important font measurements.
+	 * Black lines indicate the origin of the coordinate system (point 0,0).
+	 * Blue lines indicate the glyph bounding box.
+	 * Green line indicates the advance width of the glyph.
+	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 */
 	Glyph.prototype.drawMetrics = function(ctx, x, y, fontSize) {
 	    var scale;
 	    x = x !== undefined ? x : 0;
@@ -5852,6 +6673,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	
 	        nameID = parseInt(id);
+	
+	        if (isNaN(nameID)) {
+	            throw new Error('Name table entry "' + key + '" does not exist, see nameTableNames for complete list.');
+	        }
+	
 	        namesWithNumericKeys[nameID] = names[key];
 	        nameIDs.push(nameID);
 	    }
@@ -6277,6 +7103,900 @@ return /******/ (function(modules) { // webpackBootstrap
 
 /***/ },
 /* 25 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// The `GSUB` table contains ligatures, among other things.
+	// https://www.microsoft.com/typography/OTSPEC/gsub.htm
+	
+	'use strict';
+	
+	var check = __webpack_require__(8);
+	var Parser = __webpack_require__(12).Parser;
+	var subtableParsers = new Array(9);         // subtableParsers[0] is unused
+	var table = __webpack_require__(9);
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#SS
+	subtableParsers[1] = function parseLookup1() {
+	    var start = this.offset + this.relativeOffset;
+	    var substFormat = this.parseUShort();
+	    if (substFormat === 1) {
+	        return {
+	            substFormat: 1,
+	            coverage: this.parsePointer(Parser.coverage),
+	            deltaGlyphId: this.parseUShort()
+	        };
+	    } else if (substFormat === 2) {
+	        return {
+	            substFormat: 2,
+	            coverage: this.parsePointer(Parser.coverage),
+	            substitute: this.parseOffset16List()
+	        };
+	    }
+	    check.assert(false, '0x' + start.toString(16) + ': lookup type 1 format must be 1 or 2.');
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#MS
+	subtableParsers[2] = function parseLookup2() {
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB Multiple Substitution Subtable identifier-format must be 1');
+	    return {
+	        substFormat: substFormat,
+	        coverage: this.parsePointer(Parser.coverage),
+	        sequences: this.parseListOfLists()
+	    };
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#AS
+	subtableParsers[3] = function parseLookup3() {
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB Alternate Substitution Subtable identifier-format must be 1');
+	    return {
+	        substFormat: substFormat,
+	        coverage: this.parsePointer(Parser.coverage),
+	        alternateSets: this.parseListOfLists()
+	    };
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#LS
+	subtableParsers[4] = function parseLookup4() {
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB ligature table identifier-format must be 1');
+	    return {
+	        substFormat: substFormat,
+	        coverage: this.parsePointer(Parser.coverage),
+	        ligatureSets: this.parseListOfLists(function() {
+	            return {
+	                ligGlyph: this.parseUShort(),
+	                components: this.parseUShortList(this.parseUShort() - 1)
+	            };
+	        })
+	    };
+	};
+	
+	var lookupRecordDesc = {
+	    sequenceIndex: Parser.uShort,
+	    lookupListIndex: Parser.uShort
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#CSF
+	subtableParsers[5] = function parseLookup5() {
+	    var start = this.offset + this.relativeOffset;
+	    var substFormat = this.parseUShort();
+	
+	    if (substFormat === 1) {
+	        return {
+	            substFormat: substFormat,
+	            coverage: this.parsePointer(Parser.coverage),
+	            ruleSets: this.parseListOfLists(function() {
+	                var glyphCount = this.parseUShort();
+	                var substCount = this.parseUShort();
+	                return {
+	                    input: this.parseUShortList(glyphCount - 1),
+	                    lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
+	                };
+	            })
+	        };
+	    } else if (substFormat === 2) {
+	        return {
+	            substFormat: substFormat,
+	            coverage: this.parsePointer(Parser.coverage),
+	            classDef: this.parsePointer(Parser.classDef),
+	            classSets: this.parseListOfLists(function() {
+	                var glyphCount = this.parseUShort();
+	                var substCount = this.parseUShort();
+	                return {
+	                    classes: this.parseUShortList(glyphCount - 1),
+	                    lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
+	                };
+	            })
+	        };
+	    } else if (substFormat === 3) {
+	        var glyphCount = this.parseUShort();
+	        var substCount = this.parseUShort();
+	        return {
+	            substFormat: substFormat,
+	            coverages: this.parseList(glyphCount, Parser.pointer(Parser.coverage)),
+	            lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
+	        };
+	    }
+	    check.assert(false, '0x' + start.toString(16) + ': lookup type 5 format must be 1, 2 or 3.');
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#CC
+	subtableParsers[6] = function parseLookup6() {
+	    var start = this.offset + this.relativeOffset;
+	    var substFormat = this.parseUShort();
+	    if (substFormat === 1) {
+	        return {
+	            substFormat: 1,
+	            coverage: this.parsePointer(Parser.coverage),
+	            chainRuleSets: this.parseListOfLists(function() {
+	                return {
+	                    backtrack: this.parseUShortList(),
+	                    input: this.parseUShortList(this.parseShort() - 1),
+	                    lookahead: this.parseUShortList(),
+	                    lookupRecords: this.parseRecordList(lookupRecordDesc)
+	                };
+	            })
+	        };
+	    } else if (substFormat === 2) {
+	        return {
+	            substFormat: 2,
+	            coverage: this.parsePointer(Parser.coverage),
+	            backtrackClassDef: this.parsePointer(Parser.classDef),
+	            inputClassDef: this.parsePointer(Parser.classDef),
+	            lookaheadClassDef: this.parsePointer(Parser.classDef),
+	            chainClassSet: this.parseListOfLists(function() {
+	                return {
+	                    backtrack: this.parseUShortList(),
+	                    input: this.parseUShortList(this.parseShort() - 1),
+	                    lookahead: this.parseUShortList(),
+	                    lookupRecords: this.parseRecordList(lookupRecordDesc)
+	                };
+	            })
+	        };
+	    } else if (substFormat === 3) {
+	        return {
+	            substFormat: 3,
+	            backtrackCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	            inputCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	            lookaheadCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	            lookupRecords: this.parseRecordList(lookupRecordDesc)
+	        };
+	    }
+	    check.assert(false, '0x' + start.toString(16) + ': lookup type 6 format must be 1, 2 or 3.');
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#ES
+	subtableParsers[7] = function parseLookup7() {
+	    // Extension Substitution subtable
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB Extension Substitution subtable identifier-format must be 1');
+	    var extensionLookupType = this.parseUShort();
+	    var extensionParser = new Parser(this.data, this.offset + this.parseULong());
+	    return {
+	        substFormat: 1,
+	        lookupType: extensionLookupType,
+	        extension: subtableParsers[extensionLookupType].call(extensionParser)
+	    };
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#RCCS
+	subtableParsers[8] = function parseLookup8() {
+	    var substFormat = this.parseUShort();
+	    check.argument(substFormat === 1, 'GSUB Reverse Chaining Contextual Single Substitution Subtable identifier-format must be 1');
+	    return {
+	        substFormat: substFormat,
+	        coverage: this.parsePointer(Parser.coverage),
+	        backtrackCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	        lookaheadCoverage: this.parseList(Parser.pointer(Parser.coverage)),
+	        substitutes: this.parseUShortList()
+	    };
+	};
+	
+	// https://www.microsoft.com/typography/OTSPEC/gsub.htm
+	function parseGsubTable(data, start) {
+	    start = start || 0;
+	    var p = new Parser(data, start);
+	    var tableVersion = p.parseVersion();
+	    check.argument(tableVersion === 1, 'Unsupported GSUB table version.');
+	    return {
+	        version: tableVersion,
+	        scripts: p.parseScriptList(),
+	        features: p.parseFeatureList(),
+	        lookups: p.parseLookupList(subtableParsers)
+	    };
+	}
+	
+	// GSUB Writing //////////////////////////////////////////////
+	var subtableMakers = new Array(9);
+	
+	subtableMakers[1] = function makeLookup1(subtable) {
+	    if (subtable.substFormat === 1) {
+	        return new table.Table('substitutionTable', [
+	            {name: 'substFormat', type: 'USHORT', value: 1},
+	            {name: 'coverage', type: 'TABLE', value: new table.Coverage(subtable.coverage)},
+	            {name: 'deltaGlyphID', type: 'USHORT', value: subtable.deltaGlyphId}
+	        ]);
+	    } else {
+	        return new table.Table('substitutionTable', [
+	            {name: 'substFormat', type: 'USHORT', value: 2},
+	            {name: 'coverage', type: 'TABLE', value: new table.Coverage(subtable.coverage)}
+	        ].concat(table.ushortList('substitute', subtable.substitute)));
+	    }
+	    check.fail('Lookup type 1 substFormat must be 1 or 2.');
+	};
+	
+	subtableMakers[3] = function makeLookup3(subtable) {
+	    check.assert(subtable.substFormat === 1, 'Lookup type 3 substFormat must be 1.');
+	    return new table.Table('substitutionTable', [
+	        {name: 'substFormat', type: 'USHORT', value: 1},
+	        {name: 'coverage', type: 'TABLE', value: new table.Coverage(subtable.coverage)}
+	    ].concat(table.tableList('altSet', subtable.alternateSets, function(alternateSet) {
+	        return new table.Table('alternateSetTable', table.ushortList('alternate', alternateSet));
+	    })));
+	};
+	
+	subtableMakers[4] = function makeLookup4(subtable) {
+	    check.assert(subtable.substFormat === 1, 'Lookup type 4 substFormat must be 1.');
+	    return new table.Table('substitutionTable', [
+	        {name: 'substFormat', type: 'USHORT', value: 1},
+	        {name: 'coverage', type: 'TABLE', value: new table.Coverage(subtable.coverage)}
+	    ].concat(table.tableList('ligSet', subtable.ligatureSets, function(ligatureSet) {
+	        return new table.Table('ligatureSetTable', table.tableList('ligature', ligatureSet, function(ligature) {
+	            return new table.Table('ligatureTable',
+	                [{name: 'ligGlyph', type: 'USHORT', value: ligature.ligGlyph}]
+	                .concat(table.ushortList('component', ligature.components, ligature.components.length + 1))
+	            );
+	        }));
+	    })));
+	};
+	
+	function makeGsubTable(gsub) {
+	    return new table.Table('GSUB', [
+	        {name: 'version', type: 'ULONG', value: 0x10000},
+	        {name: 'scripts', type: 'TABLE', value: new table.ScriptList(gsub.scripts)},
+	        {name: 'features', type: 'TABLE', value: new table.FeatureList(gsub.features)},
+	        {name: 'lookups', type: 'TABLE', value: new table.LookupList(gsub.lookups, subtableMakers)}
+	    ]);
+	}
+	
+	exports.parse = parseGsubTable;
+	exports.make = makeGsubTable;
+
+
+/***/ },
+/* 26 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// The `GPOS` table contains kerning pairs, among other things.
+	// https://www.microsoft.com/typography/OTSPEC/gpos.htm
+	
+	'use strict';
+	
+	var types = __webpack_require__(10);
+	var decode = types.decode;
+	var check = __webpack_require__(8);
+	var parse = __webpack_require__(12);
+	var table = __webpack_require__(9);
+	
+	// Parse the metadata `meta` table.
+	// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6meta.html
+	function parseMetaTable(data, start) {
+	    var p = new parse.Parser(data, start);
+	    var tableVersion = p.parseULong();
+	    check.argument(tableVersion === 1, 'Unsupported META table version.');
+	    p.parseULong(); // flags - currently unused and set to 0
+	    p.parseULong(); // tableOffset
+	    var numDataMaps = p.parseULong();
+	
+	    var tags = {};
+	    for (var i = 0; i < numDataMaps; i++) {
+	        var tag = p.parseTag();
+	        var dataOffset = p.parseULong();
+	        var dataLength = p.parseULong();
+	        var text = decode.UTF8(data, start + dataOffset, dataLength);
+	
+	        tags[tag] = text;
+	    }
+	    return tags;
+	}
+	
+	function makeMetaTable(tags) {
+	    var numTags = Object.keys(tags).length;
+	    var stringPool = '';
+	    var stringPoolOffset = 16 + numTags * 12;
+	
+	    var result = new table.Table('meta', [
+	        {name: 'version', type: 'ULONG', value: 1},
+	        {name: 'flags', type: 'ULONG', value: 0},
+	        {name: 'offset', type: 'ULONG', value: stringPoolOffset},
+	        {name: 'numTags', type: 'ULONG', value: numTags}
+	    ]);
+	
+	    for (var tag in tags) {
+	        var pos = stringPool.length;
+	        stringPool += tags[tag];
+	
+	        result.fields.push({name: 'tag ' + tag, type: 'TAG', value: tag});
+	        result.fields.push({name: 'offset ' + tag, type: 'ULONG', value: stringPoolOffset + pos});
+	        result.fields.push({name: 'length ' + tag, type: 'ULONG', value: tags[tag].length});
+	    }
+	
+	    result.fields.push({name: 'stringPool', type: 'CHARARRAY', value: stringPool});
+	
+	    return result;
+	}
+	
+	exports.parse = parseMetaTable;
+	exports.make = makeMetaTable;
+
+
+/***/ },
+/* 27 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// The Substitution object provides utility methods to manipulate
+	// the GSUB substitution table.
+	
+	'use strict';
+	
+	var check = __webpack_require__(8);
+	var Layout = __webpack_require__(28);
+	
+	/**
+	 * @exports opentype.Substitution
+	 * @class
+	 * @extends opentype.Layout
+	 * @param {opentype.Font}
+	 * @constructor
+	 */
+	var Substitution = function(font) {
+	    this.font = font;
+	};
+	
+	// Check if 2 arrays of primitives are equal.
+	function arraysEqual(ar1, ar2) {
+	    var n = ar1.length;
+	    if (n !== ar2.length) { return false; }
+	    for (var i = 0; i < n; i++) {
+	        if (ar1[i] !== ar2[i]) { return false; }
+	    }
+	    return true;
+	}
+	
+	// Find the first subtable of a lookup table in a particular format.
+	function getSubstFormat(lookupTable, format, defaultSubtable) {
+	    var subtables = lookupTable.subtables;
+	    for (var i = 0; i < subtables.length; i++) {
+	        var subtable = subtables[i];
+	        if (subtable.substFormat === format) {
+	            return subtable;
+	        }
+	    }
+	    if (defaultSubtable) {
+	        subtables.push(defaultSubtable);
+	        return defaultSubtable;
+	    }
+	}
+	
+	Substitution.prototype = Layout;
+	
+	/**
+	 * Get or create the GSUB table.
+	 * @param  {boolean} create - Whether to create a new one.
+	 * @return {Object} gsub - The GSUB table.
+	 */
+	Substitution.prototype.getGsubTable = function(create) {
+	    var gsub = this.font.tables.gsub;
+	    if (!gsub && create) {
+	        // Generate a default empty GSUB table with just a DFLT script and dflt lang sys.
+	        this.font.tables.gsub = gsub = {
+	            version: 1,
+	            scripts: [{
+	                tag: 'DFLT',
+	                script: {
+	                    defaultLangSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] },
+	                    langSysRecords: []
+	                }
+	            }],
+	            features: [],
+	            lookups: []
+	        };
+	    }
+	    return gsub;
+	};
+	
+	/**
+	 * List all single substitutions (lookup type 1) for a given script, language, and feature.
+	 * @param {string} script
+	 * @param {string} language
+	 * @param {string} feature - 4-character feature name ('aalt', 'salt', 'ss01'...)
+	 * @return {Array} substitutions - The list of substitutions.
+	 */
+	Substitution.prototype.getSingle = function(feature, script, language) {
+	    var substitutions = [];
+	    var lookupTable = this.getLookupTable(script, language, feature, 1);
+	    if (!lookupTable) { return substitutions; }
+	    var subtables = lookupTable.subtables;
+	    for (var i = 0; i < subtables.length; i++) {
+	        var subtable = subtables[i];
+	        var glyphs = this.expandCoverage(subtable.coverage);
+	        var j;
+	        if (subtable.substFormat === 1) {
+	            var delta = subtable.deltaGlyphId;
+	            for (j = 0; j < glyphs.length; j++) {
+	                var glyph = glyphs[j];
+	                substitutions.push({ sub: glyph, by: glyph + delta });
+	            }
+	        } else {
+	            var substitute = subtable.substitute;
+	            for (j = 0; j < glyphs.length; j++) {
+	                substitutions.push({ sub: glyphs[j], by: substitute[j] });
+	            }
+	        }
+	    }
+	    return substitutions;
+	};
+	
+	/**
+	 * List all alternates (lookup type 3) for a given script, language, and feature.
+	 * @param {string} script
+	 * @param {string} language
+	 * @param {string} feature - 4-character feature name ('aalt', 'salt'...)
+	 * @return {Array} alternates - The list of alternates
+	 */
+	Substitution.prototype.getAlternates = function(feature, script, language) {
+	    var alternates = [];
+	    var lookupTable = this.getLookupTable(script, language, feature, 3);
+	    if (!lookupTable) { return alternates; }
+	    var subtables = lookupTable.subtables;
+	    for (var i = 0; i < subtables.length; i++) {
+	        var subtable = subtables[i];
+	        var glyphs = this.expandCoverage(subtable.coverage);
+	        var alternateSets = subtable.alternateSets;
+	        for (var j = 0; j < glyphs.length; j++) {
+	            alternates.push({ sub: glyphs[j], by: alternateSets[j] });
+	        }
+	    }
+	    return alternates;
+	};
+	
+	/**
+	 * List all ligatures (lookup type 4) for a given script, language, and feature.
+	 * The result is an array of ligature objects like { sub: [ids], by: id }
+	 * @param {string} feature - 4-letter feature name ('liga', 'rlig', 'dlig'...)
+	 * @param {string} script
+	 * @param {string} language
+	 * @return {Array} ligatures - The list of ligatures.
+	 */
+	Substitution.prototype.getLigatures = function(feature, script, language) {
+	    var ligatures = [];
+	    var lookupTable = this.getLookupTable(script, language, feature, 4);
+	    if (!lookupTable) { return []; }
+	    var subtables = lookupTable.subtables;
+	    for (var i = 0; i < subtables.length; i++) {
+	        var subtable = subtables[i];
+	        var glyphs = this.expandCoverage(subtable.coverage);
+	        var ligatureSets = subtable.ligatureSets;
+	        for (var j = 0; j < glyphs.length; j++) {
+	            var startGlyph = glyphs[j];
+	            var ligSet = ligatureSets[j];
+	            for (var k = 0; k < ligSet.length; k++) {
+	                var lig = ligSet[k];
+	                ligatures.push({
+	                    sub: [startGlyph].concat(lig.components),
+	                    by: lig.ligGlyph
+	                });
+	            }
+	        }
+	    }
+	    return ligatures;
+	};
+	
+	/**
+	 * Add or modify a single substitution (lookup type 1)
+	 * Format 2, more flexible, is always used.
+	 * @param {string} feature - 4-letter feature name ('liga', 'rlig', 'dlig'...)
+	 * @param {Object} substitution - { sub: id, delta: number } for format 1 or { sub: id, by: id } for format 2.
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='DFLT']
+	 */
+	Substitution.prototype.addSingle = function(feature, substitution, script, language) {
+	    var lookupTable = this.getLookupTable(script, language, feature, 1, true);
+	    var subtable = getSubstFormat(lookupTable, 2, {                // lookup type 1 subtable, format 2, coverage format 1
+	        substFormat: 2,
+	        coverage: { format: 1, glyphs: [] },
+	        substitute: []
+	    });
+	    check.assert(subtable.coverage.format === 1, 'Ligature: unable to modify coverage table format ' + subtable.coverage.format);
+	    var coverageGlyph = substitution.sub;
+	    var pos = this.binSearch(subtable.coverage.glyphs, coverageGlyph);
+	    if (pos < 0) {
+	        pos = -1 - pos;
+	        subtable.coverage.glyphs.splice(pos, 0, coverageGlyph);
+	        subtable.substitute.splice(pos, 0, 0);
+	    }
+	    subtable.substitute[pos] = substitution.by;
+	};
+	
+	/**
+	 * Add or modify an alternate substitution (lookup type 1)
+	 * @param {string} feature - 4-letter feature name ('liga', 'rlig', 'dlig'...)
+	 * @param {Object} substitution - { sub: id, by: [ids] }
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='DFLT']
+	 */
+	Substitution.prototype.addAlternate = function(feature, substitution, script, language) {
+	    var lookupTable = this.getLookupTable(script, language, feature, 3, true);
+	    var subtable = getSubstFormat(lookupTable, 1, {                // lookup type 3 subtable, format 1, coverage format 1
+	        substFormat: 1,
+	        coverage: { format: 1, glyphs: [] },
+	        alternateSets: []
+	    });
+	    check.assert(subtable.coverage.format === 1, 'Ligature: unable to modify coverage table format ' + subtable.coverage.format);
+	    var coverageGlyph = substitution.sub;
+	    var pos = this.binSearch(subtable.coverage.glyphs, coverageGlyph);
+	    if (pos < 0) {
+	        pos = -1 - pos;
+	        subtable.coverage.glyphs.splice(pos, 0, coverageGlyph);
+	        subtable.alternateSets.splice(pos, 0, 0);
+	    }
+	    subtable.alternateSets[pos] = substitution.by;
+	};
+	
+	/**
+	 * Add a ligature (lookup type 4)
+	 * Ligatures with more components must be stored ahead of those with fewer components in order to be found
+	 * @param {string} feature - 4-letter feature name ('liga', 'rlig', 'dlig'...)
+	 * @param {Object} ligature - { sub: [ids], by: id }
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='DFLT']
+	 */
+	Substitution.prototype.addLigature = function(feature, ligature, script, language) {
+	    script = script || 'DFLT';
+	    language = language || 'DFLT';
+	    var lookupTable = this.getLookupTable(script, language, feature, 4, true);
+	    var subtable = lookupTable.subtables[0];
+	    if (!subtable) {
+	        subtable = {                // lookup type 4 subtable, format 1, coverage format 1
+	            substFormat: 1,
+	            coverage: { format: 1, glyphs: [] },
+	            ligatureSets: []
+	        };
+	        lookupTable.subtables[0] = subtable;
+	    }
+	    check.assert(subtable.coverage.format === 1, 'Ligature: unable to modify coverage table format ' + subtable.coverage.format);
+	    var coverageGlyph = ligature.sub[0];
+	    var ligComponents = ligature.sub.slice(1);
+	    var ligatureTable = {
+	        ligGlyph: ligature.by,
+	        components: ligComponents
+	    };
+	    var pos = this.binSearch(subtable.coverage.glyphs, coverageGlyph);
+	    if (pos >= 0) {
+	        // ligatureSet already exists
+	        var ligatureSet = subtable.ligatureSets[pos];
+	        for (var i = 0; i < ligatureSet.length; i++) {
+	            // If ligature already exists, return.
+	            if (arraysEqual(ligatureSet[i].components, ligComponents)) {
+	                return;
+	            }
+	        }
+	        // ligature does not exist: add it.
+	        ligatureSet.push(ligatureTable);
+	    } else {
+	        // Create a new ligatureSet and add coverage for the first glyph.
+	        pos = -1 - pos;
+	        subtable.coverage.glyphs.splice(pos, 0, coverageGlyph);
+	        subtable.ligatureSets.splice(pos, 0, [ligatureTable]);
+	    }
+	};
+	
+	/**
+	 * List all feature data for a given script and language.
+	 * @param {string} feature - 4-letter feature name
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='DFLT']
+	 * @return {Array} substitutions - The list of substitutions.
+	 */
+	Substitution.prototype.getFeature = function(feature, script, language) {
+	    script = script || 'DFLT';
+	    language = language || 'DFLT';
+	    if (/ss\d\d/.test(feature)) {               // ss01 - ss20
+	        return this.getSingle(feature, script, language);
+	    }
+	    switch (feature) {
+	        case 'aalt':
+	        case 'salt':
+	            return this.getSingle(feature, script, language)
+	                    .concat(this.getAlternates(feature, script, language));
+	        case 'dlig':
+	        case 'liga':
+	        case 'rlig': return this.getLigatures(feature, script, language);
+	    }
+	};
+	
+	/**
+	 * Add a substitution to a feature for a given script and language.
+	 * @param {string} feature - 4-letter feature name
+	 * @param {Object} sub - the substitution to add (an object like { sub: id or [ids], by: id or [ids] })
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='DFLT']
+	 */
+	Substitution.prototype.add = function(feature, sub, script, language) {
+	    script = script || 'DFLT';
+	    language = language || 'DFLT';
+	    if (/ss\d\d/.test(feature)) {               // ss01 - ss20
+	        return this.addSingle(feature, sub, script, language);
+	    }
+	    switch (feature) {
+	        case 'aalt':
+	        case 'salt':
+	            if (typeof sub.by === 'number') {
+	                return this.addSingle(feature, sub, script, language);
+	            }
+	            return this.addAlternate(feature, sub, script, language);
+	        case 'dlig':
+	        case 'liga':
+	        case 'rlig':
+	            return this.addLigature(feature, sub, script, language);
+	    }
+	};
+	
+	module.exports = Substitution;
+
+
+/***/ },
+/* 28 */
+/***/ function(module, exports, __webpack_require__) {
+
+	// The Layout object is the prototype of Substition objects, and provides utility methods to manipulate
+	// common layout tables (GPOS, GSUB, GDEF...)
+	
+	'use strict';
+	
+	var check = __webpack_require__(8);
+	
+	function searchTag(arr, tag) {
+	    /* jshint bitwise: false */
+	    var imin = 0;
+	    var imax = arr.length - 1;
+	    while (imin <= imax) {
+	        var imid = (imin + imax) >>> 1;
+	        var val = arr[imid].tag;
+	        if (val === tag) {
+	            return imid;
+	        } else if (val < tag) {
+	            imin = imid + 1;
+	        } else { imax = imid - 1; }
+	    }
+	    // Not found: return -1-insertion point
+	    return -imin - 1;
+	}
+	
+	function binSearch(arr, value) {
+	    /* jshint bitwise: false */
+	    var imin = 0;
+	    var imax = arr.length - 1;
+	    while (imin <= imax) {
+	        var imid = (imin + imax) >>> 1;
+	        var val = arr[imid];
+	        if (val === value) {
+	            return imid;
+	        } else if (val < value) {
+	            imin = imid + 1;
+	        } else { imax = imid - 1; }
+	    }
+	    // Not found: return -1-insertion point
+	    return -imin - 1;
+	}
+	
+	/**
+	 * @exports opentype.Layout
+	 * @class
+	 */
+	var Layout = {
+	
+	    /**
+	     * Binary search an object by "tag" property
+	     * @instance
+	     * @function searchTag
+	     * @memberof opentype.Layout
+	     * @param  {Array} arr
+	     * @param  {string} tag
+	     * @return {number}
+	     */
+	    searchTag: searchTag,
+	    /**
+	     * Binary search in a list of numbers
+	     * @instance
+	     * @function binSearch
+	     * @memberof opentype.Layout
+	     * @param  {Array} arr
+	     * @param  {number} value
+	     * @return {number}
+	     */
+	    binSearch: binSearch,
+	
+	    /**
+	     * Returns all scripts in the substitution table.
+	     * @instance
+	     * @return {Array}
+	     */
+	    getScriptNames: function() {
+	        var gsub = this.getGsubTable();
+	        if (!gsub) { return []; }
+	        return gsub.scripts.map(function(script) {
+	            return script.tag;
+	        });
+	    },
+	
+	    /**
+	     * Returns all LangSysRecords in the given script.
+	     * @instance
+	     * @param {string} script - Use 'DFLT' for default script
+	     * @param {boolean} create - forces the creation of this script table if it doesn't exist.
+	     * @return {Object} An object with tag and script properties.
+	     */
+	    getScriptTable: function(script, create) {
+	        var gsub = this.getGsubTable(create);
+	        if (gsub) {
+	            var scripts = gsub.scripts;
+	            var pos = searchTag(gsub.scripts, script);
+	            if (pos >= 0) {
+	                return scripts[pos].script;
+	            } else {
+	                var scr = {
+	                    tag: script,
+	                    script: {
+	                        defaultLangSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] },
+	                        langSysRecords: []
+	                    }
+	                };
+	                scripts.splice(-1 - pos, 0, scr.script);
+	                return scr;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Returns a language system table
+	     * @instance
+	     * @param {string} script - Use 'DFLT' for default script
+	     * @param {string} language - Use 'DFLT' for default language
+	     * @param {boolean} create - forces the creation of this langSysTable if it doesn't exist.
+	     * @return {Object}
+	     */
+	    getLangSysTable: function(script, language, create) {
+	        var scriptTable = this.getScriptTable(script, create);
+	        if (scriptTable) {
+	            if (language === 'DFLT') {
+	                return scriptTable.defaultLangSys;
+	            }
+	            var pos = searchTag(scriptTable.langSysRecords, language);
+	            if (pos >= 0) {
+	                return scriptTable.langSysRecords[pos].langSys;
+	            } else if (create) {
+	                var langSysRecord = {
+	                    tag: language,
+	                    langSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] }
+	                };
+	                scriptTable.langSysRecords.splice(-1 - pos, 0, langSysRecord);
+	                return langSysRecord.langSys;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Get a specific feature table.
+	     * @instance
+	     * @param {string} script - Use 'DFLT' for default script
+	     * @param {string} language - Use 'DFLT' for default language
+	     * @param {string} feature - One of the codes listed at https://www.microsoft.com/typography/OTSPEC/featurelist.htm
+	     * @param {boolean} create - forces the creation of the feature table if it doesn't exist.
+	     * @return {Object}
+	     */
+	    getFeatureTable: function(script, language, feature, create) {
+	        var langSysTable = this.getLangSysTable(script, language, create);
+	        if (langSysTable) {
+	            var featureRecord;
+	            var featIndexes = langSysTable.featureIndexes;
+	            var allFeatures = this.font.tables.gsub.features;
+	            // The FeatureIndex array of indices is in arbitrary order,
+	            // even if allFeatures is sorted alphabetically by feature tag.
+	            for (var i = 0; i < featIndexes.length; i++) {
+	                featureRecord = allFeatures[featIndexes[i]];
+	                if (featureRecord.tag === feature) {
+	                    return featureRecord.feature;
+	                }
+	            }
+	            if (create) {
+	                var index = allFeatures.length;
+	                // Automatic ordering of features would require to shift feature indexes in the script list.
+	                check.assert(index === 0 || feature >= allFeatures[index - 1].tag, 'Features must be added in alphabetical order.');
+	                featureRecord = {
+	                    tag: feature,
+	                    feature: { params: 0, lookupListIndexes: [] }
+	                };
+	                allFeatures.push(featureRecord);
+	                featIndexes.push(index);
+	                return featureRecord.feature;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Get the first lookup table of a given type for a script/language/feature.
+	     * @instance
+	     * @param {string} script - Use 'DFLT' for default script
+	     * @param {string} language - Use 'DFLT' for default language
+	     * @param {string} feature - 4-letter feature code
+	     * @param {number} lookupType - 1 to 8
+	     * @param {boolean} create - forces the creation of the lookup table if it doesn't exist, with no subtables.
+	     * @return {Object}
+	     */
+	    getLookupTable: function(script, language, feature, lookupType, create) {
+	        var featureTable = this.getFeatureTable(script, language, feature, create);
+	        if (featureTable) {
+	            var lookupTable;
+	            var lookupListIndexes = featureTable.lookupListIndexes;
+	            var allLookups = this.font.tables.gsub.lookups;
+	            // lookupListIndexes are in no particular order, so use naïve search.
+	            for (var i = 0; i < lookupListIndexes.length; i++) {
+	                lookupTable = allLookups[lookupListIndexes[i]];
+	                if (lookupTable.lookupType === lookupType) {
+	                    return lookupTable;
+	                }
+	            }
+	            if (create) {
+	                lookupTable = {
+	                    lookupType: lookupType,
+	                    lookupFlag: 0,
+	                    subtables: [],
+	                    markFilteringSet: undefined
+	                };
+	                var index = allLookups.length;
+	                allLookups.push(lookupTable);
+	                lookupListIndexes.push(index);
+	                return lookupTable;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Returns the list of glyph indexes of a coverage table.
+	     * Format 1: the list is stored raw
+	     * Format 2: compact list as range records.
+	     * @instance
+	     * @param  {Object} coverageTable
+	     * @return {Array}
+	     */
+	    expandCoverage: function(coverageTable) {
+	        if (coverageTable.format === 1) {
+	            return coverageTable.glyphs;
+	        } else {
+	            var glyphs = [];
+	            var ranges = coverageTable.ranges;
+	            for (var i = 0; i < ranges; i++) {
+	                var range = ranges[i];
+	                var start = range.start;
+	                var end = range.end;
+	                for (var j = start; j <= end; j++) {
+	                    glyphs.push(j);
+	                }
+	            }
+	            return glyphs;
+	        }
+	    }
+	
+	};
+	
+	module.exports = Layout;
+
+
+/***/ },
+/* 29 */
 /***/ function(module, exports) {
 
 	'use strict';
@@ -6317,13 +8037,13 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 26 */
+/* 30 */
 /***/ function(module, exports) {
 
 	/* (ignored) */
 
 /***/ },
-/* 27 */
+/* 31 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `fvar` table stores font variation axes and instances.
@@ -6468,7 +8188,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 28 */
+/* 32 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `glyf` table describes the glyphs in TrueType outline format.
@@ -6511,10 +8231,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	function parseGlyph(glyph, data, start) {
 	    var p = new parse.Parser(data, start);
 	    glyph.numberOfContours = p.parseShort();
-	    glyph.xMin = p.parseShort();
-	    glyph.yMin = p.parseShort();
-	    glyph.xMax = p.parseShort();
-	    glyph.yMax = p.parseShort();
+	    glyph._xMin = p.parseShort();
+	    glyph._yMin = p.parseShort();
+	    glyph._xMax = p.parseShort();
+	    glyph._yMax = p.parseShort();
 	    var flags;
 	    var flag;
 	    if (glyph.numberOfContours > 0) {
@@ -6602,12 +8322,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	            };
 	            if ((flags & 1) > 0) {
 	                // The arguments are words
-	                component.dx = p.parseShort();
-	                component.dy = p.parseShort();
+	                if ((flags & 2) > 0) {
+	                    // values are offset
+	                    component.dx = p.parseShort();
+	                    component.dy = p.parseShort();
+	                } else {
+	                    // values are matched points
+	                    component.matchedPoints = [p.parseUShort(), p.parseUShort()];
+	                }
+	
 	            } else {
 	                // The arguments are bytes
-	                component.dx = p.parseChar();
-	                component.dy = p.parseChar();
+	                if ((flags & 2) > 0) {
+	                    // values are offset
+	                    component.dx = p.parseChar();
+	                    component.dy = p.parseChar();
+	                } else {
+	                    // values are matched points
+	                    component.matchedPoints = [p.parseByte(), p.parseByte()];
+	                }
 	            }
 	
 	            if ((flags & 8) > 0) {
@@ -6743,7 +8476,28 @@ return /******/ (function(modules) { // webpackBootstrap
 	            // Force the ttfGlyphLoader to parse the glyph.
 	            componentGlyph.getPath();
 	            if (componentGlyph.points) {
-	                var transformedPoints = transformPoints(componentGlyph.points, component);
+	                var transformedPoints;
+	                if (component.matchedPoints === undefined) {
+	                    // component positioned by offset
+	                    transformedPoints = transformPoints(componentGlyph.points, component);
+	                } else {
+	                    // component positioned by matched points
+	                    if ((component.matchedPoints[0] > glyph.points.length - 1) ||
+	                        (component.matchedPoints[1] > componentGlyph.points.length - 1)) {
+	                        throw Error('Matched points out of range in ' + glyph.name);
+	                    }
+	                    var firstPt = glyph.points[component.matchedPoints[0]];
+	                    var secondPt = componentGlyph.points[component.matchedPoints[1]];
+	                    var transform = {
+	                        xScale: component.xScale, scale01: component.scale01,
+	                        scale10: component.scale10, yScale: component.yScale,
+	                        dx: 0, dy: 0
+	                    };
+	                    secondPt = transformPoints([secondPt], transform)[0];
+	                    transform.dx = firstPt.x - secondPt.x;
+	                    transform.dy = firstPt.y - secondPt.y;
+	                    transformedPoints = transformPoints(componentGlyph.points, transform);
+	                }
 	                glyph.points = glyph.points.concat(transformedPoints);
 	            }
 	        }
@@ -6775,7 +8529,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 29 */
+/* 33 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `GPOS` table contains kerning pairs, among other things.
@@ -7017,217 +8771,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 30 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// The `GSUB` table contains ligatures, among other things.
-	// https://www.microsoft.com/typography/OTSPEC/gsub.htm
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var Parser = __webpack_require__(12).Parser;
-	var subtableParsers = new Array(9);         // subtableParsers[0] is unused
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#SS
-	subtableParsers[1] = function parseLookup1() {
-	    var start = this.offset + this.relativeOffset;
-	    var substFormat = this.parseUShort();
-	    if (substFormat === 1) {
-	        return {
-	            substFormat: 1,
-	            coverage: this.parsePointer(Parser.coverage),
-	            deltaGlyphId: this.parseUShort()
-	        };
-	    } else if (substFormat === 2) {
-	        return {
-	            substFormat: 2,
-	            coverage: this.parsePointer(Parser.coverage),
-	            substitute: this.parseOffset16List()
-	        };
-	    }
-	    check.assert(false, '0x' + start.toString(16) + ': lookup type 1 format must be 1 or 2.');
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#MS
-	subtableParsers[2] = function parseLookup2() {
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB Multiple Substitution Subtable identifier-format must be 1');
-	    return {
-	        substFormat: substFormat,
-	        coverage: this.parsePointer(Parser.coverage),
-	        sequences: this.parseListOfLists()
-	    };
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#AS
-	subtableParsers[3] = function parseLookup3() {
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB Alternate Substitution Subtable identifier-format must be 1');
-	    return {
-	        substFormat: substFormat,
-	        coverage: this.parsePointer(Parser.coverage),
-	        alternateSets: this.parseListOfLists()
-	    };
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#LS
-	subtableParsers[4] = function parseLookup4() {
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB ligature table identifier-format must be 1');
-	    return {
-	        substFormat: substFormat,
-	        coverage: this.parsePointer(Parser.coverage),
-	        ligatureSets: this.parseListOfLists(function() {
-	            return {
-	                ligGlyph: this.parseUShort(),
-	                components: this.parseUShortList(this.parseUShort() - 1)
-	            };
-	        })
-	    };
-	};
-	
-	var lookupRecordDesc = {
-	    sequenceIndex: Parser.uShort,
-	    lookupListIndex: Parser.uShort
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#CSF
-	subtableParsers[5] = function parseLookup5() {
-	    var start = this.offset + this.relativeOffset;
-	    var substFormat = this.parseUShort();
-	
-	    if (substFormat === 1) {
-	        return {
-	            substFormat: substFormat,
-	            coverage: this.parsePointer(Parser.coverage),
-	            ruleSets: this.parseListOfLists(function() {
-	                var glyphCount = this.parseUShort();
-	                var substCount = this.parseUShort();
-	                return {
-	                    input: this.parseUShortList(glyphCount - 1),
-	                    lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
-	                };
-	            })
-	        };
-	    } else if (substFormat === 2) {
-	        return {
-	            substFormat: substFormat,
-	            coverage: this.parsePointer(Parser.coverage),
-	            classDef: this.parsePointer(Parser.classDef),
-	            classSets: this.parseListOfLists(function() {
-	                var glyphCount = this.parseUShort();
-	                var substCount = this.parseUShort();
-	                return {
-	                    classes: this.parseUShortList(glyphCount - 1),
-	                    lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
-	                };
-	            })
-	        };
-	    } else if (substFormat === 3) {
-	        var glyphCount = this.parseUShort();
-	        var substCount = this.parseUShort();
-	        return {
-	            substFormat: substFormat,
-	            coverages: this.parseList(glyphCount, Parser.pointer(Parser.coverage)),
-	            lookupRecords: this.parseRecordList(substCount, lookupRecordDesc)
-	        };
-	    }
-	    check.assert(false, '0x' + start.toString(16) + ': lookup type 5 format must be 1, 2 or 3.');
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#CC
-	subtableParsers[6] = function parseLookup6() {
-	    // TODO add automated tests for lookup 6 : no examples in the MS doc.
-	    var start = this.offset + this.relativeOffset;
-	    var substFormat = this.parseUShort();
-	    if (substFormat === 1) {
-	        return {
-	            substFormat: 1,
-	            coverage: this.parsePointer(Parser.coverage),
-	            chainRuleSets: this.parseListOfLists(function() {
-	                return {
-	                    backtrack: this.parseUShortList(),
-	                    input: this.parseUShortList(this.parseShort() - 1),
-	                    lookahead: this.parseUShortList(),
-	                    lookupRecords: this.parseRecordList(lookupRecordDesc)
-	                };
-	            })
-	        };
-	    } else if (substFormat === 2) {
-	        return {
-	            substFormat: 2,
-	            coverage: this.parsePointer(Parser.coverage),
-	            backtrackClassDef: this.parsePointer(Parser.classDef),
-	            inputClassDef: this.parsePointer(Parser.classDef),
-	            lookaheadClassDef: this.parsePointer(Parser.classDef),
-	            chainClassSet: this.parseListOfLists(function() {
-	                return {
-	                    backtrack: this.parseUShortList(),
-	                    input: this.parseUShortList(this.parseShort() - 1),
-	                    lookahead: this.parseUShortList(),
-	                    lookupRecords: this.parseRecordList(lookupRecordDesc)
-	                };
-	            })
-	        };
-	    } else if (substFormat === 3) {
-	        return {
-	            substFormat: 3,
-	            backtrackCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	            inputCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	            lookaheadCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	            lookupRecords: this.parseRecordList(lookupRecordDesc)
-	        };
-	    }
-	    check.assert(false, '0x' + start.toString(16) + ': lookup type 6 format must be 1, 2 or 3.');
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#ES
-	subtableParsers[7] = function parseLookup7() {
-	    // Extension Substitution subtable
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB Extension Substitution subtable identifier-format must be 1');
-	    var extensionLookupType = this.parseUShort();
-	    var extensionParser = new Parser(this.data, this.offset + this.parseULong());
-	    return {
-	        substFormat: 1,
-	        lookupType: extensionLookupType,
-	        extension: subtableParsers[extensionLookupType].call(extensionParser)
-	    };
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#RCCS
-	subtableParsers[8] = function parseLookup8() {
-	    var substFormat = this.parseUShort();
-	    check.argument(substFormat === 1, 'GSUB Reverse Chaining Contextual Single Substitution Subtable identifier-format must be 1');
-	    return {
-	        substFormat: substFormat,
-	        coverage: this.parsePointer(Parser.coverage),
-	        backtrackCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	        lookaheadCoverage: this.parseList(Parser.pointer(Parser.coverage)),
-	        substitutes: this.parseUShortList()
-	    };
-	};
-	
-	// https://www.microsoft.com/typography/OTSPEC/gsub.htm
-	function parseGsubTable(data, start) {
-	    start = start || 0;
-	    var p = new Parser(data, start);
-	    var tableVersion = p.parseVersion();
-	    check.argument(tableVersion === 1, 'Unsupported GSUB table version.');
-	    return {
-	        version: tableVersion,
-	        scripts: p.parseScriptList(),
-	        features: p.parseFeatureList(),
-	        lookups: p.parseLookupList(subtableParsers)
-	    };
-	}
-	
-	exports.parse = parseGsubTable;
-
-
-/***/ },
-/* 31 */
+/* 34 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `kern` table contains kerning pairs.
@@ -7268,7 +8812,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 32 */
+/* 35 */
 /***/ function(module, exports, __webpack_require__) {
 
 	// The `loca` table stores the offsets to the locations of the glyphs in the font.
@@ -7307,7 +8851,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 33 */
+/* 36 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*!
@@ -7321,7 +8865,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 *
 	 * All rights reserved.
 	 *
-	 * Date: Sat Jul 23 18:50:58 2016 +0200
+	 * Date: Tue Aug 9 10:01:35 2016 +0200
 	 *
 	 ***
 	 *
@@ -7344,7 +8888,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var paper = function(self, undefined) {
 	
-	self = self || __webpack_require__(34);
+	self = self || __webpack_require__(37);
 	
 	var window = self.window,
 		document = self.document;
@@ -7574,9 +9118,10 @@ return /******/ (function(modules) { // webpackBootstrap
 			return Base.serialize(this);
 		},
 	
-		_set: function(props) {
-			if (props && Base.isPlainObject(props))
-				return Base.filter(this, props);
+		set: function(props, exclude) {
+			if (props)
+				Base.filter(this, props, exclude, this._prioritize);
+			return this;
 		},
 	
 		statics: {
@@ -7645,7 +9190,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						list.__index = begin + 1;
 					return obj && options && options.clone ? obj.clone() : obj;
 				}
-				obj = Base.create(this.prototype);
+				obj = Base.create(proto);
 				if (readIndex)
 					obj.__read = true;
 				obj = obj.initialize.apply(obj, begin > 0 || begin + amount < length
@@ -7686,7 +9231,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					var filtered = list._filtered;
 					if (!filtered) {
 						filtered = list._filtered = Base.create(list[0]);
-						filtered._filtering = list[0];
+						filtered._unfiltered = list[0];
 					}
 					filtered[name] = undefined;
 				}
@@ -7705,21 +9250,35 @@ return /******/ (function(modules) { // webpackBootstrap
 				return !!this.getNamed(list, name);
 			},
 	
-			filter: function(dest, source, exclude) {
-				var keys = Object.keys(source._filtering || source);
-				for (var i = 0, l = keys.length; i < l; i++) {
-					var key = keys[i];
-					if (!(exclude && exclude[key])) {
+			filter: function(dest, source, exclude, prioritize) {
+				var processed;
+	
+				function handleKey(key) {
+					if (!(exclude && key in exclude) &&
+						!(processed && key in processed)) {
 						var value = source[key];
 						if (value !== undefined)
 							dest[key] = value;
 					}
 				}
+	
+				if (prioritize) {
+					var keys = {};
+					for (var i = 0, key, l = prioritize.length; i < l; i++) {
+						if ((key = prioritize[i]) in source) {
+							handleKey(key);
+							keys[key] = true;
+						}
+					}
+					processed = keys;
+				}
+	
+				Object.keys(source._unfiltered || source).forEach(handleKey);
 				return dest;
 			},
 	
 			isPlainValue: function(obj, asString) {
-				return this.isPlainObject(obj) || Array.isArray(obj)
+				return Base.isPlainObject(obj) || Array.isArray(obj)
 						|| asString && typeof obj === 'string';
 			},
 	
@@ -7876,7 +9435,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			},
 	
 			camelize: function(str) {
-				return str.replace(/-(.)/g, function(all, chr) {
+				return str.replace(/-(.)/g, function(match, chr) {
 					return chr.toUpperCase();
 				});
 			},
@@ -7979,7 +9538,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						if (func)
 							func.call(this, type);
 					}
-			}
+				}
 			}
 		},
 	
@@ -8049,7 +9608,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					agent[platform] = true;
 				user.replace(
 					/(opera|chrome|safari|webkit|firefox|msie|trident|atom|node)\/?\s*([.\d]+)(?:.*version\/([.\d]+))?(?:.*rv\:v?([.\d]+))?/g,
-					function(all, n, v1, v2, rv) {
+					function(match, n, v1, v2, rv) {
 						if (!agent.chrome) {
 							var v = n === 'opera' ? v2 :
 									/^(node|trident)$/.test(n) ? rv : v1;
@@ -10202,7 +11761,8 @@ return /******/ (function(modules) { // webpackBootstrap
 			clipMask: false,
 			selected: false,
 			data: {}
-		}
+		},
+		_prioritize: ['applyMatrix']
 	},
 	new function() {
 		var handlers = ['onMouseDown', 'onMouseUp', 'onMouseDrag', 'onClick',
@@ -10263,7 +11823,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						._insertItem(undefined, this, true);
 			}
 			if (hasProps && props !== Item.NO_INSERT) {
-				Base.filter(this, props, {
+				this.set(props, {
 					internal: true, insert: true, project: true, parent: true
 				});
 			}
@@ -10310,12 +11870,6 @@ return /******/ (function(modules) { // webpackBootstrap
 				project._changed(flags, this);
 			if (symbol)
 				symbol._changed(flags);
-		},
-	
-		set: function(props) {
-			if (props)
-				this._set(props);
-			return this;
 		},
 	
 		getId: function() {
@@ -11296,14 +12850,14 @@ return /******/ (function(modules) { // webpackBootstrap
 				project = this._project,
 				index = this._index;
 			if (owner) {
+				if (this._name)
+					this._removeNamed();
 				if (index != null) {
 					if (project._activeLayer === this)
 						project._activeLayer = this.getNextSibling()
 								|| this.getPreviousSibling();
 					Base.splice(owner._children, null, index, 1);
 				}
-				if (this._name)
-					this._removeNamed();
 				this._installEvents(false);
 				if (notifySelf && project._changes)
 					this._changed(5);
@@ -12223,6 +13777,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			crossOrigin: null,
 			source: null
 		},
+		_prioritize: ['crossOrigin'],
 	
 		initialize: function Raster(object, position) {
 			if (!this._initialize(object,
@@ -13422,17 +14977,21 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 	statics: {
-		getValues: function(segment1, segment2, matrix) {
+		getValues: function(segment1, segment2, matrix, straight) {
 			var p1 = segment1._point,
 				h1 = segment1._handleOut,
 				h2 = segment2._handleIn,
 				p2 = segment2._point,
-				values = [
-					p1._x, p1._y,
-					p1._x + h1._x, p1._y + h1._y,
-					p2._x + h2._x, p2._y + h2._y,
-					p2._x, p2._y
-				];
+				x1 = p1.x, y1 = p1.y,
+				x2 = p2.x, y2 = p2.y,
+				values = straight
+					? [ x1, y1, x1, y1, x2, y2, x2, y2 ]
+					: [
+						x1, y1,
+						x1 + h1._x, y1 + h1._y,
+						x2 + h2._x, y2 + h2._y,
+						x2, y2
+					];
 			if (matrix)
 				matrix._transformCoordinates(values, values, 4);
 			return values;
@@ -14715,6 +16274,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		_class: 'PathItem',
 		_selectBounds: false,
 		_canScaleStroke: true,
+		beans: true,
 	
 		initialize: function PathItem() {
 		},
@@ -14797,12 +16357,14 @@ return /******/ (function(modules) { // webpackBootstrap
 				case 'm':
 				case 'l':
 					var move = lower === 'm';
-					for (var j = 0; j < length; j += 2)
-						this[!j && move ? 'moveTo' : 'lineTo'](
-								current = getPoint(j));
+					for (var j = 0; j < length; j += 2) {
+						this[move ? 'moveTo' : 'lineTo'](current = getPoint(j));
+						if (move) {
+							start = current;
+							move = false;
+						}
+					}
 					control = current;
-					if (move)
-						start = current;
 					break;
 				case 'h':
 				case 'v':
@@ -15380,21 +16942,19 @@ return /******/ (function(modules) { // webpackBootstrap
 			return this._length;
 		},
 	
-		getArea: function(_closed) {
-			var cached = _closed === undefined,
-				area = this._area;
-			if (!cached || area == null) {
+		getArea: function() {
+			var area = this._area;
+			if (area == null) {
 				var segments = this._segments,
-					count = segments.length,
-					closed = cached ? this._closed : _closed,
-					last = count - 1;
+					closed = this._closed;
 				area = 0;
-				for (var i = 0, l = closed ? count : last; i < l; i++) {
+				for (var i = 0, l = segments.length; i < l; i++) {
+					var last = i + 1 === l;
 					area += Curve.getArea(Curve.getValues(
-							segments[i], segments[i < last ? i + 1 : 0]));
+							segments[i], segments[last ? 0 : i + 1],
+							null, last && !closed));
 				}
-				if (cached)
-					this._area = area;
+				this._area = area;
 			}
 			return area;
 		},
@@ -15541,8 +17101,8 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		flatten: function(flatness) {
-			var iterator = new PathIterator(this, flatness || 0.25, 256, true),
-				parts = iterator.parts,
+			var flattener = new PathFlattener(this, flatness || 0.25, 256, true),
+				parts = flattener.parts,
 				length = parts.length,
 				segments = [];
 			for (var i = 0; i < length; i++) {
@@ -16126,9 +17686,9 @@ return /******/ (function(modules) { // webpackBootstrap
 						if (dashLength) {
 							if (!dontStart)
 								ctx.beginPath();
-							var iterator = new PathIterator(this, 0.25, 32, false,
+							var flattener = new PathFlattener(this, 0.25, 32, false,
 									strokeMatrix),
-								length = iterator.length,
+								length = flattener.length,
 								from = -style.getDashOffset(), to,
 								i = 0;
 							from = from % length;
@@ -16138,7 +17698,7 @@ return /******/ (function(modules) { // webpackBootstrap
 							while (from < length) {
 								to = from + getOffset(i++);
 								if (from > 0 || to > 0)
-									iterator.drawPart(ctx,
+									flattener.drawPart(ctx,
 											Math.max(from, 0), Math.max(to, 0));
 								from = to + getOffset(i++);
 							}
@@ -16732,6 +18292,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		_serializeFields: {
 			children: []
 		},
+		beans: true,
 	
 		initialize: function CompoundPath(arg) {
 			this._children = [];
@@ -16839,9 +18400,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			for (var i = 0, l = children.length; i < l; i++)
 				length += children[i].getLength();
 			return length;
-		}
-	}, {
-		beans: true,
+		},
 	
 		getPathData: function(_matrix, _precision) {
 			var children = this._children,
@@ -16853,8 +18412,8 @@ return /******/ (function(modules) { // webpackBootstrap
 						? _matrix.appended(mx) : _matrix, _precision));
 			}
 			return paths.join('');
-		}
-	}, {
+		},
+	
 		_hitTestChildren: function _hitTestChildren(point, options, viewMatrix) {
 			return _hitTestChildren.base.call(this, point,
 					options.class === Path || options.type === 'path' ? options
@@ -16956,34 +18515,35 @@ return /******/ (function(modules) { // webpackBootstrap
 				exclude:   { 1: true }
 			};
 	
-		function preparePath(path, closed) {
+		function preparePath(path, resolve) {
 			var res = path.clone(false).reduce({ simplify: true })
 					.transform(null, true, true);
-			if (closed)
-				res.setClosed(true);
-			return closed
+			return resolve
 				? res.resolveCrossings().reorient(res.getFillRule() === 'nonzero')
 				: res;
 		}
 	
-		function createResult(ctor, paths, reduce, path1, path2) {
+		function createResult(ctor, paths, reduce, path1, path2, options) {
 			var result = new ctor(Item.NO_INSERT);
 			result.addChildren(paths, true);
 			if (reduce)
 				result = result.reduce({ simplify: true });
-			result.insertAbove(path2 && path1.isSibling(path2)
-					&& path1.getIndex() < path2.getIndex() ? path2 : path1);
+			if (!(options && options.insert === false)) {
+				result.insertAbove(path2 && path1.isSibling(path2)
+						&& path1.getIndex() < path2.getIndex() ? path2 : path1);
+			}
 			result.copyAttributes(path1, true);
 			return result;
 		}
 	
-		function computeBoolean(path1, path2, operation) {
-			var operator = operators[operation];
-			operator[operation] = true;
-			if (!path1.isClosed())
-				return computeOpenBoolean(path1, path2, operator);
+		function computeBoolean(path1, path2, operation, options) {
+			if (options && options.stroke &&
+					/^(subtract|intersect)$/.test(operation))
+				return computeStrokeBoolean(path1, path2, operation === 'subtract');
 			var _path1 = preparePath(path1, true),
-				_path2 = path2 && path1 !== path2 && preparePath(path2, true);
+				_path2 = path2 && path1 !== path2 && preparePath(path2, true),
+				operator = operators[operation];
+			operator[operation] = true;
 			if (_path2 && (operator.subtract || operator.exclude)
 					^ (_path2.isClockwise() ^ _path1.isClockwise()))
 				_path2.reverse();
@@ -17020,7 +18580,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					var path = paths[i];
 					segments.push.apply(segments, path._segments);
 					curves.push.apply(curves, path.getCurves());
-					path._overlapsOnly = path._validOverlapsOnly = true;
+					path._overlapsOnly = true;
 				}
 			}
 	
@@ -17038,32 +18598,24 @@ return /******/ (function(modules) { // webpackBootstrap
 					if (segment._winding == null) {
 						propagateWinding(segment, _path1, _path2, curves, operator);
 					}
-					if (!(inter && inter._overlap)) {
-						var path = segment._path;
-						path._overlapsOnly = false;
-						if (operator[segment._winding.winding])
-							path._validOverlapsOnly = false;
-					}
+					if (!(inter && inter._overlap))
+						segment._path._overlapsOnly = false;
 				}
 				paths = tracePaths(segments, operator);
 			}
 	
-			return createResult(CompoundPath, paths, true, path1, path2);
+			return createResult(CompoundPath, paths, true, path1, path2, options);
 		}
 	
-		function computeOpenBoolean(path1, path2, operator) {
-			if (!path2 || !operator.subtract && !operator.intersect) {
-				throw new Error('Boolean operations on open paths only support ' +
-						'subtraction and intersection with another path.');
-			}
-			var _path1 = preparePath(path1, false),
-				_path2 = preparePath(path2, false),
+		function computeStrokeBoolean(path1, path2, subtract) {
+			var _path1 = preparePath(path1),
+				_path2 = preparePath(path2),
 				crossings = _path1.getCrossings(_path2),
-				sub = operator.subtract,
 				paths = [];
 	
 			function addPath(path) {
-				if (_path2.contains(path.getPointAt(path.getLength() / 2)) ^ sub) {
+				if (_path2.contains(path.getPointAt(path.getLength() / 2))
+						^ subtract) {
 					paths.unshift(path);
 					return true;
 				}
@@ -17155,7 +18707,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			return results || locations;
 		}
 	
-		function getWinding(point, curves, dir, dontFlip) {
+		function getWinding(point, curves, dir, closed, dontFlip) {
 			var epsilon = 1e-8,
 				ia = dir ? 1 : 0,
 				io = dir ? 0 : 1,
@@ -17232,7 +18784,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				vPrev = v;
 				return !dontFlip && a > paL && a < paR
 						&& Curve.getTangent(v, t)[dir ? 'x' : 'y'] === 0
-						&& getWinding(point, curves, dir ? 0 : 1, true);
+						&& getWinding(point, curves, dir ? 0 : 1, closed, true);
 			}
 	
 			function handleCurve(v) {
@@ -17264,11 +18816,10 @@ return /******/ (function(modules) { // webpackBootstrap
 				if (!i || curves[i - 1]._path !== path) {
 					vPrev = null;
 					if (!path._closed) {
-						var p1 = path.getLastCurve().getPoint2(),
-							p2 = curve.getPoint1(),
-							x1 = p1._x, y1 = p1._y,
-							x2 = p2._x, y2 = p2._y;
-						vClose = [x1, y1, x1, y1, x2, y2, x2, y2];
+						vClose = Curve.getValues(
+								path.getLastCurve().getSegment2(),
+								curve.getSegment1(),
+								null, !closed);
 						if (vClose[io] !== vClose[io + 6]) {
 							vPrev = vClose;
 						}
@@ -17295,7 +18846,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					if (vClose && (res = handleCurve(vClose)))
 						return res;
 					if (onPath && !pathWindingL && !pathWindingR) {
-						var add = path.isClockwise() ^ dir ? 1 : -1;
+						var add = path.isClockwise(closed) ^ dir ? 1 : -1;
 						windingL += add;
 						windingR -= add;
 						onPathWinding += add;
@@ -17351,10 +18902,12 @@ return /******/ (function(modules) { // webpackBootstrap
 					if (parent instanceof CompoundPath)
 						path = parent;
 					winding = !(operator.subtract && path2 && (
-							path === path1 &&  path2._getWinding(pt, dir).winding ||
-							path === path2 && !path1._getWinding(pt, dir).winding))
-								? getWinding(pt, curves, dir)
-								: { winding: 0 };
+							path === path1 &&
+								path2._getWinding(pt, dir, true).winding ||
+							path === path2 &&
+								!path1._getWinding(pt, dir, true).winding))
+							? getWinding(pt, curves, dir, true)
+							: { winding: 0 };
 					break;
 				}
 				length -= curveLength;
@@ -17366,18 +18919,23 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		function tracePaths(segments, operator) {
 			var paths = [],
-				start,
-				otherStart;
+				starts;
 	
-			function isValid(seg, excludeContour) {
+			function isValid(seg) {
 				var winding;
 				return !!(seg && !seg._visited && (!operator
-						|| operator[(winding = seg._winding).winding]
-						|| !excludeContour && operator.unite && winding.onContour));
+						|| operator[(winding = seg._winding || {}).winding]
+						|| operator.unite && winding.onContour));
 			}
 	
 			function isStart(seg) {
-				return seg === start || seg === otherStart;
+				if (seg) {
+					for (var i = 0, l = starts.length; i < l; i++) {
+						if (seg === starts[i])
+							return true;
+					}
+				}
+				return false;
 			}
 	
 			function visitPath(path) {
@@ -17387,22 +18945,37 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 			}
 	
-			function findBestIntersection(inter, exclude) {
-				if (!inter._next)
-					return inter;
-				while (inter) {
-					var seg = inter._segment,
-						nextSeg = seg.getNext(),
-						nextInter = nextSeg && nextSeg._intersection;
-					if (seg !== exclude && (isStart(seg) || isStart(nextSeg)
-						|| nextSeg && !seg._visited && !nextSeg._visited
-						&& (!operator || isValid(seg) && (isValid(nextSeg)
-							|| nextInter && isValid(nextInter._segment)))
-						))
-						return inter;
-					inter = inter._next;
+			function getIntersections(segment, collectStarts) {
+				var inter = segment._intersection,
+					start = inter,
+					inters = [];
+				if (collectStarts)
+					starts = [segment];
+	
+				function collect(inter, end) {
+					while (inter && inter !== end) {
+						var other = inter._segment,
+							path = other._path,
+							next = other.getNext() || path && path.getFirstSegment(),
+							nextInter = next && next._intersection;
+						if (other !== segment && (isStart(other) || isStart(next)
+							|| next && (isValid(other) && (isValid(next)
+								|| nextInter && isValid(nextInter._segment))))) {
+							inters.push(inter);
+						}
+						if (collectStarts)
+							starts.push(other);
+						inter = inter._next;
+					}
 				}
-				return null;
+	
+				if (inter) {
+					collect(inter);
+					while (inter && inter._prev)
+						inter = inter._prev;
+					collect(inter, start);
+				}
+				return inters;
 			}
 	
 			segments.sort(function(seg1, seg2) {
@@ -17422,14 +18995,18 @@ return /******/ (function(modules) { // webpackBootstrap
 			});
 	
 			for (var i = 0, l = segments.length; i < l; i++) {
-				var path = null,
+				var seg = segments[i],
+					valid = isValid(seg),
+					path = null,
 					finished = false,
-					seg = segments[i],
-					inter = seg._intersection,
+					closed = true,
+					branches = [],
+					branch,
+					visited,
 					handleIn;
-				if (!seg._visited && seg._path._overlapsOnly) {
+				if (valid && seg._path._overlapsOnly) {
 					var path1 = seg._path,
-						path2 = inter._segment._path;
+						path2 = seg._intersection._segment._path;
 					if (path1.compare(path2)) {
 						if ((operator.unite || operator.intersect)
 								&& path1.getArea()) {
@@ -17437,93 +19014,104 @@ return /******/ (function(modules) { // webpackBootstrap
 						}
 						visitPath(path1);
 						visitPath(path2);
+						valid = false;
 					}
 				}
-				if (!isValid(seg, true))
-					continue;
-				start = otherStart = null;
-				while (true) {
-					inter = inter && findBestIntersection(inter, seg) || inter;
-					var other = inter && inter._segment;
-					if (isStart(seg)) {
-						finished = true;
-					} else if (other) {
-						if (isStart(other)) {
-							finished = true;
-							seg = other;
-						} else if (isValid(other, isValid(seg, true))) {
-							if (operator
-									&& (operator.intersect || operator.subtract)) {
-								seg._visited = true;
-							}
-							seg = other;
-						}
+				while (valid) {
+					var first = !path,
+						intersections = getIntersections(seg, first),
+						inter = intersections.shift(),
+						other = inter && inter._segment,
+						finished = !first && (isStart(seg) || isStart(other)),
+						cross = !finished && other;
+					if (first) {
+						path = new Path(Item.NO_INSERT);
+						branch = null;
 					}
-					if (finished || seg._visited) {
+					if (finished) {
+						if (seg.isFirst() || seg.isLast())
+							closed = seg._path._closed;
 						seg._visited = true;
 						break;
 					}
-					if (seg._path._validOverlapsOnly && !isValid(seg))
-						break;
-					if (!path) {
-						path = new Path(Item.NO_INSERT);
-						start = seg;
-						otherStart = other;
+					if (cross && branch) {
+						branches.push(branch);
+						branch = null;
+					}
+					if (!branch) {
+						branch = {
+							start: path._segments.length,
+							segment: seg,
+							intersections: intersections,
+							visited: visited = [],
+							handleIn: handleIn
+						};
+					}
+					if (cross)
+						seg = other;
+					if (!isValid(seg)) {
+						path.removeSegments(branch.start);
+						for (var j = 0, k = visited.length; j < k; j++) {
+							visited[j]._visited = false;
+						}
+						if (inter = branch.intersections.shift()) {
+							seg = inter._segment;
+							visited.length = 0;
+						} else {
+							if (!(branch = branches.pop()) ||
+								!isValid(seg = branch.segment))
+								break;
+							visited = branch.visited;
+						}
+						handleIn = branch.handleIn;
 					}
 					var next = seg.getNext();
 					path.add(new Segment(seg._point, handleIn,
 							next && seg._handleOut));
 					seg._visited = true;
+					visited.push(seg);
 					seg = next || seg._path.getFirstSegment();
 					handleIn = next && next._handleIn;
-					inter = seg._intersection;
 				}
 				if (finished) {
-					path.firstSegment.setHandleIn(handleIn);
-					path.setClosed(true);
-				} else if (path) {
-					var area = path.getArea(true);
-					if (abs(area) >= 1e-7) {
-						console.error('Boolean operation resulted in open path',
-								'segments =', path._segments.length,
-								'length =', path.getLength(),
-								'area=', area);
+					if (closed) {
+						path.firstSegment.setHandleIn(handleIn);
+						path.setClosed(closed);
 					}
-					path = null;
-				}
-				if (path && (path._segments.length > 8
-						|| !Numerical.isZero(path.getArea()))) {
-					paths.push(path);
-					path = null;
+					if (path.getArea() !== 0) {
+						paths.push(path);
+					}
 				}
 			}
 			return paths;
 		}
 	
 		return {
-			_getWinding: function(point, dir) {
-				return getWinding(point, this.getCurves(), dir);
+			_getWinding: function(point, dir, closed) {
+				return getWinding(point, this.getCurves(), dir, closed);
 			},
 	
-			unite: function(path) {
-				return computeBoolean(this, path, 'unite');
+			unite: function(path, options) {
+				return computeBoolean(this, path, 'unite', options);
 			},
 	
-			intersect: function(path) {
-				return computeBoolean(this, path, 'intersect');
+			intersect: function(path, options) {
+				return computeBoolean(this, path, 'intersect', options);
 			},
 	
 			subtract: function(path) {
 				return computeBoolean(this, path, 'subtract');
 			},
 	
-			exclude: function(path) {
-				return computeBoolean(this, path, 'exclude');
+			exclude: function(path, options) {
+				return computeBoolean(this, path, 'exclude', options);
 			},
 	
-			divide: function(path) {
-				return createResult(Group, [this.subtract(path),
-						this.intersect(path)], true, this, path);
+			divide: function(path, options) {
+				return createResult(Group, [
+						this.subtract(path, options),
+						this.intersect(path, options)
+					], true, this, path, options);
 			},
 	
 			resolveCrossings: function() {
@@ -17691,8 +19279,8 @@ return /******/ (function(modules) { // webpackBootstrap
 		};
 	});
 	
-	var PathIterator = Base.extend({
-		_class: 'PathIterator',
+	var PathFlattener = Base.extend({
+		_class: 'PathFlattener',
 	
 		initialize: function(path, flatness, maxRecursion, ignoreStraight, matrix) {
 			var curves = [],
@@ -18510,7 +20098,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						: color;
 				return col === this || col && this._class === col._class
 						&& this._type === col._type
-						&& this._alpha === col._alpha
+						&& this.getAlpha() === col.getAlpha()
 						&& Base.equals(this._components, col._components)
 						|| false;
 			},
@@ -18648,7 +20236,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		initialize: function Gradient(stops, radial) {
 			this._id = UID.get();
-			if (stops && this._set(stops)) {
+			if (stops && Base.isPlainObject(stops)) {
+				this.set(stops);
 				stops = radial = null;
 			}
 			if (this._stops == null) {
@@ -18977,8 +20566,23 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		equals: function(style) {
+			function compare(style1, style2, secondary) {
+				var values1 = style1._values,
+					values2 = style2._values,
+					defaults2 = style2._defaults;
+				for (var key in values1) {
+					var value1 = values1[key],
+						value2 = values2[key];
+					if (!(secondary && key in values2) && !Base.equals(value1,
+							value2 === undefined ? defaults2[key] : value2))
+						return false;
+				}
+				return true;
+			}
+	
 			return style === this || style && this._class === style._class
-					&& Base.equals(this._values, style._values)
+					&& compare(this, style)
+					&& compare(style, this, true)
 					|| false;
 		},
 	
@@ -19421,20 +21025,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		setViewSize: function() {
 			var size = Size.read(arguments),
-				width = size.width,
-				height = size.height,
 				delta = size.subtract(this._viewSize);
 			if (delta.isZero())
 				return;
-			this._setElementSize(width, height);
-			this._viewSize._set(width, height);
-			this.emit('resize', {
-				size: size,
-				delta: delta
-			});
+			this._setElementSize(size.width, size.height);
+			this._viewSize.set(size);
 			this._changed();
-			if (this._autoUpdate)
-				this.requestUpdate();
+			this.emit('resize', { size: size, delta: delta });
+			if (this._autoUpdate) {
+				this.update();
+			}
 		},
 	
 		_setElementSize: function(width, height) {
@@ -20328,7 +21928,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			PaperScopeItem.call(this);
 			this._moveCount = -1;
 			this._downCount = -1;
-			this._set(props);
+			this.set(props);
 		},
 	
 		getMinDistance: function() {
@@ -21799,7 +23399,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	}))();
 	
 	if (paper.agent.node)
-		__webpack_require__(35)(paper);
+		__webpack_require__(38)(paper);
 	
 	if (true) {
 		!(__WEBPACK_AMD_DEFINE_FACTORY__ = (paper), __WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ? (__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) : __WEBPACK_AMD_DEFINE_FACTORY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
@@ -21812,25 +23412,45 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 34 */
+/* 37 */
 /***/ function(module, exports) {
 
 	/* (ignored) */
 
 /***/ },
-/* 35 */
+/* 38 */
 /***/ function(module, exports) {
 
 	/* (ignored) */
 
 /***/ },
-/* 36 */
+/* 39 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var opentype = __webpack_require__(2),
-		paper = __webpack_require__(33),
-		Glyph = __webpack_require__(37),
-		assign = __webpack_require__(39).assign;
+		paper = __webpack_require__(36),
+		Glyph = __webpack_require__(40),
+		assign = __webpack_require__(42).assign;
+	
+	function mergeFont(url, name, user, arrayBuffer, merged, cb) {
+		fetch(
+			[
+				url,
+				name.family,
+				name.style,
+				user,
+				name.template || 'unknown'
+			].join('/') +
+			(merged ? '/overlap' : ''), {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/otf' },
+				body: arrayBuffer
+		})
+		.then(function( response ) {
+			return response.arrayBuffer();
+		})
+		.then(cb);
+	}
 	
 	function Font( args ) {
 		paper.Group.prototype.constructor.apply( this );
@@ -22094,7 +23714,10 @@ return /******/ (function(modules) { // webpackBootstrap
 		var _URL = window.URL || window.webkitURL;
 		Font.prototype.addToFonts = document.fonts ?
 			// CSS font loading, lightning fast
-			function( buffer, enFamilyName ) {
+			function( buffer, enFamilyName, noMerge) {
+				//cancelling in browser merge
+				clearTimeout(this.mergeTimeout);
+	
 				if ( !enFamilyName ) {
 					enFamilyName = this.ot.getEnglishName('fontFamily');
 				}
@@ -22115,6 +23738,28 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 	
 				document.fonts.add( fontface );
+	
+				//we merge font that haven't been merge
+				if ( !noMerge ) {
+					var timeoutRef = this.mergeTimeout = setTimeout(function() {
+					mergeFont(
+						'https://merge.prototypo.io',
+						{
+							style: 'forbrowserdisplay',
+							template: 'noidea',
+							family: 'forbrowserdisplay'
+						},
+						'plumin',
+						buffer,
+						true,
+						function(mergedBuffer) {
+							if (timeoutRef === this.mergeTimeout) {
+								this.addToFonts(mergedBuffer, enFamilyName, true);
+							}
+						}.bind(this)
+					);
+					}.bind(this), 300);
+				}
 	
 				return this;
 			} :
@@ -22177,27 +23822,18 @@ return /******/ (function(modules) { // webpackBootstrap
 			}
 			// TODO: replace that with client-side font merging
 			if (name && user) {
-				fetch(
-					[
-						'https://merge.prototypo.io',
-						name.family,
-						name.style,
-						user,
-						name.template || 'unknown'
-					].join('/') +
-					(merged ? '/overlap' : ''), {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/otf' },
-						body: arrayBuffer
-				})
-				.then(function( response ) {
-					return response.arrayBuffer();
-				})
-				.then(function( bufferToDownload ) {
-					if ( merged ) {
-						triggerDownload( this, bufferToDownload );
-					}
-				}.bind(this));
+				mergeFont(
+					'https://merge.prototypo.io',
+					name,
+					user,
+					arrayBuffer,
+					merged,
+					function(bufferToDownload) {
+						if ( merged ) {
+							triggerDownload( this, bufferToDownload );
+						}
+					}.bind(this)
+				);
 			}
 	
 			return this;
@@ -22209,12 +23845,12 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 37 */
+/* 40 */
 /***/ function(module, exports, __webpack_require__) {
 
 	var opentype = __webpack_require__(2),
-		paper = __webpack_require__(33),
-		Outline = __webpack_require__(38);
+		paper = __webpack_require__(36),
+		Outline = __webpack_require__(41);
 	
 	function Glyph( args ) {
 		paper.Group.prototype.constructor.apply( this );
@@ -22493,10 +24129,10 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 38 */
+/* 41 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var paper = __webpack_require__(33);
+	var paper = __webpack_require__(36);
 	
 	var Outline = paper.CompoundPath;
 	
@@ -22601,7 +24237,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 39 */
+/* 42 */
 /***/ function(module, exports) {
 
 	/**
@@ -22653,13 +24289,13 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 40 */
+/* 43 */
 /***/ function(module, exports, __webpack_require__) {
 
 	/* Extend the Path prototype to add OpenType conversion
 	 * and alias *segments methods and properties to *nodes
 	 */
-	var paper = __webpack_require__(33);
+	var paper = __webpack_require__(36);
 	
 	var proto = paper.PaperScope.prototype.Path.prototype;
 	
@@ -22788,10 +24424,10 @@ return /******/ (function(modules) { // webpackBootstrap
 
 
 /***/ },
-/* 41 */
+/* 44 */
 /***/ function(module, exports, __webpack_require__) {
 
-	var paper = __webpack_require__(33);
+	var paper = __webpack_require__(36);
 	
 	Object.defineProperty( paper.Segment.prototype, 'x', {
 		get: function() {
