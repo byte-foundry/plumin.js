@@ -27,3 +27,7 @@ node_modules/codemirror/addon/*
 !node_modules/codemirror/addon/edit
 node_modules/codemirror/addon/edit/*
 !node_modules/codemirror/addon/edit/closebrackets.js
+
+.tern-project
+*.swp
+*.swo

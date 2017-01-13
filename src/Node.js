@@ -1,21 +1,23 @@
-var paper = require('paper');
+export default class Node {
+	constructor(point, handleIn, handleOut) {
+		this.point = point;
+		this.handleIn = handleIn || point;
+		this.handleOut = handleOut || point;
+	}
 
-Object.defineProperty( paper.Segment.prototype, 'x', {
-	get: function() {
+	get x() {
 		return this.point.x;
-	},
-	set: function( value ) {
-		this.point.x = value;
 	}
-});
 
-Object.defineProperty( paper.Segment.prototype, 'y', {
-	get: function() {
+	set x(x) {
+		this.point.x = x;
+	}
+
+	get y() {
 		return this.point.y;
-	},
-	set: function( value ) {
-		this.point.y = value;
 	}
-});
 
-module.exports = paper.Segment;
+	set y(y) {
+		this.point.y = y;
+	}
+}
