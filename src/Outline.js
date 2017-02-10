@@ -1,85 +1,107 @@
+/* @flow */
+import Path from './Path.js';
+
 export default class Outline {
-	constructor() {
+	children: Array<Path>;
+
+	constructor({svg, paths}: {svg?: string, paths?: Array<Path>} = {}) {
 		this.children = [];
-	}
+		if (svg) {
+			const regexp = /(M[^M]*)/g;
+			const commands = [];
+			let result = regexp.exec(svg);
 
-	insertChildren(index, aItems) {
-		let items = aItems;
-
-		if (Array.isArray(items)) {
-			// flatten items to handle CompoundPath children
-			items = [].concat([], ...items.map((item) => {
-				return item.children ? item.children : item;
-			}));
-		}
-
-		this.children.splice(index, 0, ...items);
-	}
-
-	fromPath(path) {
-	}
-
-	interpolate(ouline0, outline1, coef) {
-		for (let i = 0, l = this.children.length; i < l; i++) {
-			// The number of children should be the same everywhere,
-			// but we're going to try our best anyway
-			if (!outline0.children[i] || !outline1.children[i]) {
-				break;
+			while (result) {
+				commands.push(result);
+				result = regexp.exec(svg);
 			}
 
-			this.children[i].interpolate(
-				outline0.children[i],
-				outline1.children[i],
-				coef
-			);
+			commands.forEach(([svgItem]) => {
+				this.children.push(new Path({svg: svgItem}));
+			});
 		}
-
-		return this;
+		else if (paths) {
+			this.children = paths;
+		}
 	}
 
-	updateSVGData(path = []) {
-		this.svgData = path;
+	insertChildren(index: number, items: Array<Path>): Outline {
+		const children = [...this.children];
+
+		children.splice(index, 0, ...items);
+
+		return new Outline({
+			paths: children,
+		});
+	}
+
+	static interpolate(outline0: Outline, outline1: Outline, coef: number): Outline {
+		const paths = [];
+
+		if (outline0.children.length === outline1.children.length) {
+			for (let i = 0; i < outline0.children.length; i++) {
+				// The number of children should be the same everywhere,
+				// but we're going to try our best anyway
+				if (!outline0.children[i] || !outline1.children[i]) {
+					break;
+				}
+
+				paths.push(outline0.children[i].interpolate(
+					outline1.children[i],
+					coef
+				));
+			}
+		}
+
+		return new Outline({
+			paths,
+		});
+	}
+
+	getSVGData(aPath: {commands: Array<mixed>} = {commands: []}): {commands: Array<mixed>} {
+		const path = {
+			commands: [...aPath.commands],
+		};
 
 		this.children.forEach((contour) => {
-			contour.updateSVGData(path);
+			contour.getSVGData(path);
 		}, this);
 
-		return this.svgData;
+		return path;
 	}
+
+	combineTo(outline: Outline): Outline {
 		/*
-	combineTo(outline) {
-		return this.children.reduce(function(reducing, path) {
-			// ignore empty and open paths
-			if (path.curves.length === 0 || !path.closed) {
-				return reducing;
-			}
-
-			const tmp = (reducing === undefined
-				// when the initial value doesn't exist, use the first path
-				// (clone it otherwise it's removed from this.children)
-				? path.clone(false)
-				: reducing[
-					path.clockwise === !(path.exportReversed) ? 'unite' : 'subtract'
-				](path)
-			);
-
-			return (tmp.constructor === paper.Path ?
-				new paper.CompoundPath({children: [ tmp ]}) :
-				tmp
-			);
-
-		}, outline);
+		 * Should combine path into one by using a nonzero rule
+		*/
+		throw new Error(`this does not work. This is your outline`);
 	}
-	*/
 
-	updateOTCommands(path = []) {
-		this.ot.path.commands = path;
+	getOTCommands(aPath: {commands: Array<mixed>} = {commands: []}): {commands: Array<mixed>} {
+		const path = {
+			commands: [...aPath.commands],
+		};
 
 		this.children.forEach((contour) => {
-			contour.updateOTCommands(path);
+			contour.getOTCommands(path);
 		});
 
-		return this.ot;
+		return path;
+	}
+
+	subtract(path: Path): Outline {
+		const children = [...this.children];
+
+		if (path.orientation()) {
+			children.push(path.reverse());
+		}
+		else {
+			children.push(path);
+		}
+
+		return new Outline({
+			paths: children,
+		});
 	}
 }
 	/*
