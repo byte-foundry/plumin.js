@@ -129,7 +129,7 @@
 		"react/jsx-uses-vars": 2,
 		"react/jsx-uses-react": 2,
 
-		"babel/new-cap": [1, {"capIsNewExceptions": ["Intercom", "XXHash", "Classnames", "PouchDB", "Log"]}],
+		"babel/new-cap": [1, {"capIsNewExceptions": ["Record"]}],
 		"babel/object-curly-spacing": 2,
 		"babel/object-shorthand": 2,
 		"babel/arrow-parens": 2,

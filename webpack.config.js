@@ -1,7 +1,7 @@
-var path = require('path');
+const path = require('path');
 
 module.exports = {
-	entry: [ './src/plumin.js' ],
+	entry: './src/plumin.js',
 	output: {
 		path: path.join(__dirname, 'dist'),
 		filename: 'plumin.js',
@@ -11,7 +11,18 @@ module.exports = {
 	resolve: {
 		alias: {
 			'paper': 'paper/dist/paper-core.js',
-		}
+		},
+	},
+	module: {
+		loaders: [
+			{
+				test: /\.jsx?$/,
+				loaders: ['babel-loader?cacheDirectory'],
+				include: [
+					path.join(__dirname, 'src'),
+				],
+			},
+		],
 	},
 	externals: [{
 		'./node/window': true,
@@ -19,5 +30,5 @@ module.exports = {
 	}],
 	node: {
 		Buffer: false,
-	}
+	},
 };

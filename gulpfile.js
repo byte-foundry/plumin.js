@@ -8,7 +8,6 @@ const project = 'plumin';
 const webpack = 'webpack --devtool source-map';
 const dist = `${webpack} && cp -R node_modules/paper/dist/node/ dist/`;
 const watch = `${webpack} --watch`;
-const jscs = `jscs ${src}/**.js test/**.js`;
 const eslint = `eslint ${src}/**.js test/**.js`;
 const browsersync = `browser-sync start --server --files "${dest}/${project}.js, index.html"`;
 const mocha = 'mocha-phantomjs test.html';
@@ -20,7 +19,7 @@ shelter({
 	},
 	build: {
 		dsc: `Lint code, generate ${project}.js and test it`,
-		cmd: `{ ${jscs} & ${eslint}; } && ${dist} && ${mocha}`
+		cmd: `{ ${eslint}; } && ${dist} && ${mocha}`
 	},
 	serve: {
 		dsc: 'Opens index.html and live-reload on changes',
