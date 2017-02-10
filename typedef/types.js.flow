@@ -1,0 +1,46 @@
+/* @flow */
+
+import {Record as ImmutableRecord} from 'immutable';
+import Node from '../src/Node.js';
+import Outline from '../src/Outline.js';
+import OutlineGroup from '../src/OutlineGroup.js'
+import Glyph from '../src/Glyph.js';
+
+export type Record<Def: Object> = {
+  merge: (o?: $Shape<Def>) => Record<Def>;
+} & Def;
+
+type $RecordCreator<Def: Object> = (def?: $Shape<Def>) => Record<Def>;
+
+export function RecordC<Def: Object>(definition: Def): $RecordCreator<Def> {
+  const RecordClass = ImmutableRecord(definition);
+  return (newDef) => {
+      return new RecordClass(newDef);
+  };
+}
+
+export type Point = Record<{x: number, y: number}>;
+
+export type Matrix = [number, number, number, number, number, number];
+
+export type Curve = {
+	point1: Point;
+	handle1: ?Point;
+	handle2: ?Point;
+	point2: ?Point;
+}
+
+export type Size = Record<{width: number, height: number}>;
+
+export type NodeLabel = 'x' | 'y' | 'handleIn' | 'handleOut' | 'point';
+
+export type NodeValue = Point | number;
+
+export type GlyphLabel = 'advanceWidth' | 'subset' | 'unicode' | 'outlines' | 'components';
+
+export type Segment = Node | {
+	x: number,
+	y: number
+}
+
+export type GlyphElem = Outline | OutlineGroup | Glyph;

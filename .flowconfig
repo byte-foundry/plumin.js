@@ -1,0 +1,14 @@
+[ignore]
+.*/node_modules/config-chain/test/broken.json
+.*/node_modules/findup/test/fixture/config.json
+.*/node_modules/findup/test/fixture/f/e/d/c/b/a/top.json
+.*/node_modules/findup/test/fixture/f/e/d/c/config.json
+
+[include]
+./src
+./typedef
+
+[libs]
+
+[options]
+unsafe.enable_getters_and_setters=true
