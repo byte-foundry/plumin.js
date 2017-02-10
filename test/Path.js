@@ -1,68 +1,75 @@
 describe('Path', function() {
-	before(function() {
-		plumin.setup({
-			width: 1024,
-			height: 1024
-		});
-	});
-
 	describe('nodes, firstNode, lastNode getters', function() {
 		it('should add a glyph to the glyphMap, charMap and altMap of the font',
 			function() {
-				var rect = new plumin.Path.Rectangle({
-						point: [ 0, -255 ],
-						size: [ 100, 80 ]
+				const rect = plumin.Path.Rectangle({
+						point: {x: 0, y: -255},
+						size: {width: 100, height: 80},
 					});
 
-				expect( rect.nodes.length ).to.equal( 4 );
-				expect( rect.firstNode ).to.equal( rect.nodes[0] );
-				expect( rect.lastNode ).to.equal( rect.nodes[3] );
+				expect(rect.nodes.length).to.equal(4);
+				expect(rect.firstNode).to.equal(rect.nodes[0]);
+				expect(rect.lastNode).to.equal(rect.nodes[3]);
+
+				expect(rect.firstNode.x).to.equal(0);
+				expect(rect.firstNode.y).to.equal(-255);
+
+				expect(rect.nodes[1].x).to.equal(100);
+				expect(rect.nodes[1].y).to.equal(-255);
+
+				expect(rect.nodes[2].x).to.equal(100);
+				expect(rect.nodes[2].y).to.equal(-175);
+
+				expect(rect.lastNode.x).to.equal(0);
+				expect(rect.lastNode.y).to.equal(-175);
 			}
 		);
 	});
 
 	describe('#_updateData method', function() {
-		var closedPath,
-			openPath,
-			circle;
+		let closedPath;
+		let openPath;
+		let circle;
 
 		before(function() {
 			closedPath = new plumin.Path({
-				segments: [ [ 0, 0 ], [ 0, 100 ], [ 100, 100 ], [ 100, 0 ] ],
-				closed: true
+				segments: [ {x: 0, y: 0}, {x: 0, y: 100}, {x: 100, y: 100}, {x: 100, y: 0} ],
+				closed: true,
 			});
 
 			openPath = new plumin.Path({
-				segments: [ [ 0, 0 ], [ 0, 100 ], [ 100, 100 ], [ 100, 0 ] ],
-				closed: false
+				segments: [ {x: 0, y: 0}, {x: 0, y: 100}, {x: 100, y: 100}, {x: 100, y: 0} ],
+				closed: false,
 			});
 
-			circle = new plumin.Path(
-				'M 0 50 C 0 75 25 100 50 100 C 75 100 100 75 100 50 ' +
-				'C 100 25 75 0 50 0 C 25 0 0 25 0 50 Z'
-			);
+			circle = new plumin.Path({
+				svg: 'M 0 50 C 0 75 25 100 50 100 C 75 100 100 75 100 50 '
+				+ 'C 100 25 75 0 50 0 C 25 0 0 25 0 50 Z',
+			});
 		});
 
 		it('should return an array with pseudo-svg commands - closed path',
 			function() {
-				var data = [],
-					result = closedPath._updateData(
+				const data = {
+					commands: [],
+				};
+				const result = closedPath.updateData(
 						data,
 						function() {
-							data.push.apply(data, arguments);
+							return data.commands.push(...arguments);
 						},
 						function() {
-							data.push.apply(data, arguments);
+							return data.commands.push(...arguments);
 						}
 					);
 
-				expect(result).to.deep.equal([
+				expect(result.commands).to.deep.equal([
 					'M', 0, 0,
 					'L', 0, 100,
 					'L', 100, 100,
 					'L', 100, 0,
 					'L', 0, 0,
-					'Z'
+					'Z',
 				]);
 
 			}
@@ -70,22 +77,24 @@ describe('Path', function() {
 
 		it('should return an array with pseudo-svg commands - open path',
 			function() {
-				var data = [],
-					result = openPath._updateData(
+				const data = {
+					commands: [],
+				};
+				const result = openPath.updateData(
 						data,
 						function() {
-							data.push.apply(data, arguments);
+							return data.commands.push(...arguments);
 						},
 						function() {
-							data.push.apply(data, arguments);
+							return data.commands.push(...arguments);
 						}
 					);
 
-				expect(result).to.deep.equal([
+				expect(result.commands).to.deep.equal([
 					'M', 0, 0,
 					'L', 0, 100,
 					'L', 100, 100,
-					'L', 100, 0
+					'L', 100, 0,
 				]);
 
 			}
@@ -93,52 +102,57 @@ describe('Path', function() {
 
 		it('should return an array with pseudo-svg commands - circle',
 			function() {
-				var data = [],
-					result = circle._updateData(
+				const data = {
+					commands: [],
+				};
+				const result = circle.updateData(
 						data,
 						function() {
-							data.push.apply(data, arguments);
+							return data.commands.push(...arguments);
 						},
 						function() {
-							data.push.apply(data, arguments);
+							return data.commands.push(...arguments);
 						}
 					);
 
-				expect(result).to.deep.equal([
+				expect(result.commands).to.deep.equal([
 					'M', 0, 50,
 					'C', 0, 75, 25, 100, 50, 100,
 					'C', 75, 100, 100, 75, 100, 50,
 					'C', 100, 25, 75, 0, 50, 0,
 					'C', 25, 0, 0, 25, 0, 50,
-					'Z'
+					'Z',
 				]);
 
 			}
 		);
 
-		it('should return an array with pseudo-svg commands' +
-			' - exportReversed circle',
+		it('should return an array with pseudo-svg commands'
+			+ ' - exportReversed circle',
 			function() {
-				circle.exportReversed = true;
-
-				var data = [],
-					result = circle._updateData(
+				const data = {
+					commands: [],
+				};
+				const result = circle.updateData(
 						data,
 						function() {
-							data.push.apply(data, arguments);
+							return data.commands.push(...arguments);
 						},
 						function() {
-							data.push.apply(data, arguments);
+							return data.commands.push(...arguments);
+						},
+						{
+							reverse: true,
 						}
 					);
 
-				expect(result).to.deep.equal([
+				expect(result.commands).to.deep.equal([
 					'M', 0, 50,
 					'C', 0, 25, 25, 0, 50, 0,
 					'C', 75, 0, 100, 25, 100, 50,
 					'C', 100, 75, 75, 100, 50, 100,
 					'C', 25, 100, 0, 75, 0, 50,
-					'Z'
+					'Z',
 				]);
 
 			}
