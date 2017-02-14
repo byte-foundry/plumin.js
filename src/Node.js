@@ -105,11 +105,11 @@ export default class Node {
 		const postRotate = [1, 0, 0, 1, center.x, center.y];
 
 		const matrix = matrixMul(
-			postRotate,
 			matrixMul(
-				rotate,
-				preRotate
-			)
+				preRotate,
+				rotate
+			),
+			postRotate
 		);
 
 		return this.applyMatrix(matrix);

@@ -164,13 +164,12 @@ export default class Path {
 			closed: true,
 		});
 		const angleStep = 2 * Math.PI / sides;
-		const sideLength = radius * 2 * Math.sin(Math.PI / sides);
-		let angle = Math.PI / 2;
+		let angle = Math.PI / 2 - angleStep;
 		let point = add2D(
 			center,
 			new PointC({
-				x: radius,
-				y: 0,
+				x: 0,
+				y: radius,
 			})
 		);
 
@@ -179,10 +178,10 @@ export default class Path {
 		for (let i = 0; i < sides; i++) {
 			angle += angleStep;
 			point = add2D(
-				point,
+				center,
 				new PointC({
-					x: sideLength * Math.cos(angle),
-					y: sideLength * Math.sin(angle),
+					x: radius * Math.cos(angle),
+					y: radius * Math.sin(angle),
 				})
 			);
 
@@ -192,17 +191,31 @@ export default class Path {
 		return result;
 	}
 
-	static Circle({center, size}: {center: Point, size: Size}) {
+	static Ellipse({center, size}: {center: Point, size: Size}) {
 		let result = new Path({
 			segments: [],
 			closed: true,
 		});
-		const curves = [
+		let curves = [
 			arcToCubicBezier(size.width, size.height, 0, 0.25),
 			arcToCubicBezier(size.width, size.height, 0.25, 0.5),
 			arcToCubicBezier(size.width, size.height, 0.5, 0.75),
 			arcToCubicBezier(size.width, size.height, 0.75, 1),
 		];
+
+		if (size.height > size.width) {
+			curves = curves.map((curve) => {
+				return curve.map((item) => {
+					const point = new Node(item);
+					const {x, y} = point.rotate(90, center);
+
+					return new PointC({
+						x,
+						y,
+					});
+				});
+			});
+		}
 
 		result = result.moveTo(add2D(center, curves[0][0]));
 
@@ -492,7 +505,7 @@ export default class Path {
 			count += (next.x - point.x) * (next.y + point.y);
 		});
 
-		return count > 0;
+		return count < 0;
 	}
 
 	reverse(): Path {

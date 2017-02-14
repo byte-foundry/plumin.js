@@ -44,3 +44,15 @@ export type Segment = Node | {
 }
 
 export type GlyphElem = Outline | OutlineGroup | Glyph;
+
+export type Subset = Array<number> | string;
+
+export type OtObj = {
+	unicode: number,
+	name: string,
+	xMin?: number,
+	yMin?: number,
+	xMax?: number,
+	yMax?: number,
+	advanceWidth: number,
+};

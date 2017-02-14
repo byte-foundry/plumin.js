@@ -1,5 +1,7 @@
 /* @flow */
-import type {GlyphElem} from '../typedef/types.js.flow';
+import type {GlyphElem, Point} from '../typedef/types.js.flow';
+
+import {PointC} from './util/linear.js';
 
 import Outline from './Outline.js';
 
@@ -86,5 +88,55 @@ export default class OutlineGroup {
 		});
 
 		return path;
+	}
+
+	scale2D(vector: Point, center?: Point): OutlineGroup {
+		const children = this.children.map((child) => {
+			return child.scale2D(vector, center);
+		});
+
+		return new OutlineGroup({
+			children,
+		});
+	}
+
+	scale(scale: number, center?: Point): OutlineGroup {
+		return this.scale2D(
+			new PointC({
+				x: scale,
+				y: scale,
+			}),
+			center
+		);
+	}
+
+	rotate(theta: Point, center?: Point): OutlineGroup {
+		const children = this.children.map((child) => {
+			return child.rotate(theta, center);
+		});
+
+		return new OutlineGroup({
+			children,
+		});
+	}
+
+	translate(vector: Point): OutlineGroup {
+		const children = this.children.map((child) => {
+			return child.translate(vector);
+		});
+
+		return new OutlineGroup({
+			children,
+		});
+	}
+
+	skew(vector: Point, center?: Point): OutlineGroup {
+		const children = this.children.map((child) => {
+			return child.skew(vector, center);
+		});
+
+		return new OutlineGroup({
+			children,
+		});
 	}
 }

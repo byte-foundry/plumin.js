@@ -1,4 +1,7 @@
 /* @flow */
+
+import {PointC} from './util/linear.js';
+
 import Path from './Path.js';
 
 export default class Outline {
@@ -77,9 +80,9 @@ export default class Outline {
 		throw new Error(`this does not work. This is your outline`);
 	}
 
-	getOTCommands(aPath: {commands: Array<mixed>} = {commands: []}): {commands: Array<mixed>} {
+	getOTCommands(): {commands: Array<mixed>} {
 		const path = {
-			commands: [...aPath.commands],
+			commands: [],
 		};
 
 		this.children.forEach((contour) => {
@@ -98,6 +101,56 @@ export default class Outline {
 		else {
 			children.push(path);
 		}
+
+		return new Outline({
+			paths: children,
+		});
+	}
+
+	scale2D(vector: Point, center?: Point): Outline {
+		const children = this.children.map((child) => {
+			return child.scale2D(vector, center);
+		});
+
+		return new Outline({
+			paths: children,
+		});
+	}
+
+	scale(scale: number, center?: Point): Outline {
+		return this.scale2D(
+			new PointC({
+				x: scale,
+				y: scale,
+			}),
+			center
+		);
+	}
+
+	rotate(theta: Point, center?: Point): Outline {
+		const children = this.children.map((child) => {
+			return child.rotate(theta, center);
+		});
+
+		return new Outline({
+			paths: children,
+		});
+	}
+
+	translate(vector: Point): Outline {
+		const children = this.children.map((child) => {
+			return child.translate(vector);
+		});
+
+		return new Outline({
+			paths: children,
+		});
+	}
+
+	skew(vector: Point, center?: Point): Outline {
+		const children = this.children.map((child) => {
+			return child.skew(vector, center);
+		});
 
 		return new Outline({
 			paths: children,
