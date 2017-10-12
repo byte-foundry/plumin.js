@@ -52,22 +52,22 @@ return /******/ (function(modules) { // webpackBootstrap
 /************************************************************************/
 /******/ ([
 /* 0 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	module.exports = __webpack_require__(1);
 
 
-/***/ },
+/***/ }),
 /* 1 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
 	var opentype = __webpack_require__(2);
-	var paper = __webpack_require__(36);
-	var Font = __webpack_require__(39);
-	var Glyph = __webpack_require__(40);
-	var Outline = __webpack_require__(41);
-	var Path = __webpack_require__(43);
-	var Node = __webpack_require__(44);
+	var paper = __webpack_require__(4);
+	var Font = __webpack_require__(7);
+	var Glyph = __webpack_require__(8);
+	var Outline = __webpack_require__(9);
+	var Path = __webpack_require__(11);
+	var Node = __webpack_require__(12);
 	
 	paper.PaperScope.prototype.Font = Font;
 	paper.PaperScope.prototype.Glyph = Glyph;
@@ -80,404 +80,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = paper;
 
 
-/***/ },
+/***/ }),
 /* 2 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ (function(module, exports, __webpack_require__) {
 
-	// opentype.js
-	// https://github.com/nodebox/opentype.js
-	// (c) 2015 Frederik De Bleser
-	// opentype.js may be freely distributed under the MIT license.
-	
-	/* global DataView, Uint8Array, XMLHttpRequest  */
-	
-	'use strict';
-	
-	var inflate = __webpack_require__(3);
-	
-	var encoding = __webpack_require__(4);
-	var _font = __webpack_require__(5);
-	var glyph = __webpack_require__(15);
-	var parse = __webpack_require__(12);
-	var path = __webpack_require__(6);
-	var util = __webpack_require__(29);
-	
-	var cmap = __webpack_require__(11);
-	var cff = __webpack_require__(13);
-	var fvar = __webpack_require__(31);
-	var glyf = __webpack_require__(32);
-	var gpos = __webpack_require__(33);
-	var gsub = __webpack_require__(25);
-	var head = __webpack_require__(17);
-	var hhea = __webpack_require__(18);
-	var hmtx = __webpack_require__(19);
-	var kern = __webpack_require__(34);
-	var ltag = __webpack_require__(20);
-	var loca = __webpack_require__(35);
-	var maxp = __webpack_require__(21);
-	var _name = __webpack_require__(22);
-	var os2 = __webpack_require__(23);
-	var post = __webpack_require__(24);
-	var meta = __webpack_require__(26);
-	
 	/**
-	 * The opentype library.
-	 * @namespace opentype
+	 * https://opentype.js.org v0.7.3 | (c) Frederik De Bleser and other contributors | MIT License | Uses tiny-inflate by Devon Govett
 	 */
 	
-	// File loaders /////////////////////////////////////////////////////////
-	/**
-	 * Loads a font from a file. The callback throws an error message as the first parameter if it fails
-	 * and the font as an ArrayBuffer in the second parameter if it succeeds.
-	 * @param  {string} path - The path of the file
-	 * @param  {Function} callback - The function to call when the font load completes
-	 */
-	function loadFromFile(path, callback) {
-	    var fs = __webpack_require__(30);
-	    fs.readFile(path, function(err, buffer) {
-	        if (err) {
-	            return callback(err.message);
-	        }
+	(function (global, factory) {
+		 true ? factory(exports) :
+		typeof define === 'function' && define.amd ? define(['exports'], factory) :
+		(factory((global.opentype = global.opentype || {})));
+	}(this, (function (exports) { 'use strict';
 	
-	        callback(null, util.nodeBufferToArrayBuffer(buffer));
-	    });
-	}
-	/**
-	 * Loads a font from a URL. The callback throws an error message as the first parameter if it fails
-	 * and the font as an ArrayBuffer in the second parameter if it succeeds.
-	 * @param  {string} url - The URL of the font file.
-	 * @param  {Function} callback - The function to call when the font load completes
-	 */
-	function loadFromUrl(url, callback) {
-	    var request = new XMLHttpRequest();
-	    request.open('get', url, true);
-	    request.responseType = 'arraybuffer';
-	    request.onload = function() {
-	        if (request.status !== 200) {
-	            return callback('Font could not be loaded: ' + request.statusText);
-	        }
-	
-	        return callback(null, request.response);
-	    };
-	
-	    request.send();
-	}
-	
-	// Table Directory Entries //////////////////////////////////////////////
-	/**
-	 * Parses OpenType table entries.
-	 * @param  {DataView}
-	 * @param  {Number}
-	 * @return {Object[]}
-	 */
-	function parseOpenTypeTableEntries(data, numTables) {
-	    var tableEntries = [];
-	    var p = 12;
-	    for (var i = 0; i < numTables; i += 1) {
-	        var tag = parse.getTag(data, p);
-	        var checksum = parse.getULong(data, p + 4);
-	        var offset = parse.getULong(data, p + 8);
-	        var length = parse.getULong(data, p + 12);
-	        tableEntries.push({tag: tag, checksum: checksum, offset: offset, length: length, compression: false});
-	        p += 16;
-	    }
-	
-	    return tableEntries;
-	}
-	
-	/**
-	 * Parses WOFF table entries.
-	 * @param  {DataView}
-	 * @param  {Number}
-	 * @return {Object[]}
-	 */
-	function parseWOFFTableEntries(data, numTables) {
-	    var tableEntries = [];
-	    var p = 44; // offset to the first table directory entry.
-	    for (var i = 0; i < numTables; i += 1) {
-	        var tag = parse.getTag(data, p);
-	        var offset = parse.getULong(data, p + 4);
-	        var compLength = parse.getULong(data, p + 8);
-	        var origLength = parse.getULong(data, p + 12);
-	        var compression;
-	        if (compLength < origLength) {
-	            compression = 'WOFF';
-	        } else {
-	            compression = false;
-	        }
-	
-	        tableEntries.push({tag: tag, offset: offset, compression: compression,
-	            compressedLength: compLength, originalLength: origLength});
-	        p += 20;
-	    }
-	
-	    return tableEntries;
-	}
-	
-	/**
-	 * @typedef TableData
-	 * @type Object
-	 * @property {DataView} data - The DataView
-	 * @property {number} offset - The data offset.
-	 */
-	
-	/**
-	 * @param  {DataView}
-	 * @param  {Object}
-	 * @return {TableData}
-	 */
-	function uncompressTable(data, tableEntry) {
-	    if (tableEntry.compression === 'WOFF') {
-	        var inBuffer = new Uint8Array(data.buffer, tableEntry.offset + 2, tableEntry.compressedLength - 2);
-	        var outBuffer = new Uint8Array(tableEntry.originalLength);
-	        inflate(inBuffer, outBuffer);
-	        if (outBuffer.byteLength !== tableEntry.originalLength) {
-	            throw new Error('Decompression error: ' + tableEntry.tag + ' decompressed length doesn\'t match recorded length');
-	        }
-	
-	        var view = new DataView(outBuffer.buffer, 0);
-	        return {data: view, offset: 0};
-	    } else {
-	        return {data: data, offset: tableEntry.offset};
-	    }
-	}
-	
-	// Public API ///////////////////////////////////////////////////////////
-	
-	/**
-	 * Parse the OpenType file data (as an ArrayBuffer) and return a Font object.
-	 * Throws an error if the font could not be parsed.
-	 * @param  {ArrayBuffer}
-	 * @return {opentype.Font}
-	 */
-	function parseBuffer(buffer) {
-	    var indexToLocFormat;
-	    var ltagTable;
-	
-	    // Since the constructor can also be called to create new fonts from scratch, we indicate this
-	    // should be an empty font that we'll fill with our own data.
-	    var font = new _font.Font({empty: true});
-	
-	    // OpenType fonts use big endian byte ordering.
-	    // We can't rely on typed array view types, because they operate with the endianness of the host computer.
-	    // Instead we use DataViews where we can specify endianness.
-	    var data = new DataView(buffer, 0);
-	    var numTables;
-	    var tableEntries = [];
-	    var signature = parse.getTag(data, 0);
-	    if (signature === String.fromCharCode(0, 1, 0, 0)) {
-	        font.outlinesFormat = 'truetype';
-	        numTables = parse.getUShort(data, 4);
-	        tableEntries = parseOpenTypeTableEntries(data, numTables);
-	    } else if (signature === 'OTTO') {
-	        font.outlinesFormat = 'cff';
-	        numTables = parse.getUShort(data, 4);
-	        tableEntries = parseOpenTypeTableEntries(data, numTables);
-	    } else if (signature === 'wOFF') {
-	        var flavor = parse.getTag(data, 4);
-	        if (flavor === String.fromCharCode(0, 1, 0, 0)) {
-	            font.outlinesFormat = 'truetype';
-	        } else if (flavor === 'OTTO') {
-	            font.outlinesFormat = 'cff';
-	        } else {
-	            throw new Error('Unsupported OpenType flavor ' + signature);
-	        }
-	
-	        numTables = parse.getUShort(data, 12);
-	        tableEntries = parseWOFFTableEntries(data, numTables);
-	    } else {
-	        throw new Error('Unsupported OpenType signature ' + signature);
-	    }
-	
-	    var cffTableEntry;
-	    var fvarTableEntry;
-	    var glyfTableEntry;
-	    var gposTableEntry;
-	    var gsubTableEntry;
-	    var hmtxTableEntry;
-	    var kernTableEntry;
-	    var locaTableEntry;
-	    var nameTableEntry;
-	    var metaTableEntry;
-	
-	    for (var i = 0; i < numTables; i += 1) {
-	        var tableEntry = tableEntries[i];
-	        var table;
-	        switch (tableEntry.tag) {
-	            case 'cmap':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.cmap = cmap.parse(table.data, table.offset);
-	                font.encoding = new encoding.CmapEncoding(font.tables.cmap);
-	                break;
-	            case 'fvar':
-	                fvarTableEntry = tableEntry;
-	                break;
-	            case 'head':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.head = head.parse(table.data, table.offset);
-	                font.unitsPerEm = font.tables.head.unitsPerEm;
-	                indexToLocFormat = font.tables.head.indexToLocFormat;
-	                break;
-	            case 'hhea':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.hhea = hhea.parse(table.data, table.offset);
-	                font.ascender = font.tables.hhea.ascender;
-	                font.descender = font.tables.hhea.descender;
-	                font.numberOfHMetrics = font.tables.hhea.numberOfHMetrics;
-	                break;
-	            case 'hmtx':
-	                hmtxTableEntry = tableEntry;
-	                break;
-	            case 'ltag':
-	                table = uncompressTable(data, tableEntry);
-	                ltagTable = ltag.parse(table.data, table.offset);
-	                break;
-	            case 'maxp':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.maxp = maxp.parse(table.data, table.offset);
-	                font.numGlyphs = font.tables.maxp.numGlyphs;
-	                break;
-	            case 'name':
-	                nameTableEntry = tableEntry;
-	                break;
-	            case 'OS/2':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.os2 = os2.parse(table.data, table.offset);
-	                break;
-	            case 'post':
-	                table = uncompressTable(data, tableEntry);
-	                font.tables.post = post.parse(table.data, table.offset);
-	                font.glyphNames = new encoding.GlyphNames(font.tables.post);
-	                break;
-	            case 'glyf':
-	                glyfTableEntry = tableEntry;
-	                break;
-	            case 'loca':
-	                locaTableEntry = tableEntry;
-	                break;
-	            case 'CFF ':
-	                cffTableEntry = tableEntry;
-	                break;
-	            case 'kern':
-	                kernTableEntry = tableEntry;
-	                break;
-	            case 'GPOS':
-	                gposTableEntry = tableEntry;
-	                break;
-	            case 'GSUB':
-	                gsubTableEntry = tableEntry;
-	                break;
-	            case 'meta':
-	                metaTableEntry = tableEntry;
-	                break;
-	        }
-	    }
-	
-	    var nameTable = uncompressTable(data, nameTableEntry);
-	    font.tables.name = _name.parse(nameTable.data, nameTable.offset, ltagTable);
-	    font.names = font.tables.name;
-	
-	    if (glyfTableEntry && locaTableEntry) {
-	        var shortVersion = indexToLocFormat === 0;
-	        var locaTable = uncompressTable(data, locaTableEntry);
-	        var locaOffsets = loca.parse(locaTable.data, locaTable.offset, font.numGlyphs, shortVersion);
-	        var glyfTable = uncompressTable(data, glyfTableEntry);
-	        font.glyphs = glyf.parse(glyfTable.data, glyfTable.offset, locaOffsets, font);
-	    } else if (cffTableEntry) {
-	        var cffTable = uncompressTable(data, cffTableEntry);
-	        cff.parse(cffTable.data, cffTable.offset, font);
-	    } else {
-	        throw new Error('Font doesn\'t contain TrueType or CFF outlines.');
-	    }
-	
-	    var hmtxTable = uncompressTable(data, hmtxTableEntry);
-	    hmtx.parse(hmtxTable.data, hmtxTable.offset, font.numberOfHMetrics, font.numGlyphs, font.glyphs);
-	    encoding.addGlyphNames(font);
-	
-	    if (kernTableEntry) {
-	        var kernTable = uncompressTable(data, kernTableEntry);
-	        font.kerningPairs = kern.parse(kernTable.data, kernTable.offset);
-	    } else {
-	        font.kerningPairs = {};
-	    }
-	
-	    if (gposTableEntry) {
-	        var gposTable = uncompressTable(data, gposTableEntry);
-	        gpos.parse(gposTable.data, gposTable.offset, font);
-	    }
-	
-	    if (gsubTableEntry) {
-	        var gsubTable = uncompressTable(data, gsubTableEntry);
-	        font.tables.gsub = gsub.parse(gsubTable.data, gsubTable.offset);
-	    }
-	
-	    if (fvarTableEntry) {
-	        var fvarTable = uncompressTable(data, fvarTableEntry);
-	        font.tables.fvar = fvar.parse(fvarTable.data, fvarTable.offset, font.names);
-	    }
-	
-	    if (metaTableEntry) {
-	        var metaTable = uncompressTable(data, metaTableEntry);
-	        font.tables.meta = meta.parse(metaTable.data, metaTable.offset);
-	        font.metas = font.tables.meta;
-	    }
-	
-	    return font;
-	}
-	
-	/**
-	 * Asynchronously load the font from a URL or a filesystem. When done, call the callback
-	 * with two arguments `(err, font)`. The `err` will be null on success,
-	 * the `font` is a Font object.
-	 * We use the node.js callback convention so that
-	 * opentype.js can integrate with frameworks like async.js.
-	 * @alias opentype.load
-	 * @param  {string} url - The URL of the font to load.
-	 * @param  {Function} callback - The callback.
-	 */
-	function load(url, callback) {
-	    var isNode = typeof window === 'undefined';
-	    var loadFn = isNode ? loadFromFile : loadFromUrl;
-	    loadFn(url, function(err, arrayBuffer) {
-	        if (err) {
-	            return callback(err);
-	        }
-	        var font;
-	        try {
-	            font = parseBuffer(arrayBuffer);
-	        } catch (e) {
-	            return callback(e, null);
-	        }
-	        return callback(null, font);
-	    });
-	}
-	
-	/**
-	 * Synchronously load the font from a URL or file.
-	 * When done, returns the font object or throws an error.
-	 * @alias opentype.loadSync
-	 * @param  {string} url - The URL of the font to load.
-	 * @return {opentype.Font}
-	 */
-	function loadSync(url) {
-	    var fs = __webpack_require__(30);
-	    var buffer = fs.readFileSync(url);
-	    return parseBuffer(util.nodeBufferToArrayBuffer(buffer));
-	}
-	
-	exports._parse = parse;
-	exports.Font = _font.Font;
-	exports.Glyph = glyph.Glyph;
-	exports.Path = path.Path;
-	exports.parse = parseBuffer;
-	exports.load = load;
-	exports.loadSync = loadSync;
-
-
-/***/ },
-/* 3 */
-/***/ function(module, exports) {
-
 	var TINF_OK = 0;
 	var TINF_DATA_ERROR = -3;
 	
@@ -534,8 +150,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	  var i, sum;
 	
 	  /* build bits table */
-	  for (i = 0; i < delta; ++i) bits[i] = 0;
-	  for (i = 0; i < 30 - delta; ++i) bits[i + delta] = i / delta | 0;
+	  for (i = 0; i < delta; ++i) { bits[i] = 0; }
+	  for (i = 0; i < 30 - delta; ++i) { bits[i + delta] = i / delta | 0; }
 	
 	  /* build base table */
 	  for (sum = first, i = 0; i < 30; ++i) {
@@ -549,23 +165,23 @@ return /******/ (function(modules) { // webpackBootstrap
 	  var i;
 	
 	  /* build fixed length tree */
-	  for (i = 0; i < 7; ++i) lt.table[i] = 0;
+	  for (i = 0; i < 7; ++i) { lt.table[i] = 0; }
 	
 	  lt.table[7] = 24;
 	  lt.table[8] = 152;
 	  lt.table[9] = 112;
 	
-	  for (i = 0; i < 24; ++i) lt.trans[i] = 256 + i;
-	  for (i = 0; i < 144; ++i) lt.trans[24 + i] = i;
-	  for (i = 0; i < 8; ++i) lt.trans[24 + 144 + i] = 280 + i;
-	  for (i = 0; i < 112; ++i) lt.trans[24 + 144 + 8 + i] = 144 + i;
+	  for (i = 0; i < 24; ++i) { lt.trans[i] = 256 + i; }
+	  for (i = 0; i < 144; ++i) { lt.trans[24 + i] = i; }
+	  for (i = 0; i < 8; ++i) { lt.trans[24 + 144 + i] = 280 + i; }
+	  for (i = 0; i < 112; ++i) { lt.trans[24 + 144 + 8 + i] = 144 + i; }
 	
 	  /* build fixed distance tree */
-	  for (i = 0; i < 5; ++i) dt.table[i] = 0;
+	  for (i = 0; i < 5; ++i) { dt.table[i] = 0; }
 	
 	  dt.table[5] = 32;
 	
-	  for (i = 0; i < 32; ++i) dt.trans[i] = i;
+	  for (i = 0; i < 32; ++i) { dt.trans[i] = i; }
 	}
 	
 	/* given an array of code lengths, build a tree */
@@ -575,10 +191,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	  var i, sum;
 	
 	  /* clear code length count table */
-	  for (i = 0; i < 16; ++i) t.table[i] = 0;
+	  for (i = 0; i < 16; ++i) { t.table[i] = 0; }
 	
 	  /* scan symbol lengths, and sum code length counts */
-	  for (i = 0; i < num; ++i) t.table[lengths[off + i]]++;
+	  for (i = 0; i < num; ++i) { t.table[lengths[off + i]]++; }
 	
 	  t.table[0] = 0;
 	
@@ -590,7 +206,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	  /* create code->symbol translation table (symbols sorted by code) */
 	  for (i = 0; i < num; ++i) {
-	    if (lengths[off + i]) t.trans[offs[lengths[off + i]]++] = i;
+	    if (lengths[off + i]) { t.trans[offs[lengths[off + i]]++] = i; }
 	  }
 	}
 	
@@ -617,7 +233,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	/* read a num bit value from a stream and add base */
 	function tinf_read_bits(d, num, base) {
 	  if (!num)
-	    return base;
+	    { return base; }
 	
 	  while (d.bitcount < 24) {
 	    d.tag |= d.source[d.sourceIndex++] << d.bitcount;
@@ -670,7 +286,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  /* get 4 bits HCLEN (4-19) */
 	  hclen = tinf_read_bits(d, 4, 4);
 	
-	  for (i = 0; i < 19; ++i) lengths[i] = 0;
+	  for (i = 0; i < 19; ++i) { lengths[i] = 0; }
 	
 	  /* read code lengths for code length alphabet */
 	  for (i = 0; i < hclen; ++i) {
@@ -777,13 +393,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	  /* check length */
 	  if (length !== (~invlength & 0x0000ffff))
-	    return TINF_DATA_ERROR;
+	    { return TINF_DATA_ERROR; }
 	
 	  d.sourceIndex += 4;
 	
 	  /* copy block */
 	  for (i = length; i; --i)
-	    d.dest[d.destLen++] = d.source[d.sourceIndex++];
+	    { d.dest[d.destLen++] = d.source[d.sourceIndex++]; }
 	
 	  /* make sure we start next block on a byte boundary */
 	  d.bitcount = 0;
@@ -823,15 +439,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	
 	    if (res !== TINF_OK)
-	      throw new Error('Data error');
+	      { throw new Error('Data error'); }
 	
 	  } while (!bfinal);
 	
 	  if (d.destLen < d.dest.length) {
 	    if (typeof d.dest.slice === 'function')
-	      return d.dest.slice(0, d.destLen);
+	      { return d.dest.slice(0, d.destLen); }
 	    else
-	      return d.dest.subarray(0, d.destLen);
+	      { return d.dest.subarray(0, d.destLen); }
 	  }
 	  
 	  return d.dest;
@@ -852,787 +468,168 @@ return /******/ (function(modules) { // webpackBootstrap
 	length_bits[28] = 0;
 	length_base[28] = 258;
 	
-	module.exports = tinf_uncompress;
-
-
-/***/ },
-/* 4 */
-/***/ function(module, exports) {
-
-	// Glyph encoding
+	var index = tinf_uncompress;
 	
-	'use strict';
+	// The Bounding Box object
 	
-	var cffStandardStrings = [
-	    '.notdef', 'space', 'exclam', 'quotedbl', 'numbersign', 'dollar', 'percent', 'ampersand', 'quoteright',
-	    'parenleft', 'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash', 'zero', 'one', 'two',
-	    'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'colon', 'semicolon', 'less', 'equal', 'greater',
-	    'question', 'at', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
-	    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'bracketleft', 'backslash', 'bracketright', 'asciicircum', 'underscore',
-	    'quoteleft', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
-	    'u', 'v', 'w', 'x', 'y', 'z', 'braceleft', 'bar', 'braceright', 'asciitilde', 'exclamdown', 'cent', 'sterling',
-	    'fraction', 'yen', 'florin', 'section', 'currency', 'quotesingle', 'quotedblleft', 'guillemotleft',
-	    'guilsinglleft', 'guilsinglright', 'fi', 'fl', 'endash', 'dagger', 'daggerdbl', 'periodcentered', 'paragraph',
-	    'bullet', 'quotesinglbase', 'quotedblbase', 'quotedblright', 'guillemotright', 'ellipsis', 'perthousand',
-	    'questiondown', 'grave', 'acute', 'circumflex', 'tilde', 'macron', 'breve', 'dotaccent', 'dieresis', 'ring',
-	    'cedilla', 'hungarumlaut', 'ogonek', 'caron', 'emdash', 'AE', 'ordfeminine', 'Lslash', 'Oslash', 'OE',
-	    'ordmasculine', 'ae', 'dotlessi', 'lslash', 'oslash', 'oe', 'germandbls', 'onesuperior', 'logicalnot', 'mu',
-	    'trademark', 'Eth', 'onehalf', 'plusminus', 'Thorn', 'onequarter', 'divide', 'brokenbar', 'degree', 'thorn',
-	    'threequarters', 'twosuperior', 'registered', 'minus', 'eth', 'multiply', 'threesuperior', 'copyright',
-	    'Aacute', 'Acircumflex', 'Adieresis', 'Agrave', 'Aring', 'Atilde', 'Ccedilla', 'Eacute', 'Ecircumflex',
-	    'Edieresis', 'Egrave', 'Iacute', 'Icircumflex', 'Idieresis', 'Igrave', 'Ntilde', 'Oacute', 'Ocircumflex',
-	    'Odieresis', 'Ograve', 'Otilde', 'Scaron', 'Uacute', 'Ucircumflex', 'Udieresis', 'Ugrave', 'Yacute',
-	    'Ydieresis', 'Zcaron', 'aacute', 'acircumflex', 'adieresis', 'agrave', 'aring', 'atilde', 'ccedilla', 'eacute',
-	    'ecircumflex', 'edieresis', 'egrave', 'iacute', 'icircumflex', 'idieresis', 'igrave', 'ntilde', 'oacute',
-	    'ocircumflex', 'odieresis', 'ograve', 'otilde', 'scaron', 'uacute', 'ucircumflex', 'udieresis', 'ugrave',
-	    'yacute', 'ydieresis', 'zcaron', 'exclamsmall', 'Hungarumlautsmall', 'dollaroldstyle', 'dollarsuperior',
-	    'ampersandsmall', 'Acutesmall', 'parenleftsuperior', 'parenrightsuperior', '266 ff', 'onedotenleader',
-	    'zerooldstyle', 'oneoldstyle', 'twooldstyle', 'threeoldstyle', 'fouroldstyle', 'fiveoldstyle', 'sixoldstyle',
-	    'sevenoldstyle', 'eightoldstyle', 'nineoldstyle', 'commasuperior', 'threequartersemdash', 'periodsuperior',
-	    'questionsmall', 'asuperior', 'bsuperior', 'centsuperior', 'dsuperior', 'esuperior', 'isuperior', 'lsuperior',
-	    'msuperior', 'nsuperior', 'osuperior', 'rsuperior', 'ssuperior', 'tsuperior', 'ff', 'ffi', 'ffl',
-	    'parenleftinferior', 'parenrightinferior', 'Circumflexsmall', 'hyphensuperior', 'Gravesmall', 'Asmall',
-	    'Bsmall', 'Csmall', 'Dsmall', 'Esmall', 'Fsmall', 'Gsmall', 'Hsmall', 'Ismall', 'Jsmall', 'Ksmall', 'Lsmall',
-	    'Msmall', 'Nsmall', 'Osmall', 'Psmall', 'Qsmall', 'Rsmall', 'Ssmall', 'Tsmall', 'Usmall', 'Vsmall', 'Wsmall',
-	    'Xsmall', 'Ysmall', 'Zsmall', 'colonmonetary', 'onefitted', 'rupiah', 'Tildesmall', 'exclamdownsmall',
-	    'centoldstyle', 'Lslashsmall', 'Scaronsmall', 'Zcaronsmall', 'Dieresissmall', 'Brevesmall', 'Caronsmall',
-	    'Dotaccentsmall', 'Macronsmall', 'figuredash', 'hypheninferior', 'Ogoneksmall', 'Ringsmall', 'Cedillasmall',
-	    'questiondownsmall', 'oneeighth', 'threeeighths', 'fiveeighths', 'seveneighths', 'onethird', 'twothirds',
-	    'zerosuperior', 'foursuperior', 'fivesuperior', 'sixsuperior', 'sevensuperior', 'eightsuperior', 'ninesuperior',
-	    'zeroinferior', 'oneinferior', 'twoinferior', 'threeinferior', 'fourinferior', 'fiveinferior', 'sixinferior',
-	    'seveninferior', 'eightinferior', 'nineinferior', 'centinferior', 'dollarinferior', 'periodinferior',
-	    'commainferior', 'Agravesmall', 'Aacutesmall', 'Acircumflexsmall', 'Atildesmall', 'Adieresissmall',
-	    'Aringsmall', 'AEsmall', 'Ccedillasmall', 'Egravesmall', 'Eacutesmall', 'Ecircumflexsmall', 'Edieresissmall',
-	    'Igravesmall', 'Iacutesmall', 'Icircumflexsmall', 'Idieresissmall', 'Ethsmall', 'Ntildesmall', 'Ogravesmall',
-	    'Oacutesmall', 'Ocircumflexsmall', 'Otildesmall', 'Odieresissmall', 'OEsmall', 'Oslashsmall', 'Ugravesmall',
-	    'Uacutesmall', 'Ucircumflexsmall', 'Udieresissmall', 'Yacutesmall', 'Thornsmall', 'Ydieresissmall', '001.000',
-	    '001.001', '001.002', '001.003', 'Black', 'Bold', 'Book', 'Light', 'Medium', 'Regular', 'Roman', 'Semibold'];
-	
-	var cffStandardEncoding = [
-	    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
-	    '', '', '', '', 'space', 'exclam', 'quotedbl', 'numbersign', 'dollar', 'percent', 'ampersand', 'quoteright',
-	    'parenleft', 'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash', 'zero', 'one', 'two',
-	    'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'colon', 'semicolon', 'less', 'equal', 'greater',
-	    'question', 'at', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
-	    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'bracketleft', 'backslash', 'bracketright', 'asciicircum', 'underscore',
-	    'quoteleft', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
-	    'u', 'v', 'w', 'x', 'y', 'z', 'braceleft', 'bar', 'braceright', 'asciitilde', '', '', '', '', '', '', '', '',
-	    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
-	    'exclamdown', 'cent', 'sterling', 'fraction', 'yen', 'florin', 'section', 'currency', 'quotesingle',
-	    'quotedblleft', 'guillemotleft', 'guilsinglleft', 'guilsinglright', 'fi', 'fl', '', 'endash', 'dagger',
-	    'daggerdbl', 'periodcentered', '', 'paragraph', 'bullet', 'quotesinglbase', 'quotedblbase', 'quotedblright',
-	    'guillemotright', 'ellipsis', 'perthousand', '', 'questiondown', '', 'grave', 'acute', 'circumflex', 'tilde',
-	    'macron', 'breve', 'dotaccent', 'dieresis', '', 'ring', 'cedilla', '', 'hungarumlaut', 'ogonek', 'caron',
-	    'emdash', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'AE', '', 'ordfeminine', '', '', '',
-	    '', 'Lslash', 'Oslash', 'OE', 'ordmasculine', '', '', '', '', '', 'ae', '', '', '', 'dotlessi', '', '',
-	    'lslash', 'oslash', 'oe', 'germandbls'];
-	
-	var cffExpertEncoding = [
-	    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
-	    '', '', '', '', 'space', 'exclamsmall', 'Hungarumlautsmall', '', 'dollaroldstyle', 'dollarsuperior',
-	    'ampersandsmall', 'Acutesmall', 'parenleftsuperior', 'parenrightsuperior', 'twodotenleader', 'onedotenleader',
-	    'comma', 'hyphen', 'period', 'fraction', 'zerooldstyle', 'oneoldstyle', 'twooldstyle', 'threeoldstyle',
-	    'fouroldstyle', 'fiveoldstyle', 'sixoldstyle', 'sevenoldstyle', 'eightoldstyle', 'nineoldstyle', 'colon',
-	    'semicolon', 'commasuperior', 'threequartersemdash', 'periodsuperior', 'questionsmall', '', 'asuperior',
-	    'bsuperior', 'centsuperior', 'dsuperior', 'esuperior', '', '', 'isuperior', '', '', 'lsuperior', 'msuperior',
-	    'nsuperior', 'osuperior', '', '', 'rsuperior', 'ssuperior', 'tsuperior', '', 'ff', 'fi', 'fl', 'ffi', 'ffl',
-	    'parenleftinferior', '', 'parenrightinferior', 'Circumflexsmall', 'hyphensuperior', 'Gravesmall', 'Asmall',
-	    'Bsmall', 'Csmall', 'Dsmall', 'Esmall', 'Fsmall', 'Gsmall', 'Hsmall', 'Ismall', 'Jsmall', 'Ksmall', 'Lsmall',
-	    'Msmall', 'Nsmall', 'Osmall', 'Psmall', 'Qsmall', 'Rsmall', 'Ssmall', 'Tsmall', 'Usmall', 'Vsmall', 'Wsmall',
-	    'Xsmall', 'Ysmall', 'Zsmall', 'colonmonetary', 'onefitted', 'rupiah', 'Tildesmall', '', '', '', '', '', '', '',
-	    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
-	    'exclamdownsmall', 'centoldstyle', 'Lslashsmall', '', '', 'Scaronsmall', 'Zcaronsmall', 'Dieresissmall',
-	    'Brevesmall', 'Caronsmall', '', 'Dotaccentsmall', '', '', 'Macronsmall', '', '', 'figuredash', 'hypheninferior',
-	    '', '', 'Ogoneksmall', 'Ringsmall', 'Cedillasmall', '', '', '', 'onequarter', 'onehalf', 'threequarters',
-	    'questiondownsmall', 'oneeighth', 'threeeighths', 'fiveeighths', 'seveneighths', 'onethird', 'twothirds', '',
-	    '', 'zerosuperior', 'onesuperior', 'twosuperior', 'threesuperior', 'foursuperior', 'fivesuperior',
-	    'sixsuperior', 'sevensuperior', 'eightsuperior', 'ninesuperior', 'zeroinferior', 'oneinferior', 'twoinferior',
-	    'threeinferior', 'fourinferior', 'fiveinferior', 'sixinferior', 'seveninferior', 'eightinferior',
-	    'nineinferior', 'centinferior', 'dollarinferior', 'periodinferior', 'commainferior', 'Agravesmall',
-	    'Aacutesmall', 'Acircumflexsmall', 'Atildesmall', 'Adieresissmall', 'Aringsmall', 'AEsmall', 'Ccedillasmall',
-	    'Egravesmall', 'Eacutesmall', 'Ecircumflexsmall', 'Edieresissmall', 'Igravesmall', 'Iacutesmall',
-	    'Icircumflexsmall', 'Idieresissmall', 'Ethsmall', 'Ntildesmall', 'Ogravesmall', 'Oacutesmall',
-	    'Ocircumflexsmall', 'Otildesmall', 'Odieresissmall', 'OEsmall', 'Oslashsmall', 'Ugravesmall', 'Uacutesmall',
-	    'Ucircumflexsmall', 'Udieresissmall', 'Yacutesmall', 'Thornsmall', 'Ydieresissmall'];
-	
-	var standardNames = [
-	    '.notdef', '.null', 'nonmarkingreturn', 'space', 'exclam', 'quotedbl', 'numbersign', 'dollar', 'percent',
-	    'ampersand', 'quotesingle', 'parenleft', 'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash',
-	    'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'colon', 'semicolon', 'less',
-	    'equal', 'greater', 'question', 'at', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-	    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'bracketleft', 'backslash', 'bracketright',
-	    'asciicircum', 'underscore', 'grave', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-	    'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'braceleft', 'bar', 'braceright', 'asciitilde',
-	    'Adieresis', 'Aring', 'Ccedilla', 'Eacute', 'Ntilde', 'Odieresis', 'Udieresis', 'aacute', 'agrave',
-	    'acircumflex', 'adieresis', 'atilde', 'aring', 'ccedilla', 'eacute', 'egrave', 'ecircumflex', 'edieresis',
-	    'iacute', 'igrave', 'icircumflex', 'idieresis', 'ntilde', 'oacute', 'ograve', 'ocircumflex', 'odieresis',
-	    'otilde', 'uacute', 'ugrave', 'ucircumflex', 'udieresis', 'dagger', 'degree', 'cent', 'sterling', 'section',
-	    'bullet', 'paragraph', 'germandbls', 'registered', 'copyright', 'trademark', 'acute', 'dieresis', 'notequal',
-	    'AE', 'Oslash', 'infinity', 'plusminus', 'lessequal', 'greaterequal', 'yen', 'mu', 'partialdiff', 'summation',
-	    'product', 'pi', 'integral', 'ordfeminine', 'ordmasculine', 'Omega', 'ae', 'oslash', 'questiondown',
-	    'exclamdown', 'logicalnot', 'radical', 'florin', 'approxequal', 'Delta', 'guillemotleft', 'guillemotright',
-	    'ellipsis', 'nonbreakingspace', 'Agrave', 'Atilde', 'Otilde', 'OE', 'oe', 'endash', 'emdash', 'quotedblleft',
-	    'quotedblright', 'quoteleft', 'quoteright', 'divide', 'lozenge', 'ydieresis', 'Ydieresis', 'fraction',
-	    'currency', 'guilsinglleft', 'guilsinglright', 'fi', 'fl', 'daggerdbl', 'periodcentered', 'quotesinglbase',
-	    'quotedblbase', 'perthousand', 'Acircumflex', 'Ecircumflex', 'Aacute', 'Edieresis', 'Egrave', 'Iacute',
-	    'Icircumflex', 'Idieresis', 'Igrave', 'Oacute', 'Ocircumflex', 'apple', 'Ograve', 'Uacute', 'Ucircumflex',
-	    'Ugrave', 'dotlessi', 'circumflex', 'tilde', 'macron', 'breve', 'dotaccent', 'ring', 'cedilla', 'hungarumlaut',
-	    'ogonek', 'caron', 'Lslash', 'lslash', 'Scaron', 'scaron', 'Zcaron', 'zcaron', 'brokenbar', 'Eth', 'eth',
-	    'Yacute', 'yacute', 'Thorn', 'thorn', 'minus', 'multiply', 'onesuperior', 'twosuperior', 'threesuperior',
-	    'onehalf', 'onequarter', 'threequarters', 'franc', 'Gbreve', 'gbreve', 'Idotaccent', 'Scedilla', 'scedilla',
-	    'Cacute', 'cacute', 'Ccaron', 'ccaron', 'dcroat'];
-	
+	function derive(v0, v1, v2, v3, t) {
+	    return Math.pow(1 - t, 3) * v0 +
+	        3 * Math.pow(1 - t, 2) * t * v1 +
+	        3 * (1 - t) * Math.pow(t, 2) * v2 +
+	        Math.pow(t, 3) * v3;
+	}
 	/**
-	 * This is the encoding used for fonts created from scratch.
-	 * It loops through all glyphs and finds the appropriate unicode value.
-	 * Since it's linear time, other encodings will be faster.
-	 * @exports opentype.DefaultEncoding
+	 * A bounding box is an enclosing box that describes the smallest measure within which all the points lie.
+	 * It is used to calculate the bounding box of a glyph or text path.
+	 *
+	 * On initialization, x1/y1/x2/y2 will be NaN. Check if the bounding box is empty using `isEmpty()`.
+	 *
+	 * @exports opentype.BoundingBox
 	 * @class
 	 * @constructor
-	 * @param {opentype.Font}
 	 */
-	function DefaultEncoding(font) {
-	    this.font = font;
+	function BoundingBox() {
+	    this.x1 = Number.NaN;
+	    this.y1 = Number.NaN;
+	    this.x2 = Number.NaN;
+	    this.y2 = Number.NaN;
 	}
 	
-	DefaultEncoding.prototype.charToGlyphIndex = function(c) {
-	    var code = c.charCodeAt(0);
-	    var glyphs = this.font.glyphs;
-	    if (glyphs) {
-	        for (var i = 0; i < glyphs.length; i += 1) {
-	            var glyph = glyphs.get(i);
-	            for (var j = 0; j < glyph.unicodes.length; j += 1) {
-	                if (glyph.unicodes[j] === code) {
-	                    return i;
-	                }
+	/**
+	 * Returns true if the bounding box is empty, that is, no points have been added to the box yet.
+	 */
+	BoundingBox.prototype.isEmpty = function() {
+	    return isNaN(this.x1) || isNaN(this.y1) || isNaN(this.x2) || isNaN(this.y2);
+	};
+	
+	/**
+	 * Add the point to the bounding box.
+	 * The x1/y1/x2/y2 coordinates of the bounding box will now encompass the given point.
+	 * @param {number} x - The X coordinate of the point.
+	 * @param {number} y - The Y coordinate of the point.
+	 */
+	BoundingBox.prototype.addPoint = function(x, y) {
+	    if (typeof x === 'number') {
+	        if (isNaN(this.x1) || isNaN(this.x2)) {
+	            this.x1 = x;
+	            this.x2 = x;
+	        }
+	        if (x < this.x1) {
+	            this.x1 = x;
+	        }
+	        if (x > this.x2) {
+	            this.x2 = x;
+	        }
+	    }
+	    if (typeof y === 'number') {
+	        if (isNaN(this.y1) || isNaN(this.y2)) {
+	            this.y1 = y;
+	            this.y2 = y;
+	        }
+	        if (y < this.y1) {
+	            this.y1 = y;
+	        }
+	        if (y > this.y2) {
+	            this.y2 = y;
+	        }
+	    }
+	};
+	
+	/**
+	 * Add a X coordinate to the bounding box.
+	 * This extends the bounding box to include the X coordinate.
+	 * This function is used internally inside of addBezier.
+	 * @param {number} x - The X coordinate of the point.
+	 */
+	BoundingBox.prototype.addX = function(x) {
+	    this.addPoint(x, null);
+	};
+	
+	/**
+	 * Add a Y coordinate to the bounding box.
+	 * This extends the bounding box to include the Y coordinate.
+	 * This function is used internally inside of addBezier.
+	 * @param {number} y - The Y coordinate of the point.
+	 */
+	BoundingBox.prototype.addY = function(y) {
+	    this.addPoint(null, y);
+	};
+	
+	/**
+	 * Add a Bézier curve to the bounding box.
+	 * This extends the bounding box to include the entire Bézier.
+	 * @param {number} x0 - The starting X coordinate.
+	 * @param {number} y0 - The starting Y coordinate.
+	 * @param {number} x1 - The X coordinate of the first control point.
+	 * @param {number} y1 - The Y coordinate of the first control point.
+	 * @param {number} x2 - The X coordinate of the second control point.
+	 * @param {number} y2 - The Y coordinate of the second control point.
+	 * @param {number} x - The ending X coordinate.
+	 * @param {number} y - The ending Y coordinate.
+	 */
+	BoundingBox.prototype.addBezier = function(x0, y0, x1, y1, x2, y2, x, y) {
+	    var this$1 = this;
+	
+	    // This code is based on http://nishiohirokazu.blogspot.com/2009/06/how-to-calculate-bezier-curves-bounding.html
+	    // and https://github.com/icons8/svg-path-bounding-box
+	
+	    var p0 = [x0, y0];
+	    var p1 = [x1, y1];
+	    var p2 = [x2, y2];
+	    var p3 = [x, y];
+	
+	    this.addPoint(x0, y0);
+	    this.addPoint(x, y);
+	
+	    for (var i = 0; i <= 1; i++) {
+	        var b = 6 * p0[i] - 12 * p1[i] + 6 * p2[i];
+	        var a = -3 * p0[i] + 9 * p1[i] - 9 * p2[i] + 3 * p3[i];
+	        var c = 3 * p1[i] - 3 * p0[i];
+	
+	        if (a === 0) {
+	            if (b === 0) { continue; }
+	            var t = -c / b;
+	            if (0 < t && t < 1) {
+	                if (i === 0) { this$1.addX(derive(p0[i], p1[i], p2[i], p3[i], t)); }
+	                if (i === 1) { this$1.addY(derive(p0[i], p1[i], p2[i], p3[i], t)); }
 	            }
-	        }
-	    } else {
-	        return null;
-	    }
-	};
-	
-	/**
-	 * @exports opentype.CmapEncoding
-	 * @class
-	 * @constructor
-	 * @param {Object} cmap - a object with the cmap encoded data
-	 */
-	function CmapEncoding(cmap) {
-	    this.cmap = cmap;
-	}
-	
-	/**
-	 * @param  {string} c - the character
-	 * @return {number} The glyph index.
-	 */
-	CmapEncoding.prototype.charToGlyphIndex = function(c) {
-	    return this.cmap.glyphIndexMap[c.charCodeAt(0)] || 0;
-	};
-	
-	/**
-	 * @exports opentype.CffEncoding
-	 * @class
-	 * @constructor
-	 * @param {string} encoding - The encoding
-	 * @param {Array} charset - The charcater set.
-	 */
-	function CffEncoding(encoding, charset) {
-	    this.encoding = encoding;
-	    this.charset = charset;
-	}
-	
-	/**
-	 * @param  {string} s - The character
-	 * @return {number} The index.
-	 */
-	CffEncoding.prototype.charToGlyphIndex = function(s) {
-	    var code = s.charCodeAt(0);
-	    var charName = this.encoding[code];
-	    return this.charset.indexOf(charName);
-	};
-	
-	/**
-	 * @exports opentype.GlyphNames
-	 * @class
-	 * @constructor
-	 * @param {Object} post
-	 */
-	function GlyphNames(post) {
-	    var i;
-	    switch (post.version) {
-	        case 1:
-	            this.names = exports.standardNames.slice();
-	            break;
-	        case 2:
-	            this.names = new Array(post.numberOfGlyphs);
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
-	                if (post.glyphNameIndex[i] < exports.standardNames.length) {
-	                    this.names[i] = exports.standardNames[post.glyphNameIndex[i]];
-	                } else {
-	                    this.names[i] = post.names[post.glyphNameIndex[i] - exports.standardNames.length];
-	                }
-	            }
-	
-	            break;
-	        case 2.5:
-	            this.names = new Array(post.numberOfGlyphs);
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
-	                this.names[i] = exports.standardNames[i + post.glyphNameIndex[i]];
-	            }
-	
-	            break;
-	        case 3:
-	            this.names = [];
-	            break;
-	    }
-	}
-	
-	/**
-	 * Gets the index of a glyph by name.
-	 * @param  {string} name - The glyph name
-	 * @return {number} The index
-	 */
-	GlyphNames.prototype.nameToGlyphIndex = function(name) {
-	    return this.names.indexOf(name);
-	};
-	
-	/**
-	 * @param  {number} gid
-	 * @return {string}
-	 */
-	GlyphNames.prototype.glyphIndexToName = function(gid) {
-	    return this.names[gid];
-	};
-	
-	/**
-	 * @alias opentype.addGlyphNames
-	 * @param {opentype.Font}
-	 */
-	function addGlyphNames(font) {
-	    var glyph;
-	    var glyphIndexMap = font.tables.cmap.glyphIndexMap;
-	    var charCodes = Object.keys(glyphIndexMap);
-	
-	    for (var i = 0; i < charCodes.length; i += 1) {
-	        var c = charCodes[i];
-	        var glyphIndex = glyphIndexMap[c];
-	        glyph = font.glyphs.get(glyphIndex);
-	        glyph.addUnicode(parseInt(c));
-	    }
-	
-	    for (i = 0; i < font.glyphs.length; i += 1) {
-	        glyph = font.glyphs.get(i);
-	        if (font.cffEncoding) {
-	            glyph.name = font.cffEncoding.charset[i];
-	        } else if (font.glyphNames.names) {
-	            glyph.name = font.glyphNames.glyphIndexToName(i);
-	        }
-	    }
-	}
-	
-	exports.cffStandardStrings = cffStandardStrings;
-	exports.cffStandardEncoding = cffStandardEncoding;
-	exports.cffExpertEncoding = cffExpertEncoding;
-	exports.standardNames = standardNames;
-	exports.DefaultEncoding = DefaultEncoding;
-	exports.CmapEncoding = CmapEncoding;
-	exports.CffEncoding = CffEncoding;
-	exports.GlyphNames = GlyphNames;
-	exports.addGlyphNames = addGlyphNames;
-
-
-/***/ },
-/* 5 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// The Font object
-	
-	'use strict';
-	
-	var path = __webpack_require__(6);
-	var sfnt = __webpack_require__(7);
-	var encoding = __webpack_require__(4);
-	var glyphset = __webpack_require__(14);
-	var Substitution = __webpack_require__(27);
-	var util = __webpack_require__(29);
-	
-	/**
-	 * @typedef FontOptions
-	 * @type Object
-	 * @property {Boolean} empty - whether to create a new empty font
-	 * @property {string} familyName
-	 * @property {string} styleName
-	 * @property {string=} fullName
-	 * @property {string=} postScriptName
-	 * @property {string=} designer
-	 * @property {string=} designerURL
-	 * @property {string=} manufacturer
-	 * @property {string=} manufacturerURL
-	 * @property {string=} license
-	 * @property {string=} licenseURL
-	 * @property {string=} version
-	 * @property {string=} description
-	 * @property {string=} copyright
-	 * @property {string=} trademark
-	 * @property {Number} unitsPerEm
-	 * @property {Number} ascender
-	 * @property {Number} descender
-	 * @property {Number} createdTimestamp
-	 * @property {string=} weightClass
-	 * @property {string=} widthClass
-	 * @property {string=} fsSelection
-	 */
-	
-	/**
-	 * A Font represents a loaded OpenType font file.
-	 * It contains a set of glyphs and methods to draw text on a drawing context,
-	 * or to get a path representing the text.
-	 * @exports opentype.Font
-	 * @class
-	 * @param {FontOptions}
-	 * @constructor
-	 */
-	function Font(options) {
-	    options = options || {};
-	
-	    if (!options.empty) {
-	        // Check that we've provided the minimum set of names.
-	        util.checkArgument(options.familyName, 'When creating a new Font object, familyName is required.');
-	        util.checkArgument(options.styleName, 'When creating a new Font object, styleName is required.');
-	        util.checkArgument(options.unitsPerEm, 'When creating a new Font object, unitsPerEm is required.');
-	        util.checkArgument(options.ascender, 'When creating a new Font object, ascender is required.');
-	        util.checkArgument(options.descender, 'When creating a new Font object, descender is required.');
-	        util.checkArgument(options.descender < 0, 'Descender should be negative (e.g. -512).');
-	
-	        // OS X will complain if the names are empty, so we put a single space everywhere by default.
-	        this.names = {
-	            fontFamily: {en: options.familyName || ' '},
-	            fontSubfamily: {en: options.styleName || ' '},
-	            fullName: {en: options.fullName || options.familyName + ' ' + options.styleName},
-	            postScriptName: {en: options.postScriptName || options.familyName + options.styleName},
-	            designer: {en: options.designer || ' '},
-	            designerURL: {en: options.designerURL || ' '},
-	            manufacturer: {en: options.manufacturer || ' '},
-	            manufacturerURL: {en: options.manufacturerURL || ' '},
-	            license: {en: options.license || ' '},
-	            licenseURL: {en: options.licenseURL || ' '},
-	            version: {en: options.version || 'Version 0.1'},
-	            description: {en: options.description || ' '},
-	            copyright: {en: options.copyright || ' '},
-	            trademark: {en: options.trademark || ' '}
-	        };
-	        this.unitsPerEm = options.unitsPerEm || 1000;
-	        this.ascender = options.ascender;
-	        this.descender = options.descender;
-	        this.createdTimestamp = options.createdTimestamp;
-	        this.tables = { os2: {
-	            usWeightClass: options.weightClass || this.usWeightClasses.MEDIUM,
-	            usWidthClass: options.widthClass || this.usWidthClasses.MEDIUM,
-	            fsSelection: options.fsSelection || this.fsSelectionValues.REGULAR
-	        } };
-	    }
-	
-	    this.supported = true; // Deprecated: parseBuffer will throw an error if font is not supported.
-	    this.glyphs = new glyphset.GlyphSet(this, options.glyphs || []);
-	    this.encoding = new encoding.DefaultEncoding(this);
-	    this.substitution = new Substitution(this);
-	    this.tables = this.tables || {};
-	}
-	
-	/**
-	 * Check if the font has a glyph for the given character.
-	 * @param  {string}
-	 * @return {Boolean}
-	 */
-	Font.prototype.hasChar = function(c) {
-	    return this.encoding.charToGlyphIndex(c) !== null;
-	};
-	
-	/**
-	 * Convert the given character to a single glyph index.
-	 * Note that this function assumes that there is a one-to-one mapping between
-	 * the given character and a glyph; for complex scripts this might not be the case.
-	 * @param  {string}
-	 * @return {Number}
-	 */
-	Font.prototype.charToGlyphIndex = function(s) {
-	    return this.encoding.charToGlyphIndex(s);
-	};
-	
-	/**
-	 * Convert the given character to a single Glyph object.
-	 * Note that this function assumes that there is a one-to-one mapping between
-	 * the given character and a glyph; for complex scripts this might not be the case.
-	 * @param  {string}
-	 * @return {opentype.Glyph}
-	 */
-	Font.prototype.charToGlyph = function(c) {
-	    var glyphIndex = this.charToGlyphIndex(c);
-	    var glyph = this.glyphs.get(glyphIndex);
-	    if (!glyph) {
-	        // .notdef
-	        glyph = this.glyphs.get(0);
-	    }
-	
-	    return glyph;
-	};
-	
-	/**
-	 * Convert the given text to a list of Glyph objects.
-	 * Note that there is no strict one-to-one mapping between characters and
-	 * glyphs, so the list of returned glyphs can be larger or smaller than the
-	 * length of the given string.
-	 * @param  {string}
-	 * @return {opentype.Glyph[]}
-	 */
-	Font.prototype.stringToGlyphs = function(s) {
-	    var glyphs = [];
-	    for (var i = 0; i < s.length; i += 1) {
-	        var c = s[i];
-	        glyphs.push(this.charToGlyph(c));
-	    }
-	
-	    return glyphs;
-	};
-	
-	/**
-	 * @param  {string}
-	 * @return {Number}
-	 */
-	Font.prototype.nameToGlyphIndex = function(name) {
-	    return this.glyphNames.nameToGlyphIndex(name);
-	};
-	
-	/**
-	 * @param  {string}
-	 * @return {opentype.Glyph}
-	 */
-	Font.prototype.nameToGlyph = function(name) {
-	    var glyphIndex = this.nametoGlyphIndex(name);
-	    var glyph = this.glyphs.get(glyphIndex);
-	    if (!glyph) {
-	        // .notdef
-	        glyph = this.glyphs.get(0);
-	    }
-	
-	    return glyph;
-	};
-	
-	/**
-	 * @param  {Number}
-	 * @return {String}
-	 */
-	Font.prototype.glyphIndexToName = function(gid) {
-	    if (!this.glyphNames.glyphIndexToName) {
-	        return '';
-	    }
-	
-	    return this.glyphNames.glyphIndexToName(gid);
-	};
-	
-	/**
-	 * Retrieve the value of the kerning pair between the left glyph (or its index)
-	 * and the right glyph (or its index). If no kerning pair is found, return 0.
-	 * The kerning value gets added to the advance width when calculating the spacing
-	 * between glyphs.
-	 * @param  {opentype.Glyph} leftGlyph
-	 * @param  {opentype.Glyph} rightGlyph
-	 * @return {Number}
-	 */
-	Font.prototype.getKerningValue = function(leftGlyph, rightGlyph) {
-	    leftGlyph = leftGlyph.index || leftGlyph;
-	    rightGlyph = rightGlyph.index || rightGlyph;
-	    var gposKerning = this.getGposKerningValue;
-	    return gposKerning ? gposKerning(leftGlyph, rightGlyph) :
-	        (this.kerningPairs[leftGlyph + ',' + rightGlyph] || 0);
-	};
-	
-	/**
-	 * @typedef GlyphRenderOptions
-	 * @type Object
-	 * @property {boolean} [kerning] - whether to include kerning values
-	 */
-	
-	/**
-	 * Helper function that invokes the given callback for each glyph in the given text.
-	 * The callback gets `(glyph, x, y, fontSize, options)`.* @param  {string} text
-	 * @param {string} text - The text to apply.
-	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 * @param  {GlyphRenderOptions=} options
-	 * @param  {Function} callback
-	 */
-	Font.prototype.forEachGlyph = function(text, x, y, fontSize, options, callback) {
-	    x = x !== undefined ? x : 0;
-	    y = y !== undefined ? y : 0;
-	    fontSize = fontSize !== undefined ? fontSize : 72;
-	    options = options || {};
-	    var kerning = options.kerning === undefined ? true : options.kerning;
-	    var fontScale = 1 / this.unitsPerEm * fontSize;
-	    var glyphs = this.stringToGlyphs(text);
-	    for (var i = 0; i < glyphs.length; i += 1) {
-	        var glyph = glyphs[i];
-	        callback(glyph, x, y, fontSize, options);
-	        if (glyph.advanceWidth) {
-	            x += glyph.advanceWidth * fontScale;
+	            continue;
 	        }
 	
-	        if (kerning && i < glyphs.length - 1) {
-	            var kerningValue = this.getKerningValue(glyph, glyphs[i + 1]);
-	            x += kerningValue * fontScale;
+	        var b2ac = Math.pow(b, 2) - 4 * c * a;
+	        if (b2ac < 0) { continue; }
+	        var t1 = (-b + Math.sqrt(b2ac)) / (2 * a);
+	        if (0 < t1 && t1 < 1) {
+	            if (i === 0) { this$1.addX(derive(p0[i], p1[i], p2[i], p3[i], t1)); }
+	            if (i === 1) { this$1.addY(derive(p0[i], p1[i], p2[i], p3[i], t1)); }
+	        }
+	        var t2 = (-b - Math.sqrt(b2ac)) / (2 * a);
+	        if (0 < t2 && t2 < 1) {
+	            if (i === 0) { this$1.addX(derive(p0[i], p1[i], p2[i], p3[i], t2)); }
+	            if (i === 1) { this$1.addY(derive(p0[i], p1[i], p2[i], p3[i], t2)); }
 	        }
 	    }
 	};
 	
 	/**
-	 * Create a Path object that represents the given text.
-	 * @param  {string} text - The text to create.
-	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 * @param  {GlyphRenderOptions=} options
-	 * @return {opentype.Path}
+	 * Add a quadratic curve to the bounding box.
+	 * This extends the bounding box to include the entire quadratic curve.
+	 * @param {number} x0 - The starting X coordinate.
+	 * @param {number} y0 - The starting Y coordinate.
+	 * @param {number} x1 - The X coordinate of the control point.
+	 * @param {number} y1 - The Y coordinate of the control point.
+	 * @param {number} x - The ending X coordinate.
+	 * @param {number} y - The ending Y coordinate.
 	 */
-	Font.prototype.getPath = function(text, x, y, fontSize, options) {
-	    var fullPath = new path.Path();
-	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
-	        var glyphPath = glyph.getPath(gX, gY, gFontSize);
-	        fullPath.extend(glyphPath);
-	    });
-	
-	    return fullPath;
+	BoundingBox.prototype.addQuad = function(x0, y0, x1, y1, x, y) {
+	    var cp1x = x0 + 2 / 3 * (x1 - x0);
+	    var cp1y = y0 + 2 / 3 * (y1 - y0);
+	    var cp2x = cp1x + 1 / 3 * (x - x0);
+	    var cp2y = cp1y + 1 / 3 * (y - y0);
+	    this.addBezier(x0, y0, cp1x, cp1y, cp2x, cp2y, x, y);
 	};
 	
-	/**
-	 * Create an array of Path objects that represent the glyps of a given text.
-	 * @param  {string} text - The text to create.
-	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 * @param  {GlyphRenderOptions=} options
-	 * @return {opentype.Path[]}
-	 */
-	Font.prototype.getPaths = function(text, x, y, fontSize, options) {
-	    var glyphPaths = [];
-	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
-	        var glyphPath = glyph.getPath(gX, gY, gFontSize);
-	        glyphPaths.push(glyphPath);
-	    });
-	
-	    return glyphPaths;
-	};
-	
-	/**
-	 * Draw the text on the given drawing context.
-	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
-	 * @param  {string} text - The text to create.
-	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 * @param  {GlyphRenderOptions=} options
-	 */
-	Font.prototype.draw = function(ctx, text, x, y, fontSize, options) {
-	    this.getPath(text, x, y, fontSize, options).draw(ctx);
-	};
-	
-	/**
-	 * Draw the points of all glyphs in the text.
-	 * On-curve points will be drawn in blue, off-curve points will be drawn in red.
-	 * @param {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
-	 * @param {string} text - The text to create.
-	 * @param {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 * @param {GlyphRenderOptions=} options
-	 */
-	Font.prototype.drawPoints = function(ctx, text, x, y, fontSize, options) {
-	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
-	        glyph.drawPoints(ctx, gX, gY, gFontSize);
-	    });
-	};
-	
-	/**
-	 * Draw lines indicating important font measurements for all glyphs in the text.
-	 * Black lines indicate the origin of the coordinate system (point 0,0).
-	 * Blue lines indicate the glyph bounding box.
-	 * Green line indicates the advance width of the glyph.
-	 * @param {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
-	 * @param {string} text - The text to create.
-	 * @param {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 * @param {GlyphRenderOptions=} options
-	 */
-	Font.prototype.drawMetrics = function(ctx, text, x, y, fontSize, options) {
-	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
-	        glyph.drawMetrics(ctx, gX, gY, gFontSize);
-	    });
-	};
-	
-	/**
-	 * @param  {string}
-	 * @return {string}
-	 */
-	Font.prototype.getEnglishName = function(name) {
-	    var translations = this.names[name];
-	    if (translations) {
-	        return translations.en;
-	    }
-	};
-	
-	/**
-	 * Validate
-	 */
-	Font.prototype.validate = function() {
-	    var warnings = [];
-	    var _this = this;
-	
-	    function assert(predicate, message) {
-	        if (!predicate) {
-	            warnings.push(message);
-	        }
-	    }
-	
-	    function assertNamePresent(name) {
-	        var englishName = _this.getEnglishName(name);
-	        assert(englishName && englishName.trim().length > 0,
-	               'No English ' + name + ' specified.');
-	    }
-	
-	    // Identification information
-	    assertNamePresent('fontFamily');
-	    assertNamePresent('weightName');
-	    assertNamePresent('manufacturer');
-	    assertNamePresent('copyright');
-	    assertNamePresent('version');
-	
-	    // Dimension information
-	    assert(this.unitsPerEm > 0, 'No unitsPerEm specified.');
-	};
-	
-	/**
-	 * Convert the font object to a SFNT data structure.
-	 * This structure contains all the necessary tables and metadata to create a binary OTF file.
-	 * @return {opentype.Table}
-	 */
-	Font.prototype.toTables = function() {
-	    return sfnt.fontToTable(this);
-	};
-	/**
-	 * @deprecated Font.toBuffer is deprecated. Use Font.toArrayBuffer instead.
-	 */
-	Font.prototype.toBuffer = function() {
-	    console.warn('Font.toBuffer is deprecated. Use Font.toArrayBuffer instead.');
-	    return this.toArrayBuffer();
-	};
-	/**
-	 * Converts a `opentype.Font` into an `ArrayBuffer`
-	 * @return {ArrayBuffer}
-	 */
-	Font.prototype.toArrayBuffer = function() {
-	    var sfntTable = this.toTables();
-	    var bytes = sfntTable.encode();
-	    var buffer = new ArrayBuffer(bytes.length);
-	    var intArray = new Uint8Array(buffer);
-	    for (var i = 0; i < bytes.length; i++) {
-	        intArray[i] = bytes[i];
-	    }
-	
-	    return buffer;
-	};
-	
-	/**
-	 * Initiate a download of the OpenType font.
-	 */
-	Font.prototype.download = function() {
-	    var familyName = this.getEnglishName('fontFamily');
-	    var styleName = this.getEnglishName('fontSubfamily');
-	    var fileName = familyName.replace(/\s/g, '') + '-' + styleName + '.otf';
-	    var arrayBuffer = this.toArrayBuffer();
-	
-	    if (util.isBrowser()) {
-	        window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
-	        window.requestFileSystem(window.TEMPORARY, arrayBuffer.byteLength, function(fs) {
-	            fs.root.getFile(fileName, {create: true}, function(fileEntry) {
-	                fileEntry.createWriter(function(writer) {
-	                    var dataView = new DataView(arrayBuffer);
-	                    var blob = new Blob([dataView], {type: 'font/opentype'});
-	                    writer.write(blob);
-	
-	                    writer.addEventListener('writeend', function() {
-	                        // Navigating to the file will download it.
-	                        location.href = fileEntry.toURL();
-	                    }, false);
-	                });
-	            });
-	        },
-	        function(err) {
-	            throw new Error(err.name + ': ' + err.message);
-	        });
-	    } else {
-	        var fs = __webpack_require__(30);
-	        var buffer = util.arrayBufferToNodeBuffer(arrayBuffer);
-	        fs.writeFileSync(fileName, buffer);
-	    }
-	};
-	/**
-	 * @private
-	 */
-	Font.prototype.fsSelectionValues = {
-	    ITALIC:              0x001, //1
-	    UNDERSCORE:          0x002, //2
-	    NEGATIVE:            0x004, //4
-	    OUTLINED:            0x008, //8
-	    STRIKEOUT:           0x010, //16
-	    BOLD:                0x020, //32
-	    REGULAR:             0x040, //64
-	    USER_TYPO_METRICS:   0x080, //128
-	    WWS:                 0x100, //256
-	    OBLIQUE:             0x200  //512
-	};
-	
-	/**
-	 * @private
-	 */
-	Font.prototype.usWidthClasses = {
-	    ULTRA_CONDENSED: 1,
-	    EXTRA_CONDENSED: 2,
-	    CONDENSED: 3,
-	    SEMI_CONDENSED: 4,
-	    MEDIUM: 5,
-	    SEMI_EXPANDED: 6,
-	    EXPANDED: 7,
-	    EXTRA_EXPANDED: 8,
-	    ULTRA_EXPANDED: 9
-	};
-	
-	/**
-	 * @private
-	 */
-	Font.prototype.usWeightClasses = {
-	    THIN: 100,
-	    EXTRA_LIGHT: 200,
-	    LIGHT: 300,
-	    NORMAL: 400,
-	    MEDIUM: 500,
-	    SEMI_BOLD: 600,
-	    BOLD: 700,
-	    EXTRA_BOLD: 800,
-	    BLACK:    900
-	};
-	
-	exports.Font = Font;
-
-
-/***/ },
-/* 6 */
-/***/ function(module, exports) {
-
 	// Geometric objects
-	
-	'use strict';
 	
 	/**
 	 * A bézier path containing a set of path commands similar to a SVG path.
@@ -1760,14 +757,72 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	/**
 	 * Add the given path or list of commands to the commands of this path.
-	 * @param  {Array}
+	 * @param  {Array} pathOrCommands - another opentype.Path, an opentype.BoundingBox, or an array of commands.
 	 */
 	Path.prototype.extend = function(pathOrCommands) {
 	    if (pathOrCommands.commands) {
 	        pathOrCommands = pathOrCommands.commands;
+	    } else if (pathOrCommands instanceof BoundingBox) {
+	        var box = pathOrCommands;
+	        this.moveTo(box.x1, box.y1);
+	        this.lineTo(box.x2, box.y1);
+	        this.lineTo(box.x2, box.y2);
+	        this.lineTo(box.x1, box.y2);
+	        this.close();
+	        return;
 	    }
 	
 	    Array.prototype.push.apply(this.commands, pathOrCommands);
+	};
+	
+	/**
+	 * Calculate the bounding box of the path.
+	 * @returns {opentype.BoundingBox}
+	 */
+	Path.prototype.getBoundingBox = function() {
+	    var this$1 = this;
+	
+	    var box = new BoundingBox();
+	
+	    var startX = 0;
+	    var startY = 0;
+	    var prevX = 0;
+	    var prevY = 0;
+	    for (var i = 0; i < this.commands.length; i++) {
+	        var cmd = this$1.commands[i];
+	        switch (cmd.type) {
+	            case 'M':
+	                box.addPoint(cmd.x, cmd.y);
+	                startX = prevX = cmd.x;
+	                startY = prevY = cmd.y;
+	                break;
+	            case 'L':
+	                box.addPoint(cmd.x, cmd.y);
+	                prevX = cmd.x;
+	                prevY = cmd.y;
+	                break;
+	            case 'Q':
+	                box.addQuad(prevX, prevY, cmd.x1, cmd.y1, cmd.x, cmd.y);
+	                prevX = cmd.x;
+	                prevY = cmd.y;
+	                break;
+	            case 'C':
+	                box.addBezier(prevX, prevY, cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y);
+	                prevX = cmd.x;
+	                prevY = cmd.y;
+	                break;
+	            case 'Z':
+	                prevX = startX;
+	                prevY = startY;
+	                break;
+	            default:
+	                throw new Error('Unexpected path command ' + cmd.type);
+	        }
+	    }
+	    if (box.isEmpty()) {
+	        box.addPoint(0, 0);
+	    }
+	    return box;
 	};
 	
 	/**
@@ -1775,9 +830,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * @param {CanvasRenderingContext2D} ctx - A 2D drawing context.
 	 */
 	Path.prototype.draw = function(ctx) {
+	    var this$1 = this;
+	
 	    ctx.beginPath();
 	    for (var i = 0; i < this.commands.length; i += 1) {
-	        var cmd = this.commands[i];
+	        var cmd = this$1.commands[i];
 	        if (cmd.type === 'M') {
 	            ctx.moveTo(cmd.x, cmd.y);
 	        } else if (cmd.type === 'L') {
@@ -1810,6 +867,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * @return {string}
 	 */
 	Path.prototype.toPathData = function(decimalPlaces) {
+	    var this$1 = this;
+	
 	    decimalPlaces = decimalPlaces !== undefined ? decimalPlaces : 2;
 	
 	    function floatToString(v) {
@@ -1821,9 +880,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	
 	    function packValues() {
+	        var arguments$1 = arguments;
+	
 	        var s = '';
 	        for (var i = 0; i < arguments.length; i += 1) {
-	            var v = arguments[i];
+	            var v = arguments$1[i];
 	            if (v >= 0 && i > 0) {
 	                s += ' ';
 	            }
@@ -1836,7 +897,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    var d = '';
 	    for (var i = 0; i < this.commands.length; i += 1) {
-	        var cmd = this.commands[i];
+	        var cmd = this$1.commands[i];
 	        if (cmd.type === 'M') {
 	            d += 'M' + packValues(cmd.x, cmd.y);
 	        } else if (cmd.type === 'L') {
@@ -1878,600 +939,38 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return svg;
 	};
 	
-	exports.Path = Path;
-
-
-/***/ },
-/* 7 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// The `sfnt` wrapper provides organization for the tables in the font.
-	// It is the top-level data structure in a font.
-	// https://www.microsoft.com/typography/OTSPEC/otff.htm
-	// Recommendations for creating OpenType Fonts:
-	// http://www.microsoft.com/typography/otspec140/recom.htm
+	/**
+	 * Convert the path to a DOM element.
+	 * @param  {number} [decimalPlaces=2] - The amount of decimal places for floating-point values
+	 * @return {SVGPathElement}
+	 */
+	Path.prototype.toDOMElement = function(decimalPlaces) {
+	    var temporaryPath = this.toPathData(decimalPlaces);
+	    var newPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
 	
-	'use strict';
+	    newPath.setAttribute('d', temporaryPath);
 	
-	var check = __webpack_require__(8);
-	var table = __webpack_require__(9);
+	    return newPath;
+	};
 	
-	var cmap = __webpack_require__(11);
-	var cff = __webpack_require__(13);
-	var head = __webpack_require__(17);
-	var hhea = __webpack_require__(18);
-	var hmtx = __webpack_require__(19);
-	var ltag = __webpack_require__(20);
-	var maxp = __webpack_require__(21);
-	var _name = __webpack_require__(22);
-	var os2 = __webpack_require__(23);
-	var post = __webpack_require__(24);
-	var gsub = __webpack_require__(25);
-	var meta = __webpack_require__(26);
-	
-	function log2(v) {
-	    return Math.log(v) / Math.log(2) | 0;
-	}
-	
-	function computeCheckSum(bytes) {
-	    while (bytes.length % 4 !== 0) {
-	        bytes.push(0);
-	    }
-	
-	    var sum = 0;
-	    for (var i = 0; i < bytes.length; i += 4) {
-	        sum += (bytes[i] << 24) +
-	            (bytes[i + 1] << 16) +
-	            (bytes[i + 2] << 8) +
-	            (bytes[i + 3]);
-	    }
-	
-	    sum %= Math.pow(2, 32);
-	    return sum;
-	}
-	
-	function makeTableRecord(tag, checkSum, offset, length) {
-	    return new table.Record('Table Record', [
-	        {name: 'tag', type: 'TAG', value: tag !== undefined ? tag : ''},
-	        {name: 'checkSum', type: 'ULONG', value: checkSum !== undefined ? checkSum : 0},
-	        {name: 'offset', type: 'ULONG', value: offset !== undefined ? offset : 0},
-	        {name: 'length', type: 'ULONG', value: length !== undefined ? length : 0}
-	    ]);
-	}
-	
-	function makeSfntTable(tables) {
-	    var sfnt = new table.Table('sfnt', [
-	        {name: 'version', type: 'TAG', value: 'OTTO'},
-	        {name: 'numTables', type: 'USHORT', value: 0},
-	        {name: 'searchRange', type: 'USHORT', value: 0},
-	        {name: 'entrySelector', type: 'USHORT', value: 0},
-	        {name: 'rangeShift', type: 'USHORT', value: 0}
-	    ]);
-	    sfnt.tables = tables;
-	    sfnt.numTables = tables.length;
-	    var highestPowerOf2 = Math.pow(2, log2(sfnt.numTables));
-	    sfnt.searchRange = 16 * highestPowerOf2;
-	    sfnt.entrySelector = log2(highestPowerOf2);
-	    sfnt.rangeShift = sfnt.numTables * 16 - sfnt.searchRange;
-	
-	    var recordFields = [];
-	    var tableFields = [];
-	
-	    var offset = sfnt.sizeOf() + (makeTableRecord().sizeOf() * sfnt.numTables);
-	    while (offset % 4 !== 0) {
-	        offset += 1;
-	        tableFields.push({name: 'padding', type: 'BYTE', value: 0});
-	    }
-	
-	    for (var i = 0; i < tables.length; i += 1) {
-	        var t = tables[i];
-	        check.argument(t.tableName.length === 4, 'Table name' + t.tableName + ' is invalid.');
-	        var tableLength = t.sizeOf();
-	        var tableRecord = makeTableRecord(t.tableName, computeCheckSum(t.encode()), offset, tableLength);
-	        recordFields.push({name: tableRecord.tag + ' Table Record', type: 'RECORD', value: tableRecord});
-	        tableFields.push({name: t.tableName + ' table', type: 'RECORD', value: t});
-	        offset += tableLength;
-	        check.argument(!isNaN(offset), 'Something went wrong calculating the offset.');
-	        while (offset % 4 !== 0) {
-	            offset += 1;
-	            tableFields.push({name: 'padding', type: 'BYTE', value: 0});
-	        }
-	    }
-	
-	    // Table records need to be sorted alphabetically.
-	    recordFields.sort(function(r1, r2) {
-	        if (r1.value.tag > r2.value.tag) {
-	            return 1;
-	        } else {
-	            return -1;
-	        }
-	    });
-	
-	    sfnt.fields = sfnt.fields.concat(recordFields);
-	    sfnt.fields = sfnt.fields.concat(tableFields);
-	    return sfnt;
-	}
-	
-	// Get the metrics for a character. If the string has more than one character
-	// this function returns metrics for the first available character.
-	// You can provide optional fallback metrics if no characters are available.
-	function metricsForChar(font, chars, notFoundMetrics) {
-	    for (var i = 0; i < chars.length; i += 1) {
-	        var glyphIndex = font.charToGlyphIndex(chars[i]);
-	        if (glyphIndex > 0) {
-	            var glyph = font.glyphs.get(glyphIndex);
-	            return glyph.getMetrics();
-	        }
-	    }
-	
-	    return notFoundMetrics;
-	}
-	
-	function average(vs) {
-	    var sum = 0;
-	    for (var i = 0; i < vs.length; i += 1) {
-	        sum += vs[i];
-	    }
-	
-	    return sum / vs.length;
-	}
-	
-	// Convert the font object to a SFNT data structure.
-	// This structure contains all the necessary tables and metadata to create a binary OTF file.
-	function fontToSfntTable(font) {
-	    var xMins = [];
-	    var yMins = [];
-	    var xMaxs = [];
-	    var yMaxs = [];
-	    var advanceWidths = [];
-	    var leftSideBearings = [];
-	    var rightSideBearings = [];
-	    var firstCharIndex;
-	    var lastCharIndex = 0;
-	    var ulUnicodeRange1 = 0;
-	    var ulUnicodeRange2 = 0;
-	    var ulUnicodeRange3 = 0;
-	    var ulUnicodeRange4 = 0;
-	
-	    for (var i = 0; i < font.glyphs.length; i += 1) {
-	        var glyph = font.glyphs.get(i);
-	        var unicode = glyph.unicode | 0;
-	
-	        if (isNaN(glyph.advanceWidth)) {
-	            throw new Error('Glyph ' + glyph.name + ' (' + i + '): advanceWidth is not a number.');
-	        }
-	
-	        if (firstCharIndex > unicode || firstCharIndex === undefined) {
-	            // ignore .notdef char
-	            if (unicode > 0) {
-	                firstCharIndex = unicode;
-	            }
-	        }
-	
-	        if (lastCharIndex < unicode) {
-	            lastCharIndex = unicode;
-	        }
-	
-	        var position = os2.getUnicodeRange(unicode);
-	        if (position < 32) {
-	            ulUnicodeRange1 |= 1 << position;
-	        } else if (position < 64) {
-	            ulUnicodeRange2 |= 1 << position - 32;
-	        } else if (position < 96) {
-	            ulUnicodeRange3 |= 1 << position - 64;
-	        } else if (position < 123) {
-	            ulUnicodeRange4 |= 1 << position - 96;
-	        } else {
-	            throw new Error('Unicode ranges bits > 123 are reserved for internal usage');
-	        }
-	        // Skip non-important characters.
-	        if (glyph.name === '.notdef') continue;
-	        var metrics = glyph.getMetrics();
-	        xMins.push(metrics.xMin);
-	        yMins.push(metrics.yMin);
-	        xMaxs.push(metrics.xMax);
-	        yMaxs.push(metrics.yMax);
-	        leftSideBearings.push(metrics.leftSideBearing);
-	        rightSideBearings.push(metrics.rightSideBearing);
-	        advanceWidths.push(glyph.advanceWidth);
-	    }
-	
-	    var globals = {
-	        xMin: Math.min.apply(null, xMins),
-	        yMin: Math.min.apply(null, yMins),
-	        xMax: Math.max.apply(null, xMaxs),
-	        yMax: Math.max.apply(null, yMaxs),
-	        advanceWidthMax: Math.max.apply(null, advanceWidths),
-	        advanceWidthAvg: average(advanceWidths),
-	        minLeftSideBearing: Math.min.apply(null, leftSideBearings),
-	        maxLeftSideBearing: Math.max.apply(null, leftSideBearings),
-	        minRightSideBearing: Math.min.apply(null, rightSideBearings)
-	    };
-	    globals.ascender = font.ascender;
-	    globals.descender = font.descender;
-	
-	    var headTable = head.make({
-	        flags: 3, // 00000011 (baseline for font at y=0; left sidebearing point at x=0)
-	        unitsPerEm: font.unitsPerEm,
-	        xMin: globals.xMin,
-	        yMin: globals.yMin,
-	        xMax: globals.xMax,
-	        yMax: globals.yMax,
-	        lowestRecPPEM: 3,
-	        createdTimestamp: font.createdTimestamp
-	    });
-	
-	    var hheaTable = hhea.make({
-	        ascender: globals.ascender,
-	        descender: globals.descender,
-	        advanceWidthMax: globals.advanceWidthMax,
-	        minLeftSideBearing: globals.minLeftSideBearing,
-	        minRightSideBearing: globals.minRightSideBearing,
-	        xMaxExtent: globals.maxLeftSideBearing + (globals.xMax - globals.xMin),
-	        numberOfHMetrics: font.glyphs.length
-	    });
-	
-	    var maxpTable = maxp.make(font.glyphs.length);
-	
-	    var os2Table = os2.make({
-	        xAvgCharWidth: Math.round(globals.advanceWidthAvg),
-	        usWeightClass: font.tables.os2.usWeightClass,
-	        usWidthClass: font.tables.os2.usWidthClass,
-	        usFirstCharIndex: firstCharIndex,
-	        usLastCharIndex: lastCharIndex,
-	        ulUnicodeRange1: ulUnicodeRange1,
-	        ulUnicodeRange2: ulUnicodeRange2,
-	        ulUnicodeRange3: ulUnicodeRange3,
-	        ulUnicodeRange4: ulUnicodeRange4,
-	        fsSelection: font.tables.os2.fsSelection, // REGULAR
-	        // See http://typophile.com/node/13081 for more info on vertical metrics.
-	        // We get metrics for typical characters (such as "x" for xHeight).
-	        // We provide some fallback characters if characters are unavailable: their
-	        // ordering was chosen experimentally.
-	        sTypoAscender: globals.ascender,
-	        sTypoDescender: globals.descender,
-	        sTypoLineGap: 0,
-	        usWinAscent: globals.yMax,
-	        usWinDescent: Math.abs(globals.yMin),
-	        ulCodePageRange1: 1, // FIXME: hard-code Latin 1 support for now
-	        sxHeight: metricsForChar(font, 'xyvw', {yMax: Math.round(globals.ascender / 2)}).yMax,
-	        sCapHeight: metricsForChar(font, 'HIKLEFJMNTZBDPRAGOQSUVWXY', globals).yMax,
-	        usDefaultChar: font.hasChar(' ') ? 32 : 0, // Use space as the default character, if available.
-	        usBreakChar: font.hasChar(' ') ? 32 : 0 // Use space as the break character, if available.
-	    });
-	
-	    var hmtxTable = hmtx.make(font.glyphs);
-	    var cmapTable = cmap.make(font.glyphs);
-	
-	    var englishFamilyName = font.getEnglishName('fontFamily');
-	    var englishStyleName = font.getEnglishName('fontSubfamily');
-	    var englishFullName = englishFamilyName + ' ' + englishStyleName;
-	    var postScriptName = font.getEnglishName('postScriptName');
-	    if (!postScriptName) {
-	        postScriptName = englishFamilyName.replace(/\s/g, '') + '-' + englishStyleName;
-	    }
-	
-	    var names = {};
-	    for (var n in font.names) {
-	        names[n] = font.names[n];
-	    }
-	
-	    if (!names.uniqueID) {
-	        names.uniqueID = {en: font.getEnglishName('manufacturer') + ':' + englishFullName};
-	    }
-	
-	    if (!names.postScriptName) {
-	        names.postScriptName = {en: postScriptName};
-	    }
-	
-	    if (!names.preferredFamily) {
-	        names.preferredFamily = font.names.fontFamily;
-	    }
-	
-	    if (!names.preferredSubfamily) {
-	        names.preferredSubfamily = font.names.fontSubfamily;
-	    }
-	
-	    var languageTags = [];
-	    var nameTable = _name.make(names, languageTags);
-	    var ltagTable = (languageTags.length > 0 ? ltag.make(languageTags) : undefined);
-	
-	    var postTable = post.make();
-	    var cffTable = cff.make(font.glyphs, {
-	        version: font.getEnglishName('version'),
-	        fullName: englishFullName,
-	        familyName: englishFamilyName,
-	        weightName: englishStyleName,
-	        postScriptName: postScriptName,
-	        unitsPerEm: font.unitsPerEm,
-	        fontBBox: [0, globals.yMin, globals.ascender, globals.advanceWidthMax]
-	    });
-	
-	    var metaTable = (font.metas && Object.keys(font.metas).length > 0) ? meta.make(font.metas) : undefined;
-	
-	    // The order does not matter because makeSfntTable() will sort them.
-	    var tables = [headTable, hheaTable, maxpTable, os2Table, nameTable, cmapTable, postTable, cffTable, hmtxTable];
-	    if (ltagTable) {
-	        tables.push(ltagTable);
-	    }
-	    // Optional tables
-	    if (font.tables.gsub) {
-	        tables.push(gsub.make(font.tables.gsub));
-	    }
-	    if (metaTable) {
-	        tables.push(metaTable);
-	    }
-	
-	    var sfntTable = makeSfntTable(tables);
-	
-	    // Compute the font's checkSum and store it in head.checkSumAdjustment.
-	    var bytes = sfntTable.encode();
-	    var checkSum = computeCheckSum(bytes);
-	    var tableFields = sfntTable.fields;
-	    var checkSumAdjusted = false;
-	    for (i = 0; i < tableFields.length; i += 1) {
-	        if (tableFields[i].name === 'head table') {
-	            tableFields[i].value.checkSumAdjustment = 0xB1B0AFBA - checkSum;
-	            checkSumAdjusted = true;
-	            break;
-	        }
-	    }
-	
-	    if (!checkSumAdjusted) {
-	        throw new Error('Could not find head table with checkSum to adjust.');
-	    }
-	
-	    return sfntTable;
-	}
-	
-	exports.computeCheckSum = computeCheckSum;
-	exports.make = makeSfntTable;
-	exports.fontToTable = fontToSfntTable;
-
-
-/***/ },
-/* 8 */
-/***/ function(module, exports) {
-
 	// Run-time checking of preconditions.
 	
-	'use strict';
-	
-	exports.fail = function(message) {
+	function fail(message) {
 	    throw new Error(message);
-	};
+	}
 	
 	// Precondition function that checks if the given predicate is true.
 	// If not, it will throw an error.
-	exports.argument = function(predicate, message) {
+	function argument(predicate, message) {
 	    if (!predicate) {
-	        exports.fail(message);
-	    }
-	};
-	
-	// Precondition function that checks if the given assertion is true.
-	// If not, it will throw an error.
-	exports.assert = exports.argument;
-
-
-/***/ },
-/* 9 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// Table metadata
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var encode = __webpack_require__(10).encode;
-	var sizeOf = __webpack_require__(10).sizeOf;
-	/**
-	 * @exports opentype.Table
-	 * @class
-	 * @param {string} tableName
-	 * @param {Array} fields
-	 * @param {Object} options
-	 * @constructor
-	 */
-	function Table(tableName, fields, options) {
-	    var i;
-	    for (i = 0; i < fields.length; i += 1) {
-	        var field = fields[i];
-	        this[field.name] = field.value;
-	    }
-	
-	    this.tableName = tableName;
-	    this.fields = fields;
-	    if (options) {
-	        var optionKeys = Object.keys(options);
-	        for (i = 0; i < optionKeys.length; i += 1) {
-	            var k = optionKeys[i];
-	            var v = options[k];
-	            if (this[k] !== undefined) {
-	                this[k] = v;
-	            }
-	        }
+	        fail(message);
 	    }
 	}
 	
-	/**
-	 * Encodes the table and returns an array of bytes
-	 * @return {Array}
-	 */
-	Table.prototype.encode = function() {
-	    return encode.TABLE(this);
-	};
+	var check = { fail: fail, argument: argument, assert: argument };
 	
-	/**
-	 * Get the size of the table.
-	 * @return {number}
-	 */
-	Table.prototype.sizeOf = function() {
-	    return sizeOf.TABLE(this);
-	};
-	
-	/**
-	 * @private
-	 */
-	function ushortList(itemName, list, count) {
-	    if (count === undefined) {
-	        count = list.length;
-	    }
-	    var fields = new Array(list.length + 1);
-	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
-	    for (var i = 0; i < list.length; i++) {
-	        fields[i + 1] = {name: itemName + i, type: 'USHORT', value: list[i]};
-	    }
-	    return fields;
-	}
-	
-	/**
-	 * @private
-	 */
-	function tableList(itemName, records, itemCallback) {
-	    var count = records.length;
-	    var fields = new Array(count + 1);
-	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
-	    for (var i = 0; i < count; i++) {
-	        fields[i + 1] = {name: itemName + i, type: 'TABLE', value: itemCallback(records[i], i)};
-	    }
-	    return fields;
-	}
-	
-	/**
-	 * @private
-	 */
-	function recordList(itemName, records, itemCallback) {
-	    var count = records.length;
-	    var fields = [];
-	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
-	    for (var i = 0; i < count; i++) {
-	        fields = fields.concat(itemCallback(records[i], i));
-	    }
-	    return fields;
-	}
-	
-	// Common Layout Tables
-	
-	/**
-	 * @exports opentype.Coverage
-	 * @class
-	 * @param {opentype.Table}
-	 * @constructor
-	 * @extends opentype.Table
-	 */
-	function Coverage(coverageTable) {
-	    if (coverageTable.format === 1) {
-	        Table.call(this, 'coverageTable',
-	            [{name: 'coverageFormat', type: 'USHORT', value: 1}]
-	            .concat(ushortList('glyph', coverageTable.glyphs))
-	        );
-	    } else {
-	        check.assert(false, 'Can\'t create coverage table format 2 yet.');
-	    }
-	}
-	Coverage.prototype = Object.create(Table.prototype);
-	Coverage.prototype.constructor = Coverage;
-	
-	function ScriptList(scriptListTable) {
-	    Table.call(this, 'scriptListTable',
-	        recordList('scriptRecord', scriptListTable, function(scriptRecord, i) {
-	            var script = scriptRecord.script;
-	            var defaultLangSys = script.defaultLangSys;
-	            check.assert(!!defaultLangSys, 'Unable to write GSUB: script ' + scriptRecord.tag + ' has no default language system.');
-	            return [
-	                {name: 'scriptTag' + i, type: 'TAG', value: scriptRecord.tag},
-	                {name: 'script' + i, type: 'TABLE', value: new Table('scriptTable', [
-	                    {name: 'defaultLangSys', type: 'TABLE', value: new Table('defaultLangSys', [
-	                        {name: 'lookupOrder', type: 'USHORT', value: 0},
-	                        {name: 'reqFeatureIndex', type: 'USHORT', value: defaultLangSys.reqFeatureIndex}]
-	                        .concat(ushortList('featureIndex', defaultLangSys.featureIndexes)))}
-	                    ].concat(recordList('langSys', script.langSysRecords, function(langSysRecord, i) {
-	                        var langSys = langSysRecord.langSys;
-	                        return [
-	                            {name: 'langSysTag' + i, type: 'TAG', value: langSysRecord.tag},
-	                            {name: 'langSys' + i, type: 'TABLE', value: new Table('langSys', [
-	                                {name: 'lookupOrder', type: 'USHORT', value: 0},
-	                                {name: 'reqFeatureIndex', type: 'USHORT', value: langSys.reqFeatureIndex}
-	                                ].concat(ushortList('featureIndex', langSys.featureIndexes)))}
-	                        ];
-	                    })))}
-	            ];
-	        })
-	    );
-	}
-	ScriptList.prototype = Object.create(Table.prototype);
-	ScriptList.prototype.constructor = ScriptList;
-	
-	/**
-	 * @exports opentype.FeatureList
-	 * @class
-	 * @param {opentype.Table}
-	 * @constructor
-	 * @extends opentype.Table
-	 */
-	function FeatureList(featureListTable) {
-	    Table.call(this, 'featureListTable',
-	        recordList('featureRecord', featureListTable, function(featureRecord, i) {
-	            var feature = featureRecord.feature;
-	            return [
-	                {name: 'featureTag' + i, type: 'TAG', value: featureRecord.tag},
-	                {name: 'feature' + i, type: 'TABLE', value: new Table('featureTable', [
-	                    {name: 'featureParams', type: 'USHORT', value: feature.featureParams},
-	                    ].concat(ushortList('lookupListIndex', feature.lookupListIndexes)))}
-	            ];
-	        })
-	    );
-	}
-	FeatureList.prototype = Object.create(Table.prototype);
-	FeatureList.prototype.constructor = FeatureList;
-	
-	/**
-	 * @exports opentype.LookupList
-	 * @class
-	 * @param {opentype.Table}
-	 * @param {Object}
-	 * @constructor
-	 * @extends opentype.Table
-	 */
-	function LookupList(lookupListTable, subtableMakers) {
-	    Table.call(this, 'lookupListTable', tableList('lookup', lookupListTable, function(lookupTable) {
-	        var subtableCallback = subtableMakers[lookupTable.lookupType];
-	        check.assert(!!subtableCallback, 'Unable to write GSUB lookup type ' + lookupTable.lookupType + ' tables.');
-	        return new Table('lookupTable', [
-	            {name: 'lookupType', type: 'USHORT', value: lookupTable.lookupType},
-	            {name: 'lookupFlag', type: 'USHORT', value: lookupTable.lookupFlag}
-	        ].concat(tableList('subtable', lookupTable.subtables, subtableCallback)));
-	    }));
-	}
-	LookupList.prototype = Object.create(Table.prototype);
-	LookupList.prototype.constructor = LookupList;
-	
-	// Record = same as Table, but inlined (a Table has an offset and its data is further in the stream)
-	// Don't use offsets inside Records (probable bug), only in Tables.
-	exports.Record = exports.Table = Table;
-	exports.Coverage = Coverage;
-	exports.ScriptList = ScriptList;
-	exports.FeatureList = FeatureList;
-	exports.LookupList = LookupList;
-	
-	exports.ushortList = ushortList;
-	exports.tableList = tableList;
-	exports.recordList = recordList;
-
-
-/***/ },
-/* 10 */
-/***/ function(module, exports, __webpack_require__) {
-
 	// Data types used in the OpenType font file.
 	// All OpenType fonts use Motorola-style byte ordering (Big Endian)
-	
-	/* global WeakMap */
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
 	
 	var LIMIT16 = 32768; // The limit at which a 16-bit number switches signs == 2^15
 	var LIMIT32 = 2147483648; // The limit at which a 32-bit number switches signs == 2 ^ 31
@@ -2774,9 +1273,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	
 	    var nibbles = '';
-	    var i;
-	    var ii;
-	    for (i = 0, ii = value.length; i < ii; i += 1) {
+	    for (var i = 0, ii = value.length; i < ii; i += 1) {
 	        var c = value[i];
 	        if (c === 'e') {
 	            nibbles += value[++i] === '-' ? 'c' : 'b';
@@ -2791,8 +1288,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    nibbles += (nibbles.length & 1) ? 'f' : 'ff';
 	    var out = [30];
-	    for (i = 0, ii = nibbles.length; i < ii; i += 2) {
-	        out.push(parseInt(nibbles.substr(i, 2), 16));
+	    for (var i$1 = 0, ii$1 = nibbles.length; i$1 < ii$1; i$1 += 2) {
+	        out.push(parseInt(nibbles.substr(i$1, 2), 16));
 	    }
 	
 	    return out;
@@ -2871,7 +1368,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	// Data for converting old eight-bit Macintosh encodings to Unicode.
 	// This representation is optimized for decoding; encoding is slower
 	// and needs more memory. The assumption is that all opentype.js users
-	// want to open fonts, but saving a font will be comperatively rare
+	// want to open fonts, but saving a font will be comparatively rare
 	// so it can be more expensive. Keyed by IANA character set name.
 	//
 	// Python script for generating these strings:
@@ -2883,37 +1380,35 @@ return /******/ (function(modules) { // webpackBootstrap
 	 */
 	var eightBitMacEncodings = {
 	    'x-mac-croatian':  // Python: 'mac_croatian'
-	        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®Š™´¨≠ŽØ∞±≤≥∆µ∂∑∏š∫ªºΩžø' +
-	        '¿¡¬√ƒ≈Ć«Č… ÀÃÕŒœĐ—“”‘’÷◊©⁄€‹›Æ»–·‚„‰ÂćÁčÈÍÎÏÌÓÔđÒÚÛÙıˆ˜¯πË˚¸Êæˇ',
+	    'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®Š™´¨≠ŽØ∞±≤≥∆µ∂∑∏š∫ªºΩžø' +
+	    '¿¡¬√ƒ≈Ć«Č… ÀÃÕŒœĐ—“”‘’÷◊©⁄€‹›Æ»–·‚„‰ÂćÁčÈÍÎÏÌÓÔđÒÚÛÙıˆ˜¯πË˚¸Êæˇ',
 	    'x-mac-cyrillic':  // Python: 'mac_cyrillic'
-	        'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ†°Ґ£§•¶І®©™Ђђ≠Ѓѓ∞±≤≥іµґЈЄєЇїЉљЊњ' +
-	        'јЅ¬√ƒ≈∆«»… ЋћЌќѕ–—“”‘’÷„ЎўЏџ№Ёёяабвгдежзийклмнопрстуфхцчшщъыьэю',
-	    'x-mac-gaelic':
-	        // http://unicode.org/Public/MAPPINGS/VENDORS/APPLE/GAELIC.TXT
-	        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØḂ±≤≥ḃĊċḊḋḞḟĠġṀæø' +
-	        'ṁṖṗɼƒſṠ«»… ÀÃÕŒœ–—“”‘’ṡẛÿŸṪ€‹›Ŷŷṫ·Ỳỳ⁊ÂÊÁËÈÍÎÏÌÓÔ♣ÒÚÛÙıÝýŴŵẄẅẀẁẂẃ',
+	    'АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ†°Ґ£§•¶І®©™Ђђ≠Ѓѓ∞±≤≥іµґЈЄєЇїЉљЊњ' +
+	    'јЅ¬√ƒ≈∆«»… ЋћЌќѕ–—“”‘’÷„ЎўЏџ№Ёёяабвгдежзийклмнопрстуфхцчшщъыьэю',
+	    'x-mac-gaelic': // http://unicode.org/Public/MAPPINGS/VENDORS/APPLE/GAELIC.TXT
+	    'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØḂ±≤≥ḃĊċḊḋḞḟĠġṀæø' +
+	    'ṁṖṗɼƒſṠ«»… ÀÃÕŒœ–—“”‘’ṡẛÿŸṪ€‹›Ŷŷṫ·Ỳỳ⁊ÂÊÁËÈÍÎÏÌÓÔ♣ÒÚÛÙıÝýŴŵẄẅẀẁẂẃ',
 	    'x-mac-greek':  // Python: 'mac_greek'
-	        'Ä¹²É³ÖÜ΅àâä΄¨çéèêë£™îï•½‰ôö¦€ùûü†ΓΔΘΛΞΠß®©ΣΪ§≠°·Α±≤≥¥ΒΕΖΗΙΚΜΦΫΨΩ' +
-	        'άΝ¬ΟΡ≈Τ«»… ΥΧΆΈœ–―“”‘’÷ΉΊΌΎέήίόΏύαβψδεφγηιξκλμνοπώρστθωςχυζϊϋΐΰ\u00AD',
+	    'Ä¹²É³ÖÜ΅àâä΄¨çéèêë£™îï•½‰ôö¦€ùûü†ΓΔΘΛΞΠß®©ΣΪ§≠°·Α±≤≥¥ΒΕΖΗΙΚΜΦΫΨΩ' +
+	    'άΝ¬ΟΡ≈Τ«»… ΥΧΆΈœ–―“”‘’÷ΉΊΌΎέήίόΏύαβψδεφγηιξκλμνοπώρστθωςχυζϊϋΐΰ\u00AD',
 	    'x-mac-icelandic':  // Python: 'mac_iceland'
-	        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûüÝ°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø' +
-	        '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€ÐðÞþý·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ',
-	    'x-mac-inuit':
-	        // http://unicode.org/Public/MAPPINGS/VENDORS/APPLE/INUIT.TXT
-	        'ᐃᐄᐅᐆᐊᐋᐱᐲᐳᐴᐸᐹᑉᑎᑏᑐᑑᑕᑖᑦᑭᑮᑯᑰᑲᑳᒃᒋᒌᒍᒎᒐᒑ°ᒡᒥᒦ•¶ᒧ®©™ᒨᒪᒫᒻᓂᓃᓄᓅᓇᓈᓐᓯᓰᓱᓲᓴᓵᔅᓕᓖᓗ' +
-	        'ᓘᓚᓛᓪᔨᔩᔪᔫᔭ… ᔮᔾᕕᕖᕗ–—“”‘’ᕘᕙᕚᕝᕆᕇᕈᕉᕋᕌᕐᕿᖀᖁᖂᖃᖄᖅᖏᖐᖑᖒᖓᖔᖕᙱᙲᙳᙴᙵᙶᖖᖠᖡᖢᖣᖤᖥᖦᕼŁł',
+	    'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûüÝ°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø' +
+	    '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€ÐðÞþý·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ',
+	    'x-mac-inuit': // http://unicode.org/Public/MAPPINGS/VENDORS/APPLE/INUIT.TXT
+	    'ᐃᐄᐅᐆᐊᐋᐱᐲᐳᐴᐸᐹᑉᑎᑏᑐᑑᑕᑖᑦᑭᑮᑯᑰᑲᑳᒃᒋᒌᒍᒎᒐᒑ°ᒡᒥᒦ•¶ᒧ®©™ᒨᒪᒫᒻᓂᓃᓄᓅᓇᓈᓐᓯᓰᓱᓲᓴᓵᔅᓕᓖᓗ' +
+	    'ᓘᓚᓛᓪᔨᔩᔪᔫᔭ… ᔮᔾᕕᕖᕗ–—“”‘’ᕘᕙᕚᕝᕆᕇᕈᕉᕋᕌᕐᕿᖀᖁᖂᖃᖄᖅᖏᖐᖑᖒᖓᖔᖕᙱᙲᙳᙴᙵᙶᖖᖠᖡᖢᖣᖤᖥᖦᕼŁł',
 	    'x-mac-ce':  // Python: 'mac_latin2'
-	        'ÄĀāÉĄÖÜáąČäčĆćéŹźĎíďĒēĖóėôöõúĚěü†°Ę£§•¶ß®©™ę¨≠ģĮįĪ≤≥īĶ∂∑łĻļĽľĹĺŅ' +
-	        'ņŃ¬√ńŇ∆«»… ňŐÕőŌ–—“”‘’÷◊ōŔŕŘ‹›řŖŗŠ‚„šŚśÁŤťÍŽžŪÓÔūŮÚůŰűŲųÝýķŻŁżĢˇ',
+	    'ÄĀāÉĄÖÜáąČäčĆćéŹźĎíďĒēĖóėôöõúĚěü†°Ę£§•¶ß®©™ę¨≠ģĮįĪ≤≥īĶ∂∑łĻļĽľĹĺŅ' +
+	    'ņŃ¬√ńŇ∆«»… ňŐÕőŌ–—“”‘’÷◊ōŔŕŘ‹›řŖŗŠ‚„šŚśÁŤťÍŽžŪÓÔūŮÚůŰűŲųÝýķŻŁżĢˇ',
 	    macintosh:  // Python: 'mac_roman'
-	        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø' +
-	        '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€‹›ﬁﬂ‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ',
+	    'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø' +
+	    '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€‹›ﬁﬂ‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ',
 	    'x-mac-romanian':  // Python: 'mac_romanian'
-	        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ĂȘ∞±≤≥¥µ∂∑∏π∫ªºΩăș' +
-	        '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€‹›Țț‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ',
+	    'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ĂȘ∞±≤≥¥µ∂∑∏π∫ªºΩăș' +
+	    '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸ⁄€‹›Țț‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ˜¯˘˙˚¸˝˛ˇ',
 	    'x-mac-turkish':  // Python: 'mac_turkish'
-	        'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø' +
-	        '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸĞğİıŞş‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙˆ˜¯˘˙˚¸˝˛ˇ'
+	    'ÄÅÇÉÑÖÜáàâäãåçéèêëíìîïñóòôöõúùûü†°¢£§•¶ß®©™´¨≠ÆØ∞±≤≥¥µ∂∑∏π∫ªºΩæø' +
+	    '¿¡¬√ƒ≈∆«»… ÀÃÕŒœ–—“”‘’÷◊ÿŸĞğİıŞş‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙˆ˜¯˘˙˚¸˝˛ˇ'
 	};
 	
 	/**
@@ -2954,7 +1449,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	// encoding Macintosh strings is only rarely needed in typical applications.
 	var macEncodingTableCache = typeof WeakMap === 'function' && new WeakMap();
 	var macEncodingCacheKeys;
-	var getMacEncodingTable = function(encoding) {
+	var getMacEncodingTable = function (encoding) {
 	    // Since we use encoding as a cache key for WeakMap, it has to be
 	    // a String object and not a literal. And at least on NodeJS 2.10.1,
 	    // WeakMap requires that the same String instance is passed for cache hits.
@@ -3049,6 +1544,122 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	};
 	
+	// Helper for encode.VARDELTAS
+	function isByteEncodable(value) {
+	    return value >= -128 && value <= 127;
+	}
+	
+	// Helper for encode.VARDELTAS
+	function encodeVarDeltaRunAsZeroes(deltas, pos, result) {
+	    var runLength = 0;
+	    var numDeltas = deltas.length;
+	    while (pos < numDeltas && runLength < 64 && deltas[pos] === 0) {
+	        ++pos;
+	        ++runLength;
+	    }
+	    result.push(0x80 | (runLength - 1));
+	    return pos;
+	}
+	
+	// Helper for encode.VARDELTAS
+	function encodeVarDeltaRunAsBytes(deltas, offset, result) {
+	    var runLength = 0;
+	    var numDeltas = deltas.length;
+	    var pos = offset;
+	    while (pos < numDeltas && runLength < 64) {
+	        var value = deltas[pos];
+	        if (!isByteEncodable(value)) {
+	            break;
+	        }
+	
+	        // Within a byte-encoded run of deltas, a single zero is best
+	        // stored literally as 0x00 value. However, if we have two or
+	        // more zeroes in a sequence, it is better to start a new run.
+	        // Fore example, the sequence of deltas [15, 15, 0, 15, 15]
+	        // becomes 6 bytes (04 0F 0F 00 0F 0F) when storing the zero
+	        // within the current run, but 7 bytes (01 0F 0F 80 01 0F 0F)
+	        // when starting a new run.
+	        if (value === 0 && pos + 1 < numDeltas && deltas[pos + 1] === 0) {
+	            break;
+	        }
+	
+	        ++pos;
+	        ++runLength;
+	    }
+	    result.push(runLength - 1);
+	    for (var i = offset; i < pos; ++i) {
+	        result.push((deltas[i] + 256) & 0xff);
+	    }
+	    return pos;
+	}
+	
+	// Helper for encode.VARDELTAS
+	function encodeVarDeltaRunAsWords(deltas, offset, result) {
+	    var runLength = 0;
+	    var numDeltas = deltas.length;
+	    var pos = offset;
+	    while (pos < numDeltas && runLength < 64) {
+	        var value = deltas[pos];
+	
+	        // Within a word-encoded run of deltas, it is easiest to start
+	        // a new run (with a different encoding) whenever we encounter
+	        // a zero value. For example, the sequence [0x6666, 0, 0x7777]
+	        // needs 7 bytes when storing the zero inside the current run
+	        // (42 66 66 00 00 77 77), and equally 7 bytes when starting a
+	        // new run (40 66 66 80 40 77 77).
+	        if (value === 0) {
+	            break;
+	        }
+	
+	        // Within a word-encoded run of deltas, a single value in the
+	        // range (-128..127) should be encoded within the current run
+	        // because it is more compact. For example, the sequence
+	        // [0x6666, 2, 0x7777] becomes 7 bytes when storing the value
+	        // literally (42 66 66 00 02 77 77), but 8 bytes when starting
+	        // a new run (40 66 66 00 02 40 77 77).
+	        if (isByteEncodable(value) && pos + 1 < numDeltas && isByteEncodable(deltas[pos + 1])) {
+	            break;
+	        }
+	
+	        ++pos;
+	        ++runLength;
+	    }
+	    result.push(0x40 | (runLength - 1));
+	    for (var i = offset; i < pos; ++i) {
+	        var val = deltas[i];
+	        result.push(((val + 0x10000) >> 8) & 0xff, (val + 0x100) & 0xff);
+	    }
+	    return pos;
+	}
+	
+	/**
+	 * Encode a list of variation adjustment deltas.
+	 *
+	 * Variation adjustment deltas are used in ‘gvar’ and ‘cvar’ tables.
+	 * They indicate how points (in ‘gvar’) or values (in ‘cvar’) get adjusted
+	 * when generating instances of variation fonts.
+	 *
+	 * @see https://www.microsoft.com/typography/otspec/gvar.htm
+	 * @see https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6gvar.html
+	 * @param {Array}
+	 * @return {Array}
+	 */
+	encode.VARDELTAS = function(deltas) {
+	    var pos = 0;
+	    var result = [];
+	    while (pos < deltas.length) {
+	        var value = deltas[pos];
+	        if (value === 0) {
+	            pos = encodeVarDeltaRunAsZeroes(deltas, pos, result);
+	        } else if (value >= -128 && value <= 127) {
+	            pos = encodeVarDeltaRunAsBytes(deltas, pos, result);
+	        } else {
+	            pos = encodeVarDeltaRunAsWords(deltas, pos, result);
+	        }
+	    }
+	    return result;
+	};
+	
 	// Convert a list of values to a CFF INDEX structure.
 	// The values should be objects containing name / type / value.
 	/**
@@ -3056,16 +1667,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * @returns {Array}
 	 */
 	encode.INDEX = function(l) {
-	    var i;
 	    //var offset, offsets, offsetEncoder, encodedOffsets, encodedOffset, data,
 	    //    i, v;
 	    // Because we have to know which data type to use to encode the offsets,
 	    // we have to go through the values twice: once to encode the data and
-	    // calculate the offets, then again to encode the offsets using the fitting data type.
+	    // calculate the offsets, then again to encode the offsets using the fitting data type.
 	    var offset = 1; // First offset is always 1.
 	    var offsets = [offset];
 	    var data = [];
-	    for (i = 0; i < l.length; i += 1) {
+	    for (var i = 0; i < l.length; i += 1) {
 	        var v = encode.OBJECT(l[i]);
 	        Array.prototype.push.apply(data, v);
 	        offset += v.length;
@@ -3079,8 +1689,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var encodedOffsets = [];
 	    var offSize = (1 + Math.floor(Math.log(offset) / Math.log(2)) / 8) | 0;
 	    var offsetEncoder = [undefined, encode.BYTE, encode.USHORT, encode.UINT24, encode.ULONG][offSize];
-	    for (i = 0; i < offsets.length; i += 1) {
-	        var encodedOffset = offsetEncoder(offsets[i]);
+	    for (var i$1 = 0; i$1 < offsets.length; i$1 += 1) {
+	        var encodedOffset = offsetEncoder(offsets[i$1]);
 	        Array.prototype.push.apply(encodedOffsets, encodedOffset);
 	    }
 	
@@ -3252,9 +1862,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var length = table.fields.length;
 	    var subtables = [];
 	    var subtableOffsets = [];
-	    var i;
 	
-	    for (i = 0; i < length; i += 1) {
+	    for (var i = 0; i < length; i += 1) {
 	        var field = table.fields[i];
 	        var encodingFunction = encode[field.type];
 	        check.argument(encodingFunction !== undefined, 'No encoding function for field type ' + field.type + ' (' + field.name + ')');
@@ -3274,13 +1883,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	    }
 	
-	    for (i = 0; i < subtables.length; i += 1) {
-	        var o = subtableOffsets[i];
+	    for (var i$1 = 0; i$1 < subtables.length; i$1 += 1) {
+	        var o = subtableOffsets[i$1];
 	        var offset = d.length;
 	        check.argument(offset < 65536, 'Table ' + table.tableName + ' too big.');
 	        d[o] = offset >> 8;
 	        d[o + 1] = offset & 0xff;
-	        d = d.concat(subtables[i]);
+	        d = d.concat(subtables[i$1]);
 	    }
 	
 	    return d;
@@ -3326,255 +1935,210 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return v.length;
 	};
 	
-	exports.decode = decode;
-	exports.encode = encode;
-	exports.sizeOf = sizeOf;
-
-
-/***/ },
-/* 11 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// The `cmap` table stores the mappings from characters to glyphs.
-	// https://www.microsoft.com/typography/OTSPEC/cmap.htm
+	// Table metadata
 	
-	'use strict';
+	/**
+	 * @exports opentype.Table
+	 * @class
+	 * @param {string} tableName
+	 * @param {Array} fields
+	 * @param {Object} options
+	 * @constructor
+	 */
+	function Table(tableName, fields, options) {
+	    var this$1 = this;
 	
-	var check = __webpack_require__(8);
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
-	
-	function parseCmapTableFormat12(cmap, p) {
-	    var i;
-	
-	    //Skip reserved.
-	    p.parseUShort();
-	
-	    // Length in bytes of the sub-tables.
-	    cmap.length = p.parseULong();
-	    cmap.language = p.parseULong();
-	
-	    var groupCount;
-	    cmap.groupCount = groupCount = p.parseULong();
-	    cmap.glyphIndexMap = {};
-	
-	    for (i = 0; i < groupCount; i += 1) {
-	        var startCharCode = p.parseULong();
-	        var endCharCode = p.parseULong();
-	        var startGlyphId = p.parseULong();
-	
-	        for (var c = startCharCode; c <= endCharCode; c += 1) {
-	            cmap.glyphIndexMap[c] = startGlyphId;
-	            startGlyphId++;
-	        }
+	    for (var i = 0; i < fields.length; i += 1) {
+	        var field = fields[i];
+	        this$1[field.name] = field.value;
 	    }
-	}
 	
-	function parseCmapTableFormat4(cmap, p, data, start, offset) {
-	    var i;
-	
-	    // Length in bytes of the sub-tables.
-	    cmap.length = p.parseUShort();
-	    cmap.language = p.parseUShort();
-	
-	    // segCount is stored x 2.
-	    var segCount;
-	    cmap.segCount = segCount = p.parseUShort() >> 1;
-	
-	    // Skip searchRange, entrySelector, rangeShift.
-	    p.skip('uShort', 3);
-	
-	    // The "unrolled" mapping from character codes to glyph indices.
-	    cmap.glyphIndexMap = {};
-	    var endCountParser = new parse.Parser(data, start + offset + 14);
-	    var startCountParser = new parse.Parser(data, start + offset + 16 + segCount * 2);
-	    var idDeltaParser = new parse.Parser(data, start + offset + 16 + segCount * 4);
-	    var idRangeOffsetParser = new parse.Parser(data, start + offset + 16 + segCount * 6);
-	    var glyphIndexOffset = start + offset + 16 + segCount * 8;
-	    for (i = 0; i < segCount - 1; i += 1) {
-	        var glyphIndex;
-	        var endCount = endCountParser.parseUShort();
-	        var startCount = startCountParser.parseUShort();
-	        var idDelta = idDeltaParser.parseShort();
-	        var idRangeOffset = idRangeOffsetParser.parseUShort();
-	        for (var c = startCount; c <= endCount; c += 1) {
-	            if (idRangeOffset !== 0) {
-	                // The idRangeOffset is relative to the current position in the idRangeOffset array.
-	                // Take the current offset in the idRangeOffset array.
-	                glyphIndexOffset = (idRangeOffsetParser.offset + idRangeOffsetParser.relativeOffset - 2);
-	
-	                // Add the value of the idRangeOffset, which will move us into the glyphIndex array.
-	                glyphIndexOffset += idRangeOffset;
-	
-	                // Then add the character index of the current segment, multiplied by 2 for USHORTs.
-	                glyphIndexOffset += (c - startCount) * 2;
-	                glyphIndex = parse.getUShort(data, glyphIndexOffset);
-	                if (glyphIndex !== 0) {
-	                    glyphIndex = (glyphIndex + idDelta) & 0xFFFF;
-	                }
-	            } else {
-	                glyphIndex = (c + idDelta) & 0xFFFF;
+	    this.tableName = tableName;
+	    this.fields = fields;
+	    if (options) {
+	        var optionKeys = Object.keys(options);
+	        for (var i$1 = 0; i$1 < optionKeys.length; i$1 += 1) {
+	            var k = optionKeys[i$1];
+	            var v = options[k];
+	            if (this$1[k] !== undefined) {
+	                this$1[k] = v;
 	            }
-	
-	            cmap.glyphIndexMap[c] = glyphIndex;
 	        }
 	    }
 	}
 	
-	// Parse the `cmap` table. This table stores the mappings from characters to glyphs.
-	// There are many available formats, but we only support the Windows format 4 and 12.
-	// This function returns a `CmapEncoding` object or null if no supported format could be found.
-	function parseCmapTable(data, start) {
-	    var i;
-	    var cmap = {};
-	    cmap.version = parse.getUShort(data, start);
-	    check.argument(cmap.version === 0, 'cmap table version should be 0.');
-	
-	    // The cmap table can contain many sub-tables, each with their own format.
-	    // We're only interested in a "platform 3" table. This is a Windows format.
-	    cmap.numTables = parse.getUShort(data, start + 2);
-	    var offset = -1;
-	    for (i = cmap.numTables - 1; i >= 0; i -= 1) {
-	        var platformId = parse.getUShort(data, start + 4 + (i * 8));
-	        var encodingId = parse.getUShort(data, start + 4 + (i * 8) + 2);
-	        if (platformId === 3 && (encodingId === 0 || encodingId === 1 || encodingId === 10)) {
-	            offset = parse.getULong(data, start + 4 + (i * 8) + 4);
-	            break;
-	        }
-	    }
-	
-	    if (offset === -1) {
-	        // There is no cmap table in the font that we support, so return null.
-	        // This font will be marked as unsupported.
-	        return null;
-	    }
-	
-	    var p = new parse.Parser(data, start + offset);
-	    cmap.format = p.parseUShort();
-	
-	    if (cmap.format === 12) {
-	        parseCmapTableFormat12(cmap, p);
-	    } else if (cmap.format === 4) {
-	        parseCmapTableFormat4(cmap, p, data, start, offset);
-	    } else {
-	        throw new Error('Only format 4 and 12 cmap tables are supported.');
-	    }
-	
-	    return cmap;
-	}
-	
-	function addSegment(t, code, glyphIndex) {
-	    t.segments.push({
-	        end: code,
-	        start: code,
-	        delta: -(code - glyphIndex),
-	        offset: 0
-	    });
-	}
-	
-	function addTerminatorSegment(t) {
-	    t.segments.push({
-	        end: 0xFFFF,
-	        start: 0xFFFF,
-	        delta: 1,
-	        offset: 0
-	    });
-	}
-	
-	function makeCmapTable(glyphs) {
-	    var i;
-	    var t = new table.Table('cmap', [
-	        {name: 'version', type: 'USHORT', value: 0},
-	        {name: 'numTables', type: 'USHORT', value: 1},
-	        {name: 'platformID', type: 'USHORT', value: 3},
-	        {name: 'encodingID', type: 'USHORT', value: 1},
-	        {name: 'offset', type: 'ULONG', value: 12},
-	        {name: 'format', type: 'USHORT', value: 4},
-	        {name: 'length', type: 'USHORT', value: 0},
-	        {name: 'language', type: 'USHORT', value: 0},
-	        {name: 'segCountX2', type: 'USHORT', value: 0},
-	        {name: 'searchRange', type: 'USHORT', value: 0},
-	        {name: 'entrySelector', type: 'USHORT', value: 0},
-	        {name: 'rangeShift', type: 'USHORT', value: 0}
-	    ]);
-	
-	    t.segments = [];
-	    for (i = 0; i < glyphs.length; i += 1) {
-	        var glyph = glyphs.get(i);
-	        for (var j = 0; j < glyph.unicodes.length; j += 1) {
-	            addSegment(t, glyph.unicodes[j], i);
-	        }
-	
-	        t.segments = t.segments.sort(function(a, b) {
-	            return a.start - b.start;
-	        });
-	    }
-	
-	    addTerminatorSegment(t);
-	
-	    var segCount;
-	    segCount = t.segments.length;
-	    t.segCountX2 = segCount * 2;
-	    t.searchRange = Math.pow(2, Math.floor(Math.log(segCount) / Math.log(2))) * 2;
-	    t.entrySelector = Math.log(t.searchRange / 2) / Math.log(2);
-	    t.rangeShift = t.segCountX2 - t.searchRange;
-	
-	    // Set up parallel segment arrays.
-	    var endCounts = [];
-	    var startCounts = [];
-	    var idDeltas = [];
-	    var idRangeOffsets = [];
-	    var glyphIds = [];
-	
-	    for (i = 0; i < segCount; i += 1) {
-	        var segment = t.segments[i];
-	        endCounts = endCounts.concat({name: 'end_' + i, type: 'USHORT', value: segment.end});
-	        startCounts = startCounts.concat({name: 'start_' + i, type: 'USHORT', value: segment.start});
-	        idDeltas = idDeltas.concat({name: 'idDelta_' + i, type: 'SHORT', value: segment.delta});
-	        idRangeOffsets = idRangeOffsets.concat({name: 'idRangeOffset_' + i, type: 'USHORT', value: segment.offset});
-	        if (segment.glyphId !== undefined) {
-	            glyphIds = glyphIds.concat({name: 'glyph_' + i, type: 'USHORT', value: segment.glyphId});
-	        }
-	    }
-	
-	    t.fields = t.fields.concat(endCounts);
-	    t.fields.push({name: 'reservedPad', type: 'USHORT', value: 0});
-	    t.fields = t.fields.concat(startCounts);
-	    t.fields = t.fields.concat(idDeltas);
-	    t.fields = t.fields.concat(idRangeOffsets);
-	    t.fields = t.fields.concat(glyphIds);
-	
-	    t.length = 14 + // Subtable header
-	        endCounts.length * 2 +
-	        2 + // reservedPad
-	        startCounts.length * 2 +
-	        idDeltas.length * 2 +
-	        idRangeOffsets.length * 2 +
-	        glyphIds.length * 2;
-	
-	    return t;
-	}
-	
-	exports.parse = parseCmapTable;
-	exports.make = makeCmapTable;
-
-
-/***/ },
-/* 12 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// Parsing utility functions
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	
-	// Retrieve an unsigned byte from the DataView.
-	exports.getByte = function getByte(dataView, offset) {
-	    return dataView.getUint8(offset);
+	/**
+	 * Encodes the table and returns an array of bytes
+	 * @return {Array}
+	 */
+	Table.prototype.encode = function() {
+	    return encode.TABLE(this);
 	};
 	
-	exports.getCard8 = exports.getByte;
+	/**
+	 * Get the size of the table.
+	 * @return {number}
+	 */
+	Table.prototype.sizeOf = function() {
+	    return sizeOf.TABLE(this);
+	};
+	
+	/**
+	 * @private
+	 */
+	function ushortList(itemName, list, count) {
+	    if (count === undefined) {
+	        count = list.length;
+	    }
+	    var fields = new Array(list.length + 1);
+	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
+	    for (var i = 0; i < list.length; i++) {
+	        fields[i + 1] = {name: itemName + i, type: 'USHORT', value: list[i]};
+	    }
+	    return fields;
+	}
+	
+	/**
+	 * @private
+	 */
+	function tableList(itemName, records, itemCallback) {
+	    var count = records.length;
+	    var fields = new Array(count + 1);
+	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
+	    for (var i = 0; i < count; i++) {
+	        fields[i + 1] = {name: itemName + i, type: 'TABLE', value: itemCallback(records[i], i)};
+	    }
+	    return fields;
+	}
+	
+	/**
+	 * @private
+	 */
+	function recordList(itemName, records, itemCallback) {
+	    var count = records.length;
+	    var fields = [];
+	    fields[0] = {name: itemName + 'Count', type: 'USHORT', value: count};
+	    for (var i = 0; i < count; i++) {
+	        fields = fields.concat(itemCallback(records[i], i));
+	    }
+	    return fields;
+	}
+	
+	// Common Layout Tables
+	
+	/**
+	 * @exports opentype.Coverage
+	 * @class
+	 * @param {opentype.Table}
+	 * @constructor
+	 * @extends opentype.Table
+	 */
+	function Coverage(coverageTable) {
+	    if (coverageTable.format === 1) {
+	        Table.call(this, 'coverageTable',
+	            [{name: 'coverageFormat', type: 'USHORT', value: 1}]
+	            .concat(ushortList('glyph', coverageTable.glyphs))
+	        );
+	    } else {
+	        check.assert(false, 'Can\'t create coverage table format 2 yet.');
+	    }
+	}
+	Coverage.prototype = Object.create(Table.prototype);
+	Coverage.prototype.constructor = Coverage;
+	
+	function ScriptList(scriptListTable) {
+	    Table.call(this, 'scriptListTable',
+	        recordList('scriptRecord', scriptListTable, function(scriptRecord, i) {
+	            var script = scriptRecord.script;
+	            var defaultLangSys = script.defaultLangSys;
+	            check.assert(!!defaultLangSys, 'Unable to write GSUB: script ' + scriptRecord.tag + ' has no default language system.');
+	            return [
+	                {name: 'scriptTag' + i, type: 'TAG', value: scriptRecord.tag},
+	                {name: 'script' + i, type: 'TABLE', value: new Table('scriptTable', [
+	                    {name: 'defaultLangSys', type: 'TABLE', value: new Table('defaultLangSys', [
+	                        {name: 'lookupOrder', type: 'USHORT', value: 0},
+	                        {name: 'reqFeatureIndex', type: 'USHORT', value: defaultLangSys.reqFeatureIndex}]
+	                        .concat(ushortList('featureIndex', defaultLangSys.featureIndexes)))}
+	                    ].concat(recordList('langSys', script.langSysRecords, function(langSysRecord, i) {
+	                        var langSys = langSysRecord.langSys;
+	                        return [
+	                            {name: 'langSysTag' + i, type: 'TAG', value: langSysRecord.tag},
+	                            {name: 'langSys' + i, type: 'TABLE', value: new Table('langSys', [
+	                                {name: 'lookupOrder', type: 'USHORT', value: 0},
+	                                {name: 'reqFeatureIndex', type: 'USHORT', value: langSys.reqFeatureIndex}
+	                                ].concat(ushortList('featureIndex', langSys.featureIndexes)))}
+	                        ];
+	                    })))}
+	            ];
+	        })
+	    );
+	}
+	ScriptList.prototype = Object.create(Table.prototype);
+	ScriptList.prototype.constructor = ScriptList;
+	
+	/**
+	 * @exports opentype.FeatureList
+	 * @class
+	 * @param {opentype.Table}
+	 * @constructor
+	 * @extends opentype.Table
+	 */
+	function FeatureList(featureListTable) {
+	    Table.call(this, 'featureListTable',
+	        recordList('featureRecord', featureListTable, function(featureRecord, i) {
+	            var feature = featureRecord.feature;
+	            return [
+	                {name: 'featureTag' + i, type: 'TAG', value: featureRecord.tag},
+	                {name: 'feature' + i, type: 'TABLE', value: new Table('featureTable', [
+	                    {name: 'featureParams', type: 'USHORT', value: feature.featureParams} ].concat(ushortList('lookupListIndex', feature.lookupListIndexes)))}
+	            ];
+	        })
+	    );
+	}
+	FeatureList.prototype = Object.create(Table.prototype);
+	FeatureList.prototype.constructor = FeatureList;
+	
+	/**
+	 * @exports opentype.LookupList
+	 * @class
+	 * @param {opentype.Table}
+	 * @param {Object}
+	 * @constructor
+	 * @extends opentype.Table
+	 */
+	function LookupList(lookupListTable, subtableMakers) {
+	    Table.call(this, 'lookupListTable', tableList('lookup', lookupListTable, function(lookupTable) {
+	        var subtableCallback = subtableMakers[lookupTable.lookupType];
+	        check.assert(!!subtableCallback, 'Unable to write GSUB lookup type ' + lookupTable.lookupType + ' tables.');
+	        return new Table('lookupTable', [
+	            {name: 'lookupType', type: 'USHORT', value: lookupTable.lookupType},
+	            {name: 'lookupFlag', type: 'USHORT', value: lookupTable.lookupFlag}
+	        ].concat(tableList('subtable', lookupTable.subtables, subtableCallback)));
+	    }));
+	}
+	LookupList.prototype = Object.create(Table.prototype);
+	LookupList.prototype.constructor = LookupList;
+	
+	// Record = same as Table, but inlined (a Table has an offset and its data is further in the stream)
+	// Don't use offsets inside Records (probable bug), only in Tables.
+	var table = {
+	    Table: Table,
+	    Record: Table,
+	    Coverage: Coverage,
+	    ScriptList: ScriptList,
+	    FeatureList: FeatureList,
+	    LookupList: LookupList,
+	    ushortList: ushortList,
+	    tableList: tableList,
+	    recordList: recordList,
+	};
+	
+	// Parsing utility functions
+	
+	// Retrieve an unsigned byte from the DataView.
+	function getByte(dataView, offset) {
+	    return dataView.getUint8(offset);
+	}
 	
 	// Retrieve an unsigned 16-bit short from the DataView.
 	// The value is stored in big endian.
@@ -3582,42 +2146,40 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return dataView.getUint16(offset, false);
 	}
 	
-	exports.getUShort = exports.getCard16 = getUShort;
-	
 	// Retrieve a signed 16-bit short from the DataView.
 	// The value is stored in big endian.
-	exports.getShort = function(dataView, offset) {
+	function getShort(dataView, offset) {
 	    return dataView.getInt16(offset, false);
-	};
+	}
 	
 	// Retrieve an unsigned 32-bit long from the DataView.
 	// The value is stored in big endian.
-	exports.getULong = function(dataView, offset) {
+	function getULong(dataView, offset) {
 	    return dataView.getUint32(offset, false);
-	};
+	}
 	
 	// Retrieve a 32-bit signed fixed-point number (16.16) from the DataView.
 	// The value is stored in big endian.
-	exports.getFixed = function(dataView, offset) {
+	function getFixed(dataView, offset) {
 	    var decimal = dataView.getInt16(offset, false);
 	    var fraction = dataView.getUint16(offset + 2, false);
 	    return decimal + fraction / 65535;
-	};
+	}
 	
 	// Retrieve a 4-character tag from the DataView.
 	// Tags are used to identify tables.
-	exports.getTag = function(dataView, offset) {
+	function getTag(dataView, offset) {
 	    var tag = '';
 	    for (var i = offset; i < offset + 4; i += 1) {
 	        tag += String.fromCharCode(dataView.getInt8(i));
 	    }
 	
 	    return tag;
-	};
+	}
 	
 	// Retrieve an offset from the DataView.
 	// Offsets are 1 to 4 bytes in length, depending on the offSize argument.
-	exports.getOffset = function(dataView, offset, offSize) {
+	function getOffset(dataView, offset, offSize) {
 	    var v = 0;
 	    for (var i = 0; i < offSize; i += 1) {
 	        v <<= 8;
@@ -3625,27 +2187,27 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	
 	    return v;
-	};
+	}
 	
 	// Retrieve a number of bytes from start offset to the end offset from the DataView.
-	exports.getBytes = function(dataView, startOffset, endOffset) {
+	function getBytes(dataView, startOffset, endOffset) {
 	    var bytes = [];
 	    for (var i = startOffset; i < endOffset; i += 1) {
 	        bytes.push(dataView.getUint8(i));
 	    }
 	
 	    return bytes;
-	};
+	}
 	
 	// Convert the list of bytes to a string.
-	exports.bytesToString = function(bytes) {
+	function bytesToString(bytes) {
 	    var s = '';
 	    for (var i = 0; i < bytes.length; i += 1) {
 	        s += String.fromCharCode(bytes[i]);
 	    }
 	
 	    return s;
-	};
+	}
 	
 	var typeOffsets = {
 	    byte: 1,
@@ -3702,13 +2264,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	};
 	
 	Parser.prototype.parseULong = function() {
-	    var v = exports.getULong(this.data, this.offset + this.relativeOffset);
+	    var v = getULong(this.data, this.offset + this.relativeOffset);
 	    this.relativeOffset += 4;
 	    return v;
 	};
 	
 	Parser.prototype.parseFixed = function() {
-	    var v = exports.getFixed(this.data, this.offset + this.relativeOffset);
+	    var v = getFixed(this.data, this.offset + this.relativeOffset);
 	    this.relativeOffset += 4;
 	    return v;
 	};
@@ -3734,9 +2296,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	// only take the last 32 bits.
 	// + Since until 2038 those bits will be filled by zeros we can ignore them.
 	Parser.prototype.parseLongDateTime = function() {
-	    var v = exports.getULong(this.data, this.offset + this.relativeOffset + 4);
+	    var v = getULong(this.data, this.offset + this.relativeOffset + 4);
 	    // Subtract seconds between 01/01/1904 and 01/01/1970
-	    // to convert Apple Mac timstamp to Standard Unix timestamp
+	    // to convert Apple Mac timestamp to Standard Unix timestamp
 	    v -= 2082844800;
 	    this.relativeOffset += 8;
 	    return v;
@@ -3762,7 +2324,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	///// Parsing lists and records ///////////////////////////////
 	
-	// Parse a list of 16 bit integers. The length of the list can be read on the stream
+	// Parse a list of 16 bit unsigned integers. The length of the list can be read on the stream
 	// or provided as an argument.
 	Parser.prototype.parseOffset16List =
 	Parser.prototype.parseUShortList = function(count) {
@@ -3779,19 +2341,48 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return offsets;
 	};
 	
+	// Parses a list of 16 bit signed integers.
+	Parser.prototype.parseShortList = function(count) {
+	    var list = new Array(count);
+	    var dataView = this.data;
+	    var offset = this.offset + this.relativeOffset;
+	    for (var i = 0; i < count; i++) {
+	        list[i] = dataView.getInt16(offset);
+	        offset += 2;
+	    }
+	
+	    this.relativeOffset += count * 2;
+	    return list;
+	};
+	
+	// Parses a list of bytes.
+	Parser.prototype.parseByteList = function(count) {
+	    var list = new Array(count);
+	    var dataView = this.data;
+	    var offset = this.offset + this.relativeOffset;
+	    for (var i = 0; i < count; i++) {
+	        list[i] = dataView.getUint8(offset++);
+	    }
+	
+	    this.relativeOffset += count;
+	    return list;
+	};
+	
 	/**
 	 * Parse a list of items.
 	 * Record count is optional, if omitted it is read from the stream.
 	 * itemCallback is one of the Parser methods.
 	 */
 	Parser.prototype.parseList = function(count, itemCallback) {
+	    var this$1 = this;
+	
 	    if (!itemCallback) {
 	        itemCallback = count;
 	        count = this.parseUShort();
 	    }
 	    var list = new Array(count);
 	    for (var i = 0; i < count; i++) {
-	        list[i] = itemCallback.call(this);
+	        list[i] = itemCallback.call(this$1);
 	    }
 	    return list;
 	};
@@ -3802,6 +2393,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * Example of recordDescription: { sequenceIndex: Parser.uShort, lookupListIndex: Parser.uShort }
 	 */
 	Parser.prototype.parseRecordList = function(count, recordDescription) {
+	    var this$1 = this;
+	
 	    // If the count argument is absent, read it in the stream.
 	    if (!recordDescription) {
 	        recordDescription = count;
@@ -3814,7 +2407,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        for (var j = 0; j < fields.length; j++) {
 	            var fieldName = fields[j];
 	            var fieldType = recordDescription[fieldName];
-	            rec[fieldName] = fieldType.call(this);
+	            rec[fieldName] = fieldType.call(this$1);
 	        }
 	        records[i] = rec;
 	    }
@@ -3824,6 +2417,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	// Parse a data structure into an object
 	// Example of description: { sequenceIndex: Parser.uShort, lookupListIndex: Parser.uShort }
 	Parser.prototype.parseStruct = function(description) {
+	    var this$1 = this;
+	
 	    if (typeof description === 'function') {
 	        return description.call(this);
 	    } else {
@@ -3832,7 +2427,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        for (var j = 0; j < fields.length; j++) {
 	            var fieldName = fields[j];
 	            var fieldType = description[fieldName];
-	            struct[fieldName] = fieldType.call(this);
+	            struct[fieldName] = fieldType.call(this$1);
 	        }
 	        return struct;
 	    }
@@ -3840,9 +2435,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	Parser.prototype.parsePointer = function(description) {
 	    var structOffset = this.parseOffset16();
-	    if (structOffset > 0) {                         // NULL offset => return indefined
+	    if (structOffset > 0) {                         // NULL offset => return undefined
 	        return new Parser(this.data, this.offset + structOffset).parseStruct(description);
 	    }
+	    return undefined;
 	};
 	
 	/**
@@ -3853,6 +2449,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * See examples in tables/gsub.js
 	 */
 	Parser.prototype.parseListOfLists = function(itemCallback) {
+	    var this$1 = this;
+	
 	    var offsets = this.parseOffset16List();
 	    var count = offsets.length;
 	    var relativeOffset = this.relativeOffset;
@@ -3863,17 +2461,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	            list[i] = undefined;            // Add i as owned property to list. Convenient with assert.
 	            continue;
 	        }
-	        this.relativeOffset = start;
+	        this$1.relativeOffset = start;
 	        if (itemCallback) {
-	            var subOffsets = this.parseOffset16List();
+	            var subOffsets = this$1.parseOffset16List();
 	            var subList = new Array(subOffsets.length);
 	            for (var j = 0; j < subOffsets.length; j++) {
-	                this.relativeOffset = start + subOffsets[j];
-	                subList[j] = itemCallback.call(this);
+	                this$1.relativeOffset = start + subOffsets[j];
+	                subList[j] = itemCallback.call(this$1);
 	            }
 	            list[i] = subList;
 	        } else {
-	            list[i] = this.parseUShortList();
+	            list[i] = this$1.parseUShortList();
 	        }
 	    }
 	    this.relativeOffset = relativeOffset;
@@ -3886,6 +2484,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	// https://www.microsoft.com/typography/OTSPEC/chapter2.htm
 	// parser.offset must point to the start of the table containing the coverage.
 	Parser.prototype.parseCoverage = function() {
+	    var this$1 = this;
+	
 	    var startOffset = this.offset + this.relativeOffset;
 	    var format = this.parseUShort();
 	    var count = this.parseUShort();
@@ -3898,9 +2498,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var ranges = new Array(count);
 	        for (var i = 0; i < count; i++) {
 	            ranges[i] = {
-	                start: this.parseUShort(),
-	                end: this.parseUShort(),
-	                index: this.parseUShort()
+	                start: this$1.parseUShort(),
+	                end: this$1.parseUShort(),
+	                index: this$1.parseUShort()
 	            };
 	        }
 	        return {
@@ -3908,7 +2508,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            ranges: ranges
 	        };
 	    }
-	    check.assert(false, '0x' + startOffset.toString(16) + ': Coverage format must be 1 or 2.');
+	    throw new Error('0x' + startOffset.toString(16) + ': Coverage format must be 1 or 2.');
 	};
 	
 	// Parse a Class Definition Table in a GSUB, GPOS or GDEF table.
@@ -3932,7 +2532,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	            })
 	        };
 	    }
-	    check.assert(false, '0x' + startOffset.toString(16) + ': ClassDef format must be 1 or 2.');
+	    throw new Error('0x' + startOffset.toString(16) + ': ClassDef format must be 1 or 2.');
 	};
 	
 	///// Static methods ///////////////////////////////////
@@ -4011,25 +2611,1332 @@ return /******/ (function(modules) { // webpackBootstrap
 	    })));
 	};
 	
-	exports.Parser = Parser;
-
-
-/***/ },
-/* 13 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var parse = {
+	    getByte: getByte,
+	    getCard8: getByte,
+	    getUShort: getUShort,
+	    getCard16: getUShort,
+	    getShort: getShort,
+	    getULong: getULong,
+	    getFixed: getFixed,
+	    getTag: getTag,
+	    getOffset: getOffset,
+	    getBytes: getBytes,
+	    bytesToString: bytesToString,
+	    Parser: Parser,
+	};
+	
+	// The `cmap` table stores the mappings from characters to glyphs.
+	// https://www.microsoft.com/typography/OTSPEC/cmap.htm
+	
+	function parseCmapTableFormat12(cmap, p) {
+	    //Skip reserved.
+	    p.parseUShort();
+	
+	    // Length in bytes of the sub-tables.
+	    cmap.length = p.parseULong();
+	    cmap.language = p.parseULong();
+	
+	    var groupCount;
+	    cmap.groupCount = groupCount = p.parseULong();
+	    cmap.glyphIndexMap = {};
+	
+	    for (var i = 0; i < groupCount; i += 1) {
+	        var startCharCode = p.parseULong();
+	        var endCharCode = p.parseULong();
+	        var startGlyphId = p.parseULong();
+	
+	        for (var c = startCharCode; c <= endCharCode; c += 1) {
+	            cmap.glyphIndexMap[c] = startGlyphId;
+	            startGlyphId++;
+	        }
+	    }
+	}
+	
+	function parseCmapTableFormat4(cmap, p, data, start, offset) {
+	    // Length in bytes of the sub-tables.
+	    cmap.length = p.parseUShort();
+	    cmap.language = p.parseUShort();
+	
+	    // segCount is stored x 2.
+	    var segCount;
+	    cmap.segCount = segCount = p.parseUShort() >> 1;
+	
+	    // Skip searchRange, entrySelector, rangeShift.
+	    p.skip('uShort', 3);
+	
+	    // The "unrolled" mapping from character codes to glyph indices.
+	    cmap.glyphIndexMap = {};
+	    var endCountParser = new parse.Parser(data, start + offset + 14);
+	    var startCountParser = new parse.Parser(data, start + offset + 16 + segCount * 2);
+	    var idDeltaParser = new parse.Parser(data, start + offset + 16 + segCount * 4);
+	    var idRangeOffsetParser = new parse.Parser(data, start + offset + 16 + segCount * 6);
+	    var glyphIndexOffset = start + offset + 16 + segCount * 8;
+	    for (var i = 0; i < segCount - 1; i += 1) {
+	        var glyphIndex = (void 0);
+	        var endCount = endCountParser.parseUShort();
+	        var startCount = startCountParser.parseUShort();
+	        var idDelta = idDeltaParser.parseShort();
+	        var idRangeOffset = idRangeOffsetParser.parseUShort();
+	        for (var c = startCount; c <= endCount; c += 1) {
+	            if (idRangeOffset !== 0) {
+	                // The idRangeOffset is relative to the current position in the idRangeOffset array.
+	                // Take the current offset in the idRangeOffset array.
+	                glyphIndexOffset = (idRangeOffsetParser.offset + idRangeOffsetParser.relativeOffset - 2);
+	
+	                // Add the value of the idRangeOffset, which will move us into the glyphIndex array.
+	                glyphIndexOffset += idRangeOffset;
+	
+	                // Then add the character index of the current segment, multiplied by 2 for USHORTs.
+	                glyphIndexOffset += (c - startCount) * 2;
+	                glyphIndex = parse.getUShort(data, glyphIndexOffset);
+	                if (glyphIndex !== 0) {
+	                    glyphIndex = (glyphIndex + idDelta) & 0xFFFF;
+	                }
+	            } else {
+	                glyphIndex = (c + idDelta) & 0xFFFF;
+	            }
+	
+	            cmap.glyphIndexMap[c] = glyphIndex;
+	        }
+	    }
+	}
+	
+	// Parse the `cmap` table. This table stores the mappings from characters to glyphs.
+	// There are many available formats, but we only support the Windows format 4 and 12.
+	// This function returns a `CmapEncoding` object or null if no supported format could be found.
+	function parseCmapTable(data, start) {
+	    var cmap = {};
+	    cmap.version = parse.getUShort(data, start);
+	    check.argument(cmap.version === 0, 'cmap table version should be 0.');
+	
+	    // The cmap table can contain many sub-tables, each with their own format.
+	    // We're only interested in a "platform 3" table. This is a Windows format.
+	    cmap.numTables = parse.getUShort(data, start + 2);
+	    var offset = -1;
+	    for (var i = cmap.numTables - 1; i >= 0; i -= 1) {
+	        var platformId = parse.getUShort(data, start + 4 + (i * 8));
+	        var encodingId = parse.getUShort(data, start + 4 + (i * 8) + 2);
+	        if (platformId === 3 && (encodingId === 0 || encodingId === 1 || encodingId === 10)) {
+	            offset = parse.getULong(data, start + 4 + (i * 8) + 4);
+	            break;
+	        }
+	    }
+	
+	    if (offset === -1) {
+	        // There is no cmap table in the font that we support.
+	        throw new Error('No valid cmap sub-tables found.');
+	    }
+	
+	    var p = new parse.Parser(data, start + offset);
+	    cmap.format = p.parseUShort();
+	
+	    if (cmap.format === 12) {
+	        parseCmapTableFormat12(cmap, p);
+	    } else if (cmap.format === 4) {
+	        parseCmapTableFormat4(cmap, p, data, start, offset);
+	    } else {
+	        throw new Error('Only format 4 and 12 cmap tables are supported (found format ' + cmap.format + ').');
+	    }
+	
+	    return cmap;
+	}
+	
+	function addSegment(t, code, glyphIndex) {
+	    t.segments.push({
+	        end: code,
+	        start: code,
+	        delta: -(code - glyphIndex),
+	        offset: 0
+	    });
+	}
+	
+	function addTerminatorSegment(t) {
+	    t.segments.push({
+	        end: 0xFFFF,
+	        start: 0xFFFF,
+	        delta: 1,
+	        offset: 0
+	    });
+	}
+	
+	function makeCmapTable(glyphs) {
+	    var t = new table.Table('cmap', [
+	        {name: 'version', type: 'USHORT', value: 0},
+	        {name: 'numTables', type: 'USHORT', value: 1},
+	        {name: 'platformID', type: 'USHORT', value: 3},
+	        {name: 'encodingID', type: 'USHORT', value: 1},
+	        {name: 'offset', type: 'ULONG', value: 12},
+	        {name: 'format', type: 'USHORT', value: 4},
+	        {name: 'length', type: 'USHORT', value: 0},
+	        {name: 'language', type: 'USHORT', value: 0},
+	        {name: 'segCountX2', type: 'USHORT', value: 0},
+	        {name: 'searchRange', type: 'USHORT', value: 0},
+	        {name: 'entrySelector', type: 'USHORT', value: 0},
+	        {name: 'rangeShift', type: 'USHORT', value: 0}
+	    ]);
+	
+	    t.segments = [];
+	    for (var i = 0; i < glyphs.length; i += 1) {
+	        var glyph = glyphs.get(i);
+	        for (var j = 0; j < glyph.unicodes.length; j += 1) {
+	            addSegment(t, glyph.unicodes[j], i);
+	        }
+	
+	        t.segments = t.segments.sort(function(a, b) {
+	            return a.start - b.start;
+	        });
+	    }
+	
+	    addTerminatorSegment(t);
+	
+	    var segCount;
+	    segCount = t.segments.length;
+	    t.segCountX2 = segCount * 2;
+	    t.searchRange = Math.pow(2, Math.floor(Math.log(segCount) / Math.log(2))) * 2;
+	    t.entrySelector = Math.log(t.searchRange / 2) / Math.log(2);
+	    t.rangeShift = t.segCountX2 - t.searchRange;
+	
+	    // Set up parallel segment arrays.
+	    var endCounts = [];
+	    var startCounts = [];
+	    var idDeltas = [];
+	    var idRangeOffsets = [];
+	    var glyphIds = [];
+	
+	    for (var i$1 = 0; i$1 < segCount; i$1 += 1) {
+	        var segment = t.segments[i$1];
+	        endCounts = endCounts.concat({name: 'end_' + i$1, type: 'USHORT', value: segment.end});
+	        startCounts = startCounts.concat({name: 'start_' + i$1, type: 'USHORT', value: segment.start});
+	        idDeltas = idDeltas.concat({name: 'idDelta_' + i$1, type: 'SHORT', value: segment.delta});
+	        idRangeOffsets = idRangeOffsets.concat({name: 'idRangeOffset_' + i$1, type: 'USHORT', value: segment.offset});
+	        if (segment.glyphId !== undefined) {
+	            glyphIds = glyphIds.concat({name: 'glyph_' + i$1, type: 'USHORT', value: segment.glyphId});
+	        }
+	    }
+	
+	    t.fields = t.fields.concat(endCounts);
+	    t.fields.push({name: 'reservedPad', type: 'USHORT', value: 0});
+	    t.fields = t.fields.concat(startCounts);
+	    t.fields = t.fields.concat(idDeltas);
+	    t.fields = t.fields.concat(idRangeOffsets);
+	    t.fields = t.fields.concat(glyphIds);
+	
+	    t.length = 14 + // Subtable header
+	        endCounts.length * 2 +
+	        2 + // reservedPad
+	        startCounts.length * 2 +
+	        idDeltas.length * 2 +
+	        idRangeOffsets.length * 2 +
+	        glyphIds.length * 2;
+	
+	    return t;
+	}
+	
+	var cmap = { parse: parseCmapTable, make: makeCmapTable };
+	
+	// Glyph encoding
+	
+	var cffStandardStrings = [
+	    '.notdef', 'space', 'exclam', 'quotedbl', 'numbersign', 'dollar', 'percent', 'ampersand', 'quoteright',
+	    'parenleft', 'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash', 'zero', 'one', 'two',
+	    'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'colon', 'semicolon', 'less', 'equal', 'greater',
+	    'question', 'at', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+	    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'bracketleft', 'backslash', 'bracketright', 'asciicircum', 'underscore',
+	    'quoteleft', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+	    'u', 'v', 'w', 'x', 'y', 'z', 'braceleft', 'bar', 'braceright', 'asciitilde', 'exclamdown', 'cent', 'sterling',
+	    'fraction', 'yen', 'florin', 'section', 'currency', 'quotesingle', 'quotedblleft', 'guillemotleft',
+	    'guilsinglleft', 'guilsinglright', 'fi', 'fl', 'endash', 'dagger', 'daggerdbl', 'periodcentered', 'paragraph',
+	    'bullet', 'quotesinglbase', 'quotedblbase', 'quotedblright', 'guillemotright', 'ellipsis', 'perthousand',
+	    'questiondown', 'grave', 'acute', 'circumflex', 'tilde', 'macron', 'breve', 'dotaccent', 'dieresis', 'ring',
+	    'cedilla', 'hungarumlaut', 'ogonek', 'caron', 'emdash', 'AE', 'ordfeminine', 'Lslash', 'Oslash', 'OE',
+	    'ordmasculine', 'ae', 'dotlessi', 'lslash', 'oslash', 'oe', 'germandbls', 'onesuperior', 'logicalnot', 'mu',
+	    'trademark', 'Eth', 'onehalf', 'plusminus', 'Thorn', 'onequarter', 'divide', 'brokenbar', 'degree', 'thorn',
+	    'threequarters', 'twosuperior', 'registered', 'minus', 'eth', 'multiply', 'threesuperior', 'copyright',
+	    'Aacute', 'Acircumflex', 'Adieresis', 'Agrave', 'Aring', 'Atilde', 'Ccedilla', 'Eacute', 'Ecircumflex',
+	    'Edieresis', 'Egrave', 'Iacute', 'Icircumflex', 'Idieresis', 'Igrave', 'Ntilde', 'Oacute', 'Ocircumflex',
+	    'Odieresis', 'Ograve', 'Otilde', 'Scaron', 'Uacute', 'Ucircumflex', 'Udieresis', 'Ugrave', 'Yacute',
+	    'Ydieresis', 'Zcaron', 'aacute', 'acircumflex', 'adieresis', 'agrave', 'aring', 'atilde', 'ccedilla', 'eacute',
+	    'ecircumflex', 'edieresis', 'egrave', 'iacute', 'icircumflex', 'idieresis', 'igrave', 'ntilde', 'oacute',
+	    'ocircumflex', 'odieresis', 'ograve', 'otilde', 'scaron', 'uacute', 'ucircumflex', 'udieresis', 'ugrave',
+	    'yacute', 'ydieresis', 'zcaron', 'exclamsmall', 'Hungarumlautsmall', 'dollaroldstyle', 'dollarsuperior',
+	    'ampersandsmall', 'Acutesmall', 'parenleftsuperior', 'parenrightsuperior', '266 ff', 'onedotenleader',
+	    'zerooldstyle', 'oneoldstyle', 'twooldstyle', 'threeoldstyle', 'fouroldstyle', 'fiveoldstyle', 'sixoldstyle',
+	    'sevenoldstyle', 'eightoldstyle', 'nineoldstyle', 'commasuperior', 'threequartersemdash', 'periodsuperior',
+	    'questionsmall', 'asuperior', 'bsuperior', 'centsuperior', 'dsuperior', 'esuperior', 'isuperior', 'lsuperior',
+	    'msuperior', 'nsuperior', 'osuperior', 'rsuperior', 'ssuperior', 'tsuperior', 'ff', 'ffi', 'ffl',
+	    'parenleftinferior', 'parenrightinferior', 'Circumflexsmall', 'hyphensuperior', 'Gravesmall', 'Asmall',
+	    'Bsmall', 'Csmall', 'Dsmall', 'Esmall', 'Fsmall', 'Gsmall', 'Hsmall', 'Ismall', 'Jsmall', 'Ksmall', 'Lsmall',
+	    'Msmall', 'Nsmall', 'Osmall', 'Psmall', 'Qsmall', 'Rsmall', 'Ssmall', 'Tsmall', 'Usmall', 'Vsmall', 'Wsmall',
+	    'Xsmall', 'Ysmall', 'Zsmall', 'colonmonetary', 'onefitted', 'rupiah', 'Tildesmall', 'exclamdownsmall',
+	    'centoldstyle', 'Lslashsmall', 'Scaronsmall', 'Zcaronsmall', 'Dieresissmall', 'Brevesmall', 'Caronsmall',
+	    'Dotaccentsmall', 'Macronsmall', 'figuredash', 'hypheninferior', 'Ogoneksmall', 'Ringsmall', 'Cedillasmall',
+	    'questiondownsmall', 'oneeighth', 'threeeighths', 'fiveeighths', 'seveneighths', 'onethird', 'twothirds',
+	    'zerosuperior', 'foursuperior', 'fivesuperior', 'sixsuperior', 'sevensuperior', 'eightsuperior', 'ninesuperior',
+	    'zeroinferior', 'oneinferior', 'twoinferior', 'threeinferior', 'fourinferior', 'fiveinferior', 'sixinferior',
+	    'seveninferior', 'eightinferior', 'nineinferior', 'centinferior', 'dollarinferior', 'periodinferior',
+	    'commainferior', 'Agravesmall', 'Aacutesmall', 'Acircumflexsmall', 'Atildesmall', 'Adieresissmall',
+	    'Aringsmall', 'AEsmall', 'Ccedillasmall', 'Egravesmall', 'Eacutesmall', 'Ecircumflexsmall', 'Edieresissmall',
+	    'Igravesmall', 'Iacutesmall', 'Icircumflexsmall', 'Idieresissmall', 'Ethsmall', 'Ntildesmall', 'Ogravesmall',
+	    'Oacutesmall', 'Ocircumflexsmall', 'Otildesmall', 'Odieresissmall', 'OEsmall', 'Oslashsmall', 'Ugravesmall',
+	    'Uacutesmall', 'Ucircumflexsmall', 'Udieresissmall', 'Yacutesmall', 'Thornsmall', 'Ydieresissmall', '001.000',
+	    '001.001', '001.002', '001.003', 'Black', 'Bold', 'Book', 'Light', 'Medium', 'Regular', 'Roman', 'Semibold'];
+	
+	var cffStandardEncoding = [
+	    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+	    '', '', '', '', 'space', 'exclam', 'quotedbl', 'numbersign', 'dollar', 'percent', 'ampersand', 'quoteright',
+	    'parenleft', 'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash', 'zero', 'one', 'two',
+	    'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'colon', 'semicolon', 'less', 'equal', 'greater',
+	    'question', 'at', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+	    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'bracketleft', 'backslash', 'bracketright', 'asciicircum', 'underscore',
+	    'quoteleft', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+	    'u', 'v', 'w', 'x', 'y', 'z', 'braceleft', 'bar', 'braceright', 'asciitilde', '', '', '', '', '', '', '', '',
+	    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+	    'exclamdown', 'cent', 'sterling', 'fraction', 'yen', 'florin', 'section', 'currency', 'quotesingle',
+	    'quotedblleft', 'guillemotleft', 'guilsinglleft', 'guilsinglright', 'fi', 'fl', '', 'endash', 'dagger',
+	    'daggerdbl', 'periodcentered', '', 'paragraph', 'bullet', 'quotesinglbase', 'quotedblbase', 'quotedblright',
+	    'guillemotright', 'ellipsis', 'perthousand', '', 'questiondown', '', 'grave', 'acute', 'circumflex', 'tilde',
+	    'macron', 'breve', 'dotaccent', 'dieresis', '', 'ring', 'cedilla', '', 'hungarumlaut', 'ogonek', 'caron',
+	    'emdash', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'AE', '', 'ordfeminine', '', '', '',
+	    '', 'Lslash', 'Oslash', 'OE', 'ordmasculine', '', '', '', '', '', 'ae', '', '', '', 'dotlessi', '', '',
+	    'lslash', 'oslash', 'oe', 'germandbls'];
+	
+	var cffExpertEncoding = [
+	    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+	    '', '', '', '', 'space', 'exclamsmall', 'Hungarumlautsmall', '', 'dollaroldstyle', 'dollarsuperior',
+	    'ampersandsmall', 'Acutesmall', 'parenleftsuperior', 'parenrightsuperior', 'twodotenleader', 'onedotenleader',
+	    'comma', 'hyphen', 'period', 'fraction', 'zerooldstyle', 'oneoldstyle', 'twooldstyle', 'threeoldstyle',
+	    'fouroldstyle', 'fiveoldstyle', 'sixoldstyle', 'sevenoldstyle', 'eightoldstyle', 'nineoldstyle', 'colon',
+	    'semicolon', 'commasuperior', 'threequartersemdash', 'periodsuperior', 'questionsmall', '', 'asuperior',
+	    'bsuperior', 'centsuperior', 'dsuperior', 'esuperior', '', '', 'isuperior', '', '', 'lsuperior', 'msuperior',
+	    'nsuperior', 'osuperior', '', '', 'rsuperior', 'ssuperior', 'tsuperior', '', 'ff', 'fi', 'fl', 'ffi', 'ffl',
+	    'parenleftinferior', '', 'parenrightinferior', 'Circumflexsmall', 'hyphensuperior', 'Gravesmall', 'Asmall',
+	    'Bsmall', 'Csmall', 'Dsmall', 'Esmall', 'Fsmall', 'Gsmall', 'Hsmall', 'Ismall', 'Jsmall', 'Ksmall', 'Lsmall',
+	    'Msmall', 'Nsmall', 'Osmall', 'Psmall', 'Qsmall', 'Rsmall', 'Ssmall', 'Tsmall', 'Usmall', 'Vsmall', 'Wsmall',
+	    'Xsmall', 'Ysmall', 'Zsmall', 'colonmonetary', 'onefitted', 'rupiah', 'Tildesmall', '', '', '', '', '', '', '',
+	    '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+	    'exclamdownsmall', 'centoldstyle', 'Lslashsmall', '', '', 'Scaronsmall', 'Zcaronsmall', 'Dieresissmall',
+	    'Brevesmall', 'Caronsmall', '', 'Dotaccentsmall', '', '', 'Macronsmall', '', '', 'figuredash', 'hypheninferior',
+	    '', '', 'Ogoneksmall', 'Ringsmall', 'Cedillasmall', '', '', '', 'onequarter', 'onehalf', 'threequarters',
+	    'questiondownsmall', 'oneeighth', 'threeeighths', 'fiveeighths', 'seveneighths', 'onethird', 'twothirds', '',
+	    '', 'zerosuperior', 'onesuperior', 'twosuperior', 'threesuperior', 'foursuperior', 'fivesuperior',
+	    'sixsuperior', 'sevensuperior', 'eightsuperior', 'ninesuperior', 'zeroinferior', 'oneinferior', 'twoinferior',
+	    'threeinferior', 'fourinferior', 'fiveinferior', 'sixinferior', 'seveninferior', 'eightinferior',
+	    'nineinferior', 'centinferior', 'dollarinferior', 'periodinferior', 'commainferior', 'Agravesmall',
+	    'Aacutesmall', 'Acircumflexsmall', 'Atildesmall', 'Adieresissmall', 'Aringsmall', 'AEsmall', 'Ccedillasmall',
+	    'Egravesmall', 'Eacutesmall', 'Ecircumflexsmall', 'Edieresissmall', 'Igravesmall', 'Iacutesmall',
+	    'Icircumflexsmall', 'Idieresissmall', 'Ethsmall', 'Ntildesmall', 'Ogravesmall', 'Oacutesmall',
+	    'Ocircumflexsmall', 'Otildesmall', 'Odieresissmall', 'OEsmall', 'Oslashsmall', 'Ugravesmall', 'Uacutesmall',
+	    'Ucircumflexsmall', 'Udieresissmall', 'Yacutesmall', 'Thornsmall', 'Ydieresissmall'];
+	
+	var standardNames = [
+	    '.notdef', '.null', 'nonmarkingreturn', 'space', 'exclam', 'quotedbl', 'numbersign', 'dollar', 'percent',
+	    'ampersand', 'quotesingle', 'parenleft', 'parenright', 'asterisk', 'plus', 'comma', 'hyphen', 'period', 'slash',
+	    'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'colon', 'semicolon', 'less',
+	    'equal', 'greater', 'question', 'at', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+	    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'bracketleft', 'backslash', 'bracketright',
+	    'asciicircum', 'underscore', 'grave', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+	    'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'braceleft', 'bar', 'braceright', 'asciitilde',
+	    'Adieresis', 'Aring', 'Ccedilla', 'Eacute', 'Ntilde', 'Odieresis', 'Udieresis', 'aacute', 'agrave',
+	    'acircumflex', 'adieresis', 'atilde', 'aring', 'ccedilla', 'eacute', 'egrave', 'ecircumflex', 'edieresis',
+	    'iacute', 'igrave', 'icircumflex', 'idieresis', 'ntilde', 'oacute', 'ograve', 'ocircumflex', 'odieresis',
+	    'otilde', 'uacute', 'ugrave', 'ucircumflex', 'udieresis', 'dagger', 'degree', 'cent', 'sterling', 'section',
+	    'bullet', 'paragraph', 'germandbls', 'registered', 'copyright', 'trademark', 'acute', 'dieresis', 'notequal',
+	    'AE', 'Oslash', 'infinity', 'plusminus', 'lessequal', 'greaterequal', 'yen', 'mu', 'partialdiff', 'summation',
+	    'product', 'pi', 'integral', 'ordfeminine', 'ordmasculine', 'Omega', 'ae', 'oslash', 'questiondown',
+	    'exclamdown', 'logicalnot', 'radical', 'florin', 'approxequal', 'Delta', 'guillemotleft', 'guillemotright',
+	    'ellipsis', 'nonbreakingspace', 'Agrave', 'Atilde', 'Otilde', 'OE', 'oe', 'endash', 'emdash', 'quotedblleft',
+	    'quotedblright', 'quoteleft', 'quoteright', 'divide', 'lozenge', 'ydieresis', 'Ydieresis', 'fraction',
+	    'currency', 'guilsinglleft', 'guilsinglright', 'fi', 'fl', 'daggerdbl', 'periodcentered', 'quotesinglbase',
+	    'quotedblbase', 'perthousand', 'Acircumflex', 'Ecircumflex', 'Aacute', 'Edieresis', 'Egrave', 'Iacute',
+	    'Icircumflex', 'Idieresis', 'Igrave', 'Oacute', 'Ocircumflex', 'apple', 'Ograve', 'Uacute', 'Ucircumflex',
+	    'Ugrave', 'dotlessi', 'circumflex', 'tilde', 'macron', 'breve', 'dotaccent', 'ring', 'cedilla', 'hungarumlaut',
+	    'ogonek', 'caron', 'Lslash', 'lslash', 'Scaron', 'scaron', 'Zcaron', 'zcaron', 'brokenbar', 'Eth', 'eth',
+	    'Yacute', 'yacute', 'Thorn', 'thorn', 'minus', 'multiply', 'onesuperior', 'twosuperior', 'threesuperior',
+	    'onehalf', 'onequarter', 'threequarters', 'franc', 'Gbreve', 'gbreve', 'Idotaccent', 'Scedilla', 'scedilla',
+	    'Cacute', 'cacute', 'Ccaron', 'ccaron', 'dcroat'];
+	
+	/**
+	 * This is the encoding used for fonts created from scratch.
+	 * It loops through all glyphs and finds the appropriate unicode value.
+	 * Since it's linear time, other encodings will be faster.
+	 * @exports opentype.DefaultEncoding
+	 * @class
+	 * @constructor
+	 * @param {opentype.Font}
+	 */
+	function DefaultEncoding(font) {
+	    this.font = font;
+	}
+	
+	DefaultEncoding.prototype.charToGlyphIndex = function(c) {
+	    var code = c.charCodeAt(0);
+	    var glyphs = this.font.glyphs;
+	    if (glyphs) {
+	        for (var i = 0; i < glyphs.length; i += 1) {
+	            var glyph = glyphs.get(i);
+	            for (var j = 0; j < glyph.unicodes.length; j += 1) {
+	                if (glyph.unicodes[j] === code) {
+	                    return i;
+	                }
+	            }
+	        }
+	    }
+	    return null;
+	};
+	
+	/**
+	 * @exports opentype.CmapEncoding
+	 * @class
+	 * @constructor
+	 * @param {Object} cmap - a object with the cmap encoded data
+	 */
+	function CmapEncoding(cmap) {
+	    this.cmap = cmap;
+	}
+	
+	/**
+	 * @param  {string} c - the character
+	 * @return {number} The glyph index.
+	 */
+	CmapEncoding.prototype.charToGlyphIndex = function(c) {
+	    return this.cmap.glyphIndexMap[c.charCodeAt(0)] || 0;
+	};
+	
+	/**
+	 * @exports opentype.CffEncoding
+	 * @class
+	 * @constructor
+	 * @param {string} encoding - The encoding
+	 * @param {Array} charset - The character set.
+	 */
+	function CffEncoding(encoding, charset) {
+	    this.encoding = encoding;
+	    this.charset = charset;
+	}
+	
+	/**
+	 * @param  {string} s - The character
+	 * @return {number} The index.
+	 */
+	CffEncoding.prototype.charToGlyphIndex = function(s) {
+	    var code = s.charCodeAt(0);
+	    var charName = this.encoding[code];
+	    return this.charset.indexOf(charName);
+	};
+	
+	/**
+	 * @exports opentype.GlyphNames
+	 * @class
+	 * @constructor
+	 * @param {Object} post
+	 */
+	function GlyphNames(post) {
+	    var this$1 = this;
+	
+	    switch (post.version) {
+	        case 1:
+	            this.names = standardNames.slice();
+	            break;
+	        case 2:
+	            this.names = new Array(post.numberOfGlyphs);
+	            for (var i = 0; i < post.numberOfGlyphs; i++) {
+	                if (post.glyphNameIndex[i] < standardNames.length) {
+	                    this$1.names[i] = standardNames[post.glyphNameIndex[i]];
+	                } else {
+	                    this$1.names[i] = post.names[post.glyphNameIndex[i] - standardNames.length];
+	                }
+	            }
+	
+	            break;
+	        case 2.5:
+	            this.names = new Array(post.numberOfGlyphs);
+	            for (var i$1 = 0; i$1 < post.numberOfGlyphs; i$1++) {
+	                this$1.names[i$1] = standardNames[i$1 + post.glyphNameIndex[i$1]];
+	            }
+	
+	            break;
+	        case 3:
+	            this.names = [];
+	            break;
+	        default:
+	            this.names = [];
+	            break;
+	    }
+	}
+	
+	/**
+	 * Gets the index of a glyph by name.
+	 * @param  {string} name - The glyph name
+	 * @return {number} The index
+	 */
+	GlyphNames.prototype.nameToGlyphIndex = function(name) {
+	    return this.names.indexOf(name);
+	};
+	
+	/**
+	 * @param  {number} gid
+	 * @return {string}
+	 */
+	GlyphNames.prototype.glyphIndexToName = function(gid) {
+	    return this.names[gid];
+	};
+	
+	/**
+	 * @alias opentype.addGlyphNames
+	 * @param {opentype.Font}
+	 */
+	function addGlyphNames(font) {
+	    var glyph;
+	    var glyphIndexMap = font.tables.cmap.glyphIndexMap;
+	    var charCodes = Object.keys(glyphIndexMap);
+	
+	    for (var i = 0; i < charCodes.length; i += 1) {
+	        var c = charCodes[i];
+	        var glyphIndex = glyphIndexMap[c];
+	        glyph = font.glyphs.get(glyphIndex);
+	        glyph.addUnicode(parseInt(c));
+	    }
+	
+	    for (var i$1 = 0; i$1 < font.glyphs.length; i$1 += 1) {
+	        glyph = font.glyphs.get(i$1);
+	        if (font.cffEncoding) {
+	            if (font.isCIDFont) {
+	                glyph.name = 'gid' + i$1;
+	            } else {
+	                glyph.name = font.cffEncoding.charset[i$1];
+	            }
+	        } else if (font.glyphNames.names) {
+	            glyph.name = font.glyphNames.glyphIndexToName(i$1);
+	        }
+	    }
+	}
+	
+	// Drawing utility functions.
+	
+	// Draw a line on the given context from point `x1,y1` to point `x2,y2`.
+	function line(ctx, x1, y1, x2, y2) {
+	    ctx.beginPath();
+	    ctx.moveTo(x1, y1);
+	    ctx.lineTo(x2, y2);
+	    ctx.stroke();
+	}
+	
+	var draw = { line: line };
+	
+	// The `glyf` table describes the glyphs in TrueType outline format.
+	// http://www.microsoft.com/typography/otspec/glyf.htm
+	
+	// Parse the coordinate data for a glyph.
+	function parseGlyphCoordinate(p, flag, previousValue, shortVectorBitMask, sameBitMask) {
+	    var v;
+	    if ((flag & shortVectorBitMask) > 0) {
+	        // The coordinate is 1 byte long.
+	        v = p.parseByte();
+	        // The `same` bit is re-used for short values to signify the sign of the value.
+	        if ((flag & sameBitMask) === 0) {
+	            v = -v;
+	        }
+	
+	        v = previousValue + v;
+	    } else {
+	        //  The coordinate is 2 bytes long.
+	        // If the `same` bit is set, the coordinate is the same as the previous coordinate.
+	        if ((flag & sameBitMask) > 0) {
+	            v = previousValue;
+	        } else {
+	            // Parse the coordinate as a signed 16-bit delta value.
+	            v = previousValue + p.parseShort();
+	        }
+	    }
+	
+	    return v;
+	}
+	
+	// Parse a TrueType glyph.
+	function parseGlyph(glyph, data, start) {
+	    var p = new parse.Parser(data, start);
+	    glyph.numberOfContours = p.parseShort();
+	    glyph._xMin = p.parseShort();
+	    glyph._yMin = p.parseShort();
+	    glyph._xMax = p.parseShort();
+	    glyph._yMax = p.parseShort();
+	    var flags;
+	    var flag;
+	
+	    if (glyph.numberOfContours > 0) {
+	        // This glyph is not a composite.
+	        var endPointIndices = glyph.endPointIndices = [];
+	        for (var i = 0; i < glyph.numberOfContours; i += 1) {
+	            endPointIndices.push(p.parseUShort());
+	        }
+	
+	        glyph.instructionLength = p.parseUShort();
+	        glyph.instructions = [];
+	        for (var i$1 = 0; i$1 < glyph.instructionLength; i$1 += 1) {
+	            glyph.instructions.push(p.parseByte());
+	        }
+	
+	        var numberOfCoordinates = endPointIndices[endPointIndices.length - 1] + 1;
+	        flags = [];
+	        for (var i$2 = 0; i$2 < numberOfCoordinates; i$2 += 1) {
+	            flag = p.parseByte();
+	            flags.push(flag);
+	            // If bit 3 is set, we repeat this flag n times, where n is the next byte.
+	            if ((flag & 8) > 0) {
+	                var repeatCount = p.parseByte();
+	                for (var j = 0; j < repeatCount; j += 1) {
+	                    flags.push(flag);
+	                    i$2 += 1;
+	                }
+	            }
+	        }
+	
+	        check.argument(flags.length === numberOfCoordinates, 'Bad flags.');
+	
+	        if (endPointIndices.length > 0) {
+	            var points = [];
+	            var point;
+	            // X/Y coordinates are relative to the previous point, except for the first point which is relative to 0,0.
+	            if (numberOfCoordinates > 0) {
+	                for (var i$3 = 0; i$3 < numberOfCoordinates; i$3 += 1) {
+	                    flag = flags[i$3];
+	                    point = {};
+	                    point.onCurve = !!(flag & 1);
+	                    point.lastPointOfContour = endPointIndices.indexOf(i$3) >= 0;
+	                    points.push(point);
+	                }
+	
+	                var px = 0;
+	                for (var i$4 = 0; i$4 < numberOfCoordinates; i$4 += 1) {
+	                    flag = flags[i$4];
+	                    point = points[i$4];
+	                    point.x = parseGlyphCoordinate(p, flag, px, 2, 16);
+	                    px = point.x;
+	                }
+	
+	                var py = 0;
+	                for (var i$5 = 0; i$5 < numberOfCoordinates; i$5 += 1) {
+	                    flag = flags[i$5];
+	                    point = points[i$5];
+	                    point.y = parseGlyphCoordinate(p, flag, py, 4, 32);
+	                    py = point.y;
+	                }
+	            }
+	
+	            glyph.points = points;
+	        } else {
+	            glyph.points = [];
+	        }
+	    } else if (glyph.numberOfContours === 0) {
+	        glyph.points = [];
+	    } else {
+	        glyph.isComposite = true;
+	        glyph.points = [];
+	        glyph.components = [];
+	        var moreComponents = true;
+	        while (moreComponents) {
+	            flags = p.parseUShort();
+	            var component = {
+	                glyphIndex: p.parseUShort(),
+	                xScale: 1,
+	                scale01: 0,
+	                scale10: 0,
+	                yScale: 1,
+	                dx: 0,
+	                dy: 0
+	            };
+	            if ((flags & 1) > 0) {
+	                // The arguments are words
+	                if ((flags & 2) > 0) {
+	                    // values are offset
+	                    component.dx = p.parseShort();
+	                    component.dy = p.parseShort();
+	                } else {
+	                    // values are matched points
+	                    component.matchedPoints = [p.parseUShort(), p.parseUShort()];
+	                }
+	
+	            } else {
+	                // The arguments are bytes
+	                if ((flags & 2) > 0) {
+	                    // values are offset
+	                    component.dx = p.parseChar();
+	                    component.dy = p.parseChar();
+	                } else {
+	                    // values are matched points
+	                    component.matchedPoints = [p.parseByte(), p.parseByte()];
+	                }
+	            }
+	
+	            if ((flags & 8) > 0) {
+	                // We have a scale
+	                component.xScale = component.yScale = p.parseF2Dot14();
+	            } else if ((flags & 64) > 0) {
+	                // We have an X / Y scale
+	                component.xScale = p.parseF2Dot14();
+	                component.yScale = p.parseF2Dot14();
+	            } else if ((flags & 128) > 0) {
+	                // We have a 2x2 transformation
+	                component.xScale = p.parseF2Dot14();
+	                component.scale01 = p.parseF2Dot14();
+	                component.scale10 = p.parseF2Dot14();
+	                component.yScale = p.parseF2Dot14();
+	            }
+	
+	            glyph.components.push(component);
+	            moreComponents = !!(flags & 32);
+	        }
+	        if (flags & 0x100) {
+	            // We have instructions
+	            glyph.instructionLength = p.parseUShort();
+	            glyph.instructions = [];
+	            for (var i$6 = 0; i$6 < glyph.instructionLength; i$6 += 1) {
+	                glyph.instructions.push(p.parseByte());
+	            }
+	        }
+	    }
+	}
+	
+	// Transform an array of points and return a new array.
+	function transformPoints(points, transform) {
+	    var newPoints = [];
+	    for (var i = 0; i < points.length; i += 1) {
+	        var pt = points[i];
+	        var newPt = {
+	            x: transform.xScale * pt.x + transform.scale01 * pt.y + transform.dx,
+	            y: transform.scale10 * pt.x + transform.yScale * pt.y + transform.dy,
+	            onCurve: pt.onCurve,
+	            lastPointOfContour: pt.lastPointOfContour
+	        };
+	        newPoints.push(newPt);
+	    }
+	
+	    return newPoints;
+	}
+	
+	function getContours(points) {
+	    var contours = [];
+	    var currentContour = [];
+	    for (var i = 0; i < points.length; i += 1) {
+	        var pt = points[i];
+	        currentContour.push(pt);
+	        if (pt.lastPointOfContour) {
+	            contours.push(currentContour);
+	            currentContour = [];
+	        }
+	    }
+	
+	    check.argument(currentContour.length === 0, 'There are still points left in the current contour.');
+	    return contours;
+	}
+	
+	// Convert the TrueType glyph outline to a Path.
+	function getPath(points) {
+	    var p = new Path();
+	    if (!points) {
+	        return p;
+	    }
+	
+	    var contours = getContours(points);
+	
+	    for (var contourIndex = 0; contourIndex < contours.length; ++contourIndex) {
+	        var contour = contours[contourIndex];
+	
+	        var prev = null;
+	        var curr = contour[contour.length - 1];
+	        var next = contour[0];
+	
+	        if (curr.onCurve) {
+	            p.moveTo(curr.x, curr.y);
+	        } else {
+	            if (next.onCurve) {
+	                p.moveTo(next.x, next.y);
+	            } else {
+	                // If both first and last points are off-curve, start at their middle.
+	                var start = {x: (curr.x + next.x) * 0.5, y: (curr.y + next.y) * 0.5};
+	                p.moveTo(start.x, start.y);
+	            }
+	        }
+	
+	        for (var i = 0; i < contour.length; ++i) {
+	            prev = curr;
+	            curr = next;
+	            next = contour[(i + 1) % contour.length];
+	
+	            if (curr.onCurve) {
+	                // This is a straight line.
+	                p.lineTo(curr.x, curr.y);
+	            } else {
+	                var prev2 = prev;
+	                var next2 = next;
+	
+	                if (!prev.onCurve) {
+	                    prev2 = { x: (curr.x + prev.x) * 0.5, y: (curr.y + prev.y) * 0.5 };
+	                    p.lineTo(prev2.x, prev2.y);
+	                }
+	
+	                if (!next.onCurve) {
+	                    next2 = { x: (curr.x + next.x) * 0.5, y: (curr.y + next.y) * 0.5 };
+	                }
+	
+	                p.lineTo(prev2.x, prev2.y);
+	                p.quadraticCurveTo(curr.x, curr.y, next2.x, next2.y);
+	            }
+	        }
+	
+	        p.closePath();
+	    }
+	    return p;
+	}
+	
+	function buildPath(glyphs, glyph) {
+	    if (glyph.isComposite) {
+	        for (var j = 0; j < glyph.components.length; j += 1) {
+	            var component = glyph.components[j];
+	            var componentGlyph = glyphs.get(component.glyphIndex);
+	            // Force the ttfGlyphLoader to parse the glyph.
+	            componentGlyph.getPath();
+	            if (componentGlyph.points) {
+	                var transformedPoints = (void 0);
+	                if (component.matchedPoints === undefined) {
+	                    // component positioned by offset
+	                    transformedPoints = transformPoints(componentGlyph.points, component);
+	                } else {
+	                    // component positioned by matched points
+	                    if ((component.matchedPoints[0] > glyph.points.length - 1) ||
+	                        (component.matchedPoints[1] > componentGlyph.points.length - 1)) {
+	                        throw Error('Matched points out of range in ' + glyph.name);
+	                    }
+	                    var firstPt = glyph.points[component.matchedPoints[0]];
+	                    var secondPt = componentGlyph.points[component.matchedPoints[1]];
+	                    var transform = {
+	                        xScale: component.xScale, scale01: component.scale01,
+	                        scale10: component.scale10, yScale: component.yScale,
+	                        dx: 0, dy: 0
+	                    };
+	                    secondPt = transformPoints([secondPt], transform)[0];
+	                    transform.dx = firstPt.x - secondPt.x;
+	                    transform.dy = firstPt.y - secondPt.y;
+	                    transformedPoints = transformPoints(componentGlyph.points, transform);
+	                }
+	                glyph.points = glyph.points.concat(transformedPoints);
+	            }
+	        }
+	    }
+	
+	    return getPath(glyph.points);
+	}
+	
+	// Parse all the glyphs according to the offsets from the `loca` table.
+	function parseGlyfTable(data, start, loca, font) {
+	    var glyphs = new glyphset.GlyphSet(font);
+	
+	    // The last element of the loca table is invalid.
+	    for (var i = 0; i < loca.length - 1; i += 1) {
+	        var offset = loca[i];
+	        var nextOffset = loca[i + 1];
+	        if (offset !== nextOffset) {
+	            glyphs.push(i, glyphset.ttfGlyphLoader(font, i, parseGlyph, data, start + offset, buildPath));
+	        } else {
+	            glyphs.push(i, glyphset.glyphLoader(font, i));
+	        }
+	    }
+	
+	    return glyphs;
+	}
+	
+	var glyf = { getPath: getPath, parse: parseGlyfTable };
+	
+	// The Glyph object
+	
+	function getPathDefinition(glyph, path) {
+	    var _path = path || {commands: []};
+	    return {
+	        configurable: true,
+	
+	        get: function() {
+	            if (typeof _path === 'function') {
+	                _path = _path();
+	            }
+	
+	            return _path;
+	        },
+	
+	        set: function(p) {
+	            _path = p;
+	        }
+	    };
+	}
+	/**
+	 * @typedef GlyphOptions
+	 * @type Object
+	 * @property {string} [name] - The glyph name
+	 * @property {number} [unicode]
+	 * @property {Array} [unicodes]
+	 * @property {number} [xMin]
+	 * @property {number} [yMin]
+	 * @property {number} [xMax]
+	 * @property {number} [yMax]
+	 * @property {number} [advanceWidth]
+	 */
+	
+	// A Glyph is an individual mark that often corresponds to a character.
+	// Some glyphs, such as ligatures, are a combination of many characters.
+	// Glyphs are the basic building blocks of a font.
+	//
+	// The `Glyph` class contains utility methods for drawing the path and its points.
+	/**
+	 * @exports opentype.Glyph
+	 * @class
+	 * @param {GlyphOptions}
+	 * @constructor
+	 */
+	function Glyph(options) {
+	    // By putting all the code on a prototype function (which is only declared once)
+	    // we reduce the memory requirements for larger fonts by some 2%
+	    this.bindConstructorValues(options);
+	}
+	
+	/**
+	 * @param  {GlyphOptions}
+	 */
+	Glyph.prototype.bindConstructorValues = function(options) {
+	    this.index = options.index || 0;
+	
+	    // These three values cannot be deferred for memory optimization:
+	    this.name = options.name || null;
+	    this.unicode = options.unicode || undefined;
+	    this.unicodes = options.unicodes || options.unicode !== undefined ? [options.unicode] : [];
+	
+	    // But by binding these values only when necessary, we reduce can
+	    // the memory requirements by almost 3% for larger fonts.
+	    if (options.xMin) {
+	        this.xMin = options.xMin;
+	    }
+	
+	    if (options.yMin) {
+	        this.yMin = options.yMin;
+	    }
+	
+	    if (options.xMax) {
+	        this.xMax = options.xMax;
+	    }
+	
+	    if (options.yMax) {
+	        this.yMax = options.yMax;
+	    }
+	
+	    if (options.advanceWidth) {
+	        this.advanceWidth = options.advanceWidth;
+	    }
+	
+	    // The path for a glyph is the most memory intensive, and is bound as a value
+	    // with a getter/setter to ensure we actually do path parsing only once the
+	    // path is actually needed by anything.
+	    Object.defineProperty(this, 'path', getPathDefinition(this, options.path));
+	};
+	
+	/**
+	 * @param {number}
+	 */
+	Glyph.prototype.addUnicode = function(unicode) {
+	    if (this.unicodes.length === 0) {
+	        this.unicode = unicode;
+	    }
+	
+	    this.unicodes.push(unicode);
+	};
+	
+	/**
+	 * Calculate the minimum bounding box for this glyph.
+	 * @return {opentype.BoundingBox}
+	 */
+	Glyph.prototype.getBoundingBox = function() {
+	    return this.path.getBoundingBox();
+	};
+	
+	/**
+	 * Convert the glyph to a Path we can draw on a drawing context.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {Object=} options - xScale, yScale to stretch the glyph.
+	 * @param  {opentype.Font} if hinting is to be used, the font
+	 * @return {opentype.Path}
+	 */
+	Glyph.prototype.getPath = function(x, y, fontSize, options, font) {
+	    x = x !== undefined ? x : 0;
+	    y = y !== undefined ? y : 0;
+	    fontSize = fontSize !== undefined ? fontSize : 72;
+	    var commands;
+	    var hPoints;
+	    if (!options) { options = { }; }
+	    var xScale = options.xScale;
+	    var yScale = options.yScale;
+	
+	    if (options.hinting && font && font.hinting) {
+	        // in case of hinting, the hinting engine takes care
+	        // of scaling the points (not the path) before hinting.
+	        hPoints = this.path && font.hinting.exec(this, fontSize);
+	        // in case the hinting engine failed hPoints is undefined
+	        // and thus reverts to plain rending
+	    }
+	
+	    if (hPoints) {
+	        commands = glyf.getPath(hPoints).commands;
+	        x = Math.round(x);
+	        y = Math.round(y);
+	        // TODO in case of hinting xyScaling is not yet supported
+	        xScale = yScale = 1;
+	    } else {
+	        commands = this.path.commands;
+	        var scale = 1 / this.path.unitsPerEm * fontSize;
+	        if (xScale === undefined) { xScale = scale; }
+	        if (yScale === undefined) { yScale = scale; }
+	    }
+	
+	    var p = new Path();
+	    for (var i = 0; i < commands.length; i += 1) {
+	        var cmd = commands[i];
+	        if (cmd.type === 'M') {
+	            p.moveTo(x + (cmd.x * xScale), y + (-cmd.y * yScale));
+	        } else if (cmd.type === 'L') {
+	            p.lineTo(x + (cmd.x * xScale), y + (-cmd.y * yScale));
+	        } else if (cmd.type === 'Q') {
+	            p.quadraticCurveTo(x + (cmd.x1 * xScale), y + (-cmd.y1 * yScale),
+	                               x + (cmd.x * xScale), y + (-cmd.y * yScale));
+	        } else if (cmd.type === 'C') {
+	            p.curveTo(x + (cmd.x1 * xScale), y + (-cmd.y1 * yScale),
+	                      x + (cmd.x2 * xScale), y + (-cmd.y2 * yScale),
+	                      x + (cmd.x * xScale), y + (-cmd.y * yScale));
+	        } else if (cmd.type === 'Z') {
+	            p.closePath();
+	        }
+	    }
+	
+	    return p;
+	};
+	
+	/**
+	 * Split the glyph into contours.
+	 * This function is here for backwards compatibility, and to
+	 * provide raw access to the TrueType glyph outlines.
+	 * @return {Array}
+	 */
+	Glyph.prototype.getContours = function() {
+	    var this$1 = this;
+	
+	    if (this.points === undefined) {
+	        return [];
+	    }
+	
+	    var contours = [];
+	    var currentContour = [];
+	    for (var i = 0; i < this.points.length; i += 1) {
+	        var pt = this$1.points[i];
+	        currentContour.push(pt);
+	        if (pt.lastPointOfContour) {
+	            contours.push(currentContour);
+	            currentContour = [];
+	        }
+	    }
+	
+	    check.argument(currentContour.length === 0, 'There are still points left in the current contour.');
+	    return contours;
+	};
+	
+	/**
+	 * Calculate the xMin/yMin/xMax/yMax/lsb/rsb for a Glyph.
+	 * @return {Object}
+	 */
+	Glyph.prototype.getMetrics = function() {
+	    var commands = this.path.commands;
+	    var xCoords = [];
+	    var yCoords = [];
+	    for (var i = 0; i < commands.length; i += 1) {
+	        var cmd = commands[i];
+	        if (cmd.type !== 'Z') {
+	            xCoords.push(cmd.x);
+	            yCoords.push(cmd.y);
+	        }
+	
+	        if (cmd.type === 'Q' || cmd.type === 'C') {
+	            xCoords.push(cmd.x1);
+	            yCoords.push(cmd.y1);
+	        }
+	
+	        if (cmd.type === 'C') {
+	            xCoords.push(cmd.x2);
+	            yCoords.push(cmd.y2);
+	        }
+	    }
+	
+	    var metrics = {
+	        xMin: Math.min.apply(null, xCoords),
+	        yMin: Math.min.apply(null, yCoords),
+	        xMax: Math.max.apply(null, xCoords),
+	        yMax: Math.max.apply(null, yCoords),
+	        leftSideBearing: this.leftSideBearing
+	    };
+	
+	    if (!isFinite(metrics.xMin)) {
+	        metrics.xMin = 0;
+	    }
+	
+	    if (!isFinite(metrics.xMax)) {
+	        metrics.xMax = this.advanceWidth;
+	    }
+	
+	    if (!isFinite(metrics.yMin)) {
+	        metrics.yMin = 0;
+	    }
+	
+	    if (!isFinite(metrics.yMax)) {
+	        metrics.yMax = 0;
+	    }
+	
+	    metrics.rightSideBearing = this.advanceWidth - metrics.leftSideBearing - (metrics.xMax - metrics.xMin);
+	    return metrics;
+	};
+	
+	/**
+	 * Draw the glyph on the given context.
+	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {Object=} options - xScale, yScale to stretch the glyph.
+	 */
+	Glyph.prototype.draw = function(ctx, x, y, fontSize, options) {
+	    this.getPath(x, y, fontSize, options).draw(ctx);
+	};
+	
+	/**
+	 * Draw the points of the glyph.
+	 * On-curve points will be drawn in blue, off-curve points will be drawn in red.
+	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 */
+	Glyph.prototype.drawPoints = function(ctx, x, y, fontSize) {
+	    function drawCircles(l, x, y, scale) {
+	        var PI_SQ = Math.PI * 2;
+	        ctx.beginPath();
+	        for (var j = 0; j < l.length; j += 1) {
+	            ctx.moveTo(x + (l[j].x * scale), y + (l[j].y * scale));
+	            ctx.arc(x + (l[j].x * scale), y + (l[j].y * scale), 2, 0, PI_SQ, false);
+	        }
+	
+	        ctx.closePath();
+	        ctx.fill();
+	    }
+	
+	    x = x !== undefined ? x : 0;
+	    y = y !== undefined ? y : 0;
+	    fontSize = fontSize !== undefined ? fontSize : 24;
+	    var scale = 1 / this.path.unitsPerEm * fontSize;
+	
+	    var blueCircles = [];
+	    var redCircles = [];
+	    var path = this.path;
+	    for (var i = 0; i < path.commands.length; i += 1) {
+	        var cmd = path.commands[i];
+	        if (cmd.x !== undefined) {
+	            blueCircles.push({x: cmd.x, y: -cmd.y});
+	        }
+	
+	        if (cmd.x1 !== undefined) {
+	            redCircles.push({x: cmd.x1, y: -cmd.y1});
+	        }
+	
+	        if (cmd.x2 !== undefined) {
+	            redCircles.push({x: cmd.x2, y: -cmd.y2});
+	        }
+	    }
+	
+	    ctx.fillStyle = 'blue';
+	    drawCircles(blueCircles, x, y, scale);
+	    ctx.fillStyle = 'red';
+	    drawCircles(redCircles, x, y, scale);
+	};
+	
+	/**
+	 * Draw lines indicating important font measurements.
+	 * Black lines indicate the origin of the coordinate system (point 0,0).
+	 * Blue lines indicate the glyph bounding box.
+	 * Green line indicates the advance width of the glyph.
+	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 */
+	Glyph.prototype.drawMetrics = function(ctx, x, y, fontSize) {
+	    var scale;
+	    x = x !== undefined ? x : 0;
+	    y = y !== undefined ? y : 0;
+	    fontSize = fontSize !== undefined ? fontSize : 24;
+	    scale = 1 / this.path.unitsPerEm * fontSize;
+	    ctx.lineWidth = 1;
+	
+	    // Draw the origin
+	    ctx.strokeStyle = 'black';
+	    draw.line(ctx, x, -10000, x, 10000);
+	    draw.line(ctx, -10000, y, 10000, y);
+	
+	    // This code is here due to memory optimization: by not using
+	    // defaults in the constructor, we save a notable amount of memory.
+	    var xMin = this.xMin || 0;
+	    var yMin = this.yMin || 0;
+	    var xMax = this.xMax || 0;
+	    var yMax = this.yMax || 0;
+	    var advanceWidth = this.advanceWidth || 0;
+	
+	    // Draw the glyph box
+	    ctx.strokeStyle = 'blue';
+	    draw.line(ctx, x + (xMin * scale), -10000, x + (xMin * scale), 10000);
+	    draw.line(ctx, x + (xMax * scale), -10000, x + (xMax * scale), 10000);
+	    draw.line(ctx, -10000, y + (-yMin * scale), 10000, y + (-yMin * scale));
+	    draw.line(ctx, -10000, y + (-yMax * scale), 10000, y + (-yMax * scale));
+	
+	    // Draw the advance width
+	    ctx.strokeStyle = 'green';
+	    draw.line(ctx, x + (advanceWidth * scale), -10000, x + (advanceWidth * scale), 10000);
+	};
+	
+	// The GlyphSet object
+	
+	// Define a property on the glyph that depends on the path being loaded.
+	function defineDependentProperty(glyph, externalName, internalName) {
+	    Object.defineProperty(glyph, externalName, {
+	        get: function() {
+	            // Request the path property to make sure the path is loaded.
+	            glyph.path; // jshint ignore:line
+	            return glyph[internalName];
+	        },
+	        set: function(newValue) {
+	            glyph[internalName] = newValue;
+	        },
+	        enumerable: true,
+	        configurable: true
+	    });
+	}
+	
+	/**
+	 * A GlyphSet represents all glyphs available in the font, but modelled using
+	 * a deferred glyph loader, for retrieving glyphs only once they are absolutely
+	 * necessary, to keep the memory footprint down.
+	 * @exports opentype.GlyphSet
+	 * @class
+	 * @param {opentype.Font}
+	 * @param {Array}
+	 */
+	function GlyphSet(font, glyphs) {
+	    var this$1 = this;
+	
+	    this.font = font;
+	    this.glyphs = {};
+	    if (Array.isArray(glyphs)) {
+	        for (var i = 0; i < glyphs.length; i++) {
+	            this$1.glyphs[i] = glyphs[i];
+	        }
+	    }
+	
+	    this.length = (glyphs && glyphs.length) || 0;
+	}
+	
+	/**
+	 * @param  {number} index
+	 * @return {opentype.Glyph}
+	 */
+	GlyphSet.prototype.get = function(index) {
+	    if (typeof this.glyphs[index] === 'function') {
+	        this.glyphs[index] = this.glyphs[index]();
+	    }
+	
+	    return this.glyphs[index];
+	};
+	
+	/**
+	 * @param  {number} index
+	 * @param  {Object}
+	 */
+	GlyphSet.prototype.push = function(index, loader) {
+	    this.glyphs[index] = loader;
+	    this.length++;
+	};
+	
+	/**
+	 * @alias opentype.glyphLoader
+	 * @param  {opentype.Font} font
+	 * @param  {number} index
+	 * @return {opentype.Glyph}
+	 */
+	function glyphLoader(font, index) {
+	    return new Glyph({index: index, font: font});
+	}
+	
+	/**
+	 * Generate a stub glyph that can be filled with all metadata *except*
+	 * the "points" and "path" properties, which must be loaded only once
+	 * the glyph's path is actually requested for text shaping.
+	 * @alias opentype.ttfGlyphLoader
+	 * @param  {opentype.Font} font
+	 * @param  {number} index
+	 * @param  {Function} parseGlyph
+	 * @param  {Object} data
+	 * @param  {number} position
+	 * @param  {Function} buildPath
+	 * @return {opentype.Glyph}
+	 */
+	function ttfGlyphLoader(font, index, parseGlyph, data, position, buildPath) {
+	    return function() {
+	        var glyph = new Glyph({index: index, font: font});
+	
+	        glyph.path = function() {
+	            parseGlyph(glyph, data, position);
+	            var path = buildPath(font.glyphs, glyph);
+	            path.unitsPerEm = font.unitsPerEm;
+	            return path;
+	        };
+	
+	        defineDependentProperty(glyph, 'xMin', '_xMin');
+	        defineDependentProperty(glyph, 'xMax', '_xMax');
+	        defineDependentProperty(glyph, 'yMin', '_yMin');
+	        defineDependentProperty(glyph, 'yMax', '_yMax');
+	
+	        return glyph;
+	    };
+	}
+	/**
+	 * @alias opentype.cffGlyphLoader
+	 * @param  {opentype.Font} font
+	 * @param  {number} index
+	 * @param  {Function} parseCFFCharstring
+	 * @param  {string} charstring
+	 * @return {opentype.Glyph}
+	 */
+	function cffGlyphLoader(font, index, parseCFFCharstring, charstring) {
+	    return function() {
+	        var glyph = new Glyph({index: index, font: font});
+	
+	        glyph.path = function() {
+	            var path = parseCFFCharstring(font, glyph, charstring);
+	            path.unitsPerEm = font.unitsPerEm;
+	            return path;
+	        };
+	
+	        return glyph;
+	    };
+	}
+	
+	var glyphset = { GlyphSet: GlyphSet, glyphLoader: glyphLoader, ttfGlyphLoader: ttfGlyphLoader, cffGlyphLoader: cffGlyphLoader };
+	
 	// The `CFF` table contains the glyph outlines in PostScript format.
 	// https://www.microsoft.com/typography/OTSPEC/cff.htm
 	// http://download.microsoft.com/download/8/0/1/801a191c-029d-4af3-9642-555f6fe514ee/cff.pdf
 	// http://download.microsoft.com/download/8/0/1/801a191c-029d-4af3-9642-555f6fe514ee/type2.pdf
-	
-	'use strict';
-	
-	var encoding = __webpack_require__(4);
-	var glyphset = __webpack_require__(14);
-	var parse = __webpack_require__(12);
-	var path = __webpack_require__(6);
-	var table = __webpack_require__(9);
 	
 	// Custom equals function that can also check lists.
 	function equals(a, b) {
@@ -4052,21 +3959,34 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	}
 	
+	// Subroutines are encoded using the negative half of the number space.
+	// See type 2 chapter 4.7 "Subroutine operators".
+	function calcCFFSubroutineBias(subrs) {
+	    var bias;
+	    if (subrs.length < 1240) {
+	        bias = 107;
+	    } else if (subrs.length < 33900) {
+	        bias = 1131;
+	    } else {
+	        bias = 32768;
+	    }
+	
+	    return bias;
+	}
+	
 	// Parse a `CFF` INDEX array.
 	// An index array consists of a list of offsets, then a list of objects at those offsets.
 	function parseCFFIndex(data, start, conversionFn) {
-	    //var i, objectOffset, endOffset;
 	    var offsets = [];
 	    var objects = [];
 	    var count = parse.getCard16(data, start);
-	    var i;
 	    var objectOffset;
 	    var endOffset;
 	    if (count !== 0) {
 	        var offsetSize = parse.getByte(data, start + 2);
 	        objectOffset = start + ((count + 1) * offsetSize) + 2;
 	        var pos = start + 3;
-	        for (i = 0; i < count + 1; i += 1) {
+	        for (var i = 0; i < count + 1; i += 1) {
 	            offsets.push(parse.getOffset(data, pos, offsetSize));
 	            pos += offsetSize;
 	        }
@@ -4077,8 +3997,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        endOffset = start + 2;
 	    }
 	
-	    for (i = 0; i < offsets.length - 1; i += 1) {
-	        var value = parse.getBytes(data, objectOffset + offsets[i], objectOffset + offsets[i + 1]);
+	    for (var i$1 = 0; i$1 < offsets.length - 1; i$1 += 1) {
+	        var value = parse.getBytes(data, objectOffset + offsets[i$1], objectOffset + offsets[i$1 + 1]);
 	        if (conversionFn) {
 	            value = conversionFn(value);
 	        }
@@ -4163,14 +4083,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	    for (var i = 0; i < entries.length; i += 1) {
 	        var key = entries[i][0];
 	        var values = entries[i][1];
-	        var value;
+	        var value = (void 0);
 	        if (values.length === 1) {
 	            value = values[0];
 	        } else {
 	            value = values;
 	        }
 	
-	        if (o.hasOwnProperty(key)) {
+	        if (o.hasOwnProperty(key) && !isNaN(o[key])) {
 	            throw new Error('Object ' + o + ' already has key ' + key);
 	        }
 	
@@ -4216,7 +4136,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	// Strings below index 392 are standard CFF strings and are not encoded in the font.
 	function getCFFString(strings, index) {
 	    if (index <= 390) {
-	        index = encoding.cffStandardStrings[index];
+	        index = cffStandardStrings[index];
 	    } else {
 	        index = strings[index - 391];
 	    }
@@ -4228,21 +4148,38 @@ return /******/ (function(modules) { // webpackBootstrap
 	// This function takes `meta` which is a list of objects containing `operand`, `name` and `default`.
 	function interpretDict(dict, meta, strings) {
 	    var newDict = {};
+	    var value;
 	
 	    // Because we also want to include missing values, we start out from the meta list
 	    // and lookup values in the dict.
 	    for (var i = 0; i < meta.length; i += 1) {
 	        var m = meta[i];
-	        var value = dict[m.op];
-	        if (value === undefined) {
-	            value = m.value !== undefined ? m.value : null;
-	        }
 	
-	        if (m.type === 'SID') {
-	            value = getCFFString(strings, value);
-	        }
+	        if (Array.isArray(m.type)) {
+	            var values = [];
+	            values.length = m.type.length;
+	            for (var j = 0; j < m.type.length; j++) {
+	                value = dict[m.op] !== undefined ? dict[m.op][j] : undefined;
+	                if (value === undefined) {
+	                    value = m.value !== undefined && m.value[j] !== undefined ? m.value[j] : null;
+	                }
+	                if (m.type[j] === 'SID') {
+	                    value = getCFFString(strings, value);
+	                }
+	                values[j] = value;
+	            }
+	            newDict[m.name] = values;
+	        } else {
+	            value = dict[m.op];
+	            if (value === undefined) {
+	                value = m.value !== undefined ? m.value : null;
+	            }
 	
-	        newDict[m.name] = value;
+	            if (m.type === 'SID') {
+	                value = getCFFString(strings, value);
+	            }
+	            newDict[m.name] = value;
+	        }
 	    }
 	
 	    return newDict;
@@ -4273,7 +4210,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	    {name: 'underlineThickness', op: 1204, type: 'number', value: 50},
 	    {name: 'paintType', op: 1205, type: 'number', value: 0},
 	    {name: 'charstringType', op: 1206, type: 'number', value: 2},
-	    {name: 'fontMatrix', op: 1207, type: ['real', 'real', 'real', 'real', 'real', 'real'], value: [0.001, 0, 0, 0.001, 0, 0]},
+	    {
+	        name: 'fontMatrix',
+	        op: 1207,
+	        type: ['real', 'real', 'real', 'real', 'real', 'real'],
+	        value: [0.001, 0, 0, 0.001, 0, 0]
+	    },
 	    {name: 'uniqueId', op: 13, type: 'number'},
 	    {name: 'fontBBox', op: 5, type: ['number', 'number', 'number', 'number'], value: [0, 0, 0, 0]},
 	    {name: 'strokeWidth', op: 1208, type: 'number', value: 0},
@@ -4281,7 +4223,16 @@ return /******/ (function(modules) { // webpackBootstrap
 	    {name: 'charset', op: 15, type: 'offset', value: 0},
 	    {name: 'encoding', op: 16, type: 'offset', value: 0},
 	    {name: 'charStrings', op: 17, type: 'offset', value: 0},
-	    {name: 'private', op: 18, type: ['number', 'offset'], value: [0, 0]}
+	    {name: 'private', op: 18, type: ['number', 'offset'], value: [0, 0]},
+	    {name: 'ros', op: 1230, type: ['SID', 'SID', 'number']},
+	    {name: 'cidFontVersion', op: 1231, type: 'number', value: 0},
+	    {name: 'cidFontRevision', op: 1232, type: 'number', value: 0},
+	    {name: 'cidFontType', op: 1233, type: 'number', value: 0},
+	    {name: 'cidCount', op: 1234, type: 'number', value: 8720},
+	    {name: 'uidBase', op: 1235, type: 'number'},
+	    {name: 'fdArray', op: 1236, type: 'offset'},
+	    {name: 'fdSelect', op: 1237, type: 'offset'},
+	    {name: 'fontName', op: 1238, type: 'SID'}
 	];
 	
 	var PRIVATE_DICT_META = [
@@ -4303,11 +4254,51 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return interpretDict(dict, PRIVATE_DICT_META, strings);
 	}
 	
+	// Returns a list of "Top DICT"s found using an INDEX list.
+	// Used to read both the usual high-level Top DICTs and also the FDArray
+	// discovered inside CID-keyed fonts.  When a Top DICT has a reference to
+	// a Private DICT that is read and saved into the Top DICT.
+	//
+	// In addition to the expected/optional values as outlined in TOP_DICT_META
+	// the following values might be saved into the Top DICT.
+	//
+	//    _subrs []        array of local CFF subroutines from Private DICT
+	//    _subrsBias       bias value computed from number of subroutines
+	//                      (see calcCFFSubroutineBias() and parseCFFCharstring())
+	//    _defaultWidthX   default widths for CFF characters
+	//    _nominalWidthX   bias added to width embedded within glyph description
+	//
+	//    _privateDict     saved copy of parsed Private DICT from Top DICT
+	function gatherCFFTopDicts(data, start, cffIndex, strings) {
+	    var topDictArray = [];
+	    for (var iTopDict = 0; iTopDict < cffIndex.length; iTopDict += 1) {
+	        var topDictData = new DataView(new Uint8Array(cffIndex[iTopDict]).buffer);
+	        var topDict = parseCFFTopDict(topDictData, strings);
+	        topDict._subrs = [];
+	        topDict._subrsBias = 0;
+	        var privateSize = topDict.private[0];
+	        var privateOffset = topDict.private[1];
+	        if (privateSize !== 0 && privateOffset !== 0) {
+	            var privateDict = parseCFFPrivateDict(data, privateOffset + start, privateSize, strings);
+	            topDict._defaultWidthX = privateDict.defaultWidthX;
+	            topDict._nominalWidthX = privateDict.nominalWidthX;
+	            if (privateDict.subrs !== 0) {
+	                var subrOffset = privateOffset + privateDict.subrs;
+	                var subrIndex = parseCFFIndex(data, subrOffset + start);
+	                topDict._subrs = subrIndex.objects;
+	                topDict._subrsBias = calcCFFSubroutineBias(topDict._subrs);
+	            }
+	            topDict._privateDict = privateDict;
+	        }
+	        topDictArray.push(topDict);
+	    }
+	    return topDictArray;
+	}
+	
 	// Parse the CFF charset table, which contains internal names for all the glyphs.
 	// This function will return a list of glyph names.
 	// See Adobe TN #5176 chapter 13, "Charsets".
 	function parseCFFCharset(data, start, nGlyphs, strings) {
-	    var i;
 	    var sid;
 	    var count;
 	    var parser = new parse.Parser(data, start);
@@ -4318,7 +4309,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    var format = parser.parseCard8();
 	    if (format === 0) {
-	        for (i = 0; i < nGlyphs; i += 1) {
+	        for (var i = 0; i < nGlyphs; i += 1) {
 	            sid = parser.parseSID();
 	            charset.push(getCFFString(strings, sid));
 	        }
@@ -4326,7 +4317,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        while (charset.length <= nGlyphs) {
 	            sid = parser.parseSID();
 	            count = parser.parseCard8();
-	            for (i = 0; i <= count; i += 1) {
+	            for (var i$1 = 0; i$1 <= count; i$1 += 1) {
 	                charset.push(getCFFString(strings, sid));
 	                sid += 1;
 	            }
@@ -4335,7 +4326,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        while (charset.length <= nGlyphs) {
 	            sid = parser.parseSID();
 	            count = parser.parseCard16();
-	            for (i = 0; i <= count; i += 1) {
+	            for (var i$2 = 0; i$2 <= count; i$2 += 1) {
 	                charset.push(getCFFString(strings, sid));
 	                sid += 1;
 	            }
@@ -4350,21 +4341,20 @@ return /******/ (function(modules) { // webpackBootstrap
 	// Parse the CFF encoding data. Only one encoding can be specified per font.
 	// See Adobe TN #5176 chapter 12, "Encodings".
 	function parseCFFEncoding(data, start, charset) {
-	    var i;
 	    var code;
 	    var enc = {};
 	    var parser = new parse.Parser(data, start);
 	    var format = parser.parseCard8();
 	    if (format === 0) {
 	        var nCodes = parser.parseCard8();
-	        for (i = 0; i < nCodes; i += 1) {
+	        for (var i = 0; i < nCodes; i += 1) {
 	            code = parser.parseCard8();
 	            enc[code] = i;
 	        }
 	    } else if (format === 1) {
 	        var nRanges = parser.parseCard8();
 	        code = 1;
-	        for (i = 0; i < nRanges; i += 1) {
+	        for (var i$1 = 0; i$1 < nRanges; i$1 += 1) {
 	            var first = parser.parseCard8();
 	            var nLeft = parser.parseCard8();
 	            for (var j = first; j <= first + nLeft; j += 1) {
@@ -4376,7 +4366,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        throw new Error('Unknown encoding format ' + format);
 	    }
 	
-	    return new encoding.CffEncoding(enc, charset);
+	    return new CffEncoding(enc, charset);
 	}
 	
 	// Take in charstring code and return a Glyph object.
@@ -4387,14 +4377,31 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var c1y;
 	    var c2x;
 	    var c2y;
-	    var p = new path.Path();
+	    var p = new Path();
 	    var stack = [];
 	    var nStems = 0;
 	    var haveWidth = false;
-	    var width = font.defaultWidthX;
 	    var open = false;
 	    var x = 0;
 	    var y = 0;
+	    var subrs;
+	    var subrsBias;
+	    var defaultWidthX;
+	    var nominalWidthX;
+	    if (font.isCIDFont) {
+	        var fdIndex = font.tables.cff.topDict._fdSelect[glyph.index];
+	        var fdDict = font.tables.cff.topDict._fdArray[fdIndex];
+	        subrs = fdDict._subrs;
+	        subrsBias = fdDict._subrsBias;
+	        defaultWidthX = fdDict._defaultWidthX;
+	        nominalWidthX = fdDict._nominalWidthX;
+	    } else {
+	        subrs = font.tables.cff.topDict._subrs;
+	        subrsBias = font.tables.cff.topDict._subrsBias;
+	        defaultWidthX = font.tables.cff.topDict._defaultWidthX;
+	        nominalWidthX = font.tables.cff.topDict._nominalWidthX;
+	    }
+	    var width = defaultWidthX;
 	
 	    function newContour(x, y) {
 	        if (open) {
@@ -4412,7 +4419,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        // If the value is uneven, that means a width is specified.
 	        hasWidthArg = stack.length % 2 !== 0;
 	        if (hasWidthArg && !haveWidth) {
-	            width = stack.shift() + font.nominalWidthX;
+	            width = stack.shift() + nominalWidthX;
 	        }
 	
 	        nStems += stack.length >> 1;
@@ -4420,7 +4427,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        haveWidth = true;
 	    }
 	
-	    function parse(code) {
+	    function parse$$1(code) {
 	        var b1;
 	        var b2;
 	        var b3;
@@ -4447,7 +4454,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    break;
 	                case 4: // vmoveto
 	                    if (stack.length > 1 && !haveWidth) {
-	                        width = stack.shift() + font.nominalWidthX;
+	                        width = stack.shift() + nominalWidthX;
 	                        haveWidth = true;
 	                    }
 	
@@ -4501,10 +4508,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	                    break;
 	                case 10: // callsubr
-	                    codeIndex = stack.pop() + font.subrsBias;
-	                    subrCode = font.subrs[codeIndex];
+	                    codeIndex = stack.pop() + subrsBias;
+	                    subrCode = subrs[codeIndex];
 	                    if (subrCode) {
-	                        parse(subrCode);
+	                        parse$$1(subrCode);
 	                    }
 	
 	                    break;
@@ -4526,8 +4533,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	                            c3y = jpy + stack.shift();    // dy4
 	                            c4x = c3x + stack.shift();    // dx5
 	                            c4y = c3y + stack.shift();    // dy5
-	                            x = c4x + stack.shift();      // dx6
-	                            y = c4y + stack.shift();      // dy6
+	                            x = c4x   + stack.shift();    // dx6
+	                            y = c4y   + stack.shift();    // dy6
 	                            stack.shift();                // flex depth
 	                            p.curveTo(c1x, c1y, c2x, c2y, jpx, jpy);
 	                            p.curveTo(c3x, c3y, c4x, c4y, x, y);
@@ -4592,7 +4599,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    break;
 	                case 14: // endchar
 	                    if (stack.length > 0 && !haveWidth) {
-	                        width = stack.shift() + font.nominalWidthX;
+	                        width = stack.shift() + nominalWidthX;
 	                        haveWidth = true;
 	                    }
 	
@@ -4612,7 +4619,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    break;
 	                case 21: // rmoveto
 	                    if (stack.length > 2 && !haveWidth) {
-	                        width = stack.shift() + font.nominalWidthX;
+	                        width = stack.shift() + nominalWidthX;
 	                        haveWidth = true;
 	                    }
 	
@@ -4622,7 +4629,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    break;
 	                case 22: // hmoveto
 	                    if (stack.length > 1 && !haveWidth) {
-	                        width = stack.shift() + font.nominalWidthX;
+	                        width = stack.shift() + nominalWidthX;
 	                        haveWidth = true;
 	                    }
 	
@@ -4704,7 +4711,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	                    codeIndex = stack.pop() + font.gsubrsBias;
 	                    subrCode = font.gsubrs[codeIndex];
 	                    if (subrCode) {
-	                        parse(subrCode);
+	                        parse$$1(subrCode);
 	                    }
 	
 	                    break;
@@ -4779,25 +4786,55 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	    }
 	
-	    parse(code);
+	    parse$$1(code);
 	
 	    glyph.advanceWidth = width;
 	    return p;
 	}
 	
-	// Subroutines are encoded using the negative half of the number space.
-	// See type 2 chapter 4.7 "Subroutine operators".
-	function calcCFFSubroutineBias(subrs) {
-	    var bias;
-	    if (subrs.length < 1240) {
-	        bias = 107;
-	    } else if (subrs.length < 33900) {
-	        bias = 1131;
+	function parseCFFFDSelect(data, start, nGlyphs, fdArrayCount) {
+	    var fdSelect = [];
+	    var fdIndex;
+	    var parser = new parse.Parser(data, start);
+	    var format = parser.parseCard8();
+	    if (format === 0) {
+	        // Simple list of nGlyphs elements
+	        for (var iGid = 0; iGid < nGlyphs; iGid++) {
+	            fdIndex = parser.parseCard8();
+	            if (fdIndex >= fdArrayCount) {
+	                throw new Error('CFF table CID Font FDSelect has bad FD index value ' + fdIndex + ' (FD count ' + fdArrayCount + ')');
+	            }
+	            fdSelect.push(fdIndex);
+	        }
+	    } else if (format === 3) {
+	        // Ranges
+	        var nRanges = parser.parseCard16();
+	        var first = parser.parseCard16();
+	        if (first !== 0) {
+	            throw new Error('CFF Table CID Font FDSelect format 3 range has bad initial GID ' + first);
+	        }
+	        var next;
+	        for (var iRange = 0; iRange < nRanges; iRange++) {
+	            fdIndex = parser.parseCard8();
+	            next = parser.parseCard16();
+	            if (fdIndex >= fdArrayCount) {
+	                throw new Error('CFF table CID Font FDSelect has bad FD index value ' + fdIndex + ' (FD count ' + fdArrayCount + ')');
+	            }
+	            if (next > nGlyphs) {
+	                throw new Error('CFF Table CID Font FDSelect format 3 range has bad GID ' + next);
+	            }
+	            for (; first < next; first++) {
+	                fdSelect.push(fdIndex);
+	            }
+	            first = next;
+	        }
+	        if (next !== nGlyphs) {
+	            throw new Error('CFF Table CID Font FDSelect format 3 range has bad final GID ' + next);
+	        }
 	    } else {
-	        bias = 32768;
+	        throw new Error('CFF Table CID Font FDSelect table has unsupported format ' + format);
 	    }
-	
-	    return bias;
+	    return fdSelect;
 	}
 	
 	// Parse the `CFF` table, which contains the glyph outlines in PostScript format.
@@ -4811,12 +4848,39 @@ return /******/ (function(modules) { // webpackBootstrap
 	    font.gsubrs = globalSubrIndex.objects;
 	    font.gsubrsBias = calcCFFSubroutineBias(font.gsubrs);
 	
-	    var topDictData = new DataView(new Uint8Array(topDictIndex.objects[0]).buffer);
-	    var topDict = parseCFFTopDict(topDictData, stringIndex.objects);
+	    var topDictArray = gatherCFFTopDicts(data, start, topDictIndex.objects, stringIndex.objects);
+	    if (topDictArray.length !== 1) {
+	        throw new Error('CFF table has too many fonts in \'FontSet\' - count of fonts NameIndex.length = ' + topDictArray.length);
+	    }
+	
+	    var topDict = topDictArray[0];
 	    font.tables.cff.topDict = topDict;
 	
-	    var privateDictOffset = start + topDict['private'][1];
-	    var privateDict = parseCFFPrivateDict(data, privateDictOffset, topDict['private'][0], stringIndex.objects);
+	    if (topDict._privateDict) {
+	        font.defaultWidthX = topDict._privateDict.defaultWidthX;
+	        font.nominalWidthX = topDict._privateDict.nominalWidthX;
+	    }
+	
+	    if (topDict.ros[0] !== undefined && topDict.ros[1] !== undefined) {
+	        font.isCIDFont = true;
+	    }
+	
+	    if (font.isCIDFont) {
+	        var fdArrayOffset = topDict.fdArray;
+	        var fdSelectOffset = topDict.fdSelect;
+	        if (fdArrayOffset === 0 || fdSelectOffset === 0) {
+	            throw new Error('Font is marked as a CID font, but FDArray and/or FDSelect information is missing');
+	        }
+	        fdArrayOffset += start;
+	        var fdArrayIndex = parseCFFIndex(data, fdArrayOffset);
+	        var fdArray = gatherCFFTopDicts(data, start, fdArrayIndex.objects, stringIndex.objects);
+	        topDict._fdArray = fdArray;
+	        fdSelectOffset += start;
+	        topDict._fdSelect = parseCFFFDSelect(data, fdSelectOffset, font.numGlyphs, fdArray.length);
+	    }
+	
+	    var privateDictOffset = start + topDict.private[1];
+	    var privateDict = parseCFFPrivateDict(data, privateDictOffset, topDict.private[0], stringIndex.objects);
 	    font.defaultWidthX = privateDict.defaultWidthX;
 	    font.nominalWidthX = privateDict.nominalWidthX;
 	
@@ -4836,9 +4900,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	    var charset = parseCFFCharset(data, start + topDict.charset, font.nGlyphs, stringIndex.objects);
 	    if (topDict.encoding === 0) { // Standard encoding
-	        font.cffEncoding = new encoding.CffEncoding(encoding.cffStandardEncoding, charset);
+	        font.cffEncoding = new CffEncoding(cffStandardEncoding, charset);
 	    } else if (topDict.encoding === 1) { // Expert encoding
-	        font.cffEncoding = new encoding.CffEncoding(encoding.cffExpertEncoding, charset);
+	        font.cffEncoding = new CffEncoding(cffExpertEncoding, charset);
 	    } else {
 	        font.cffEncoding = parseCFFEncoding(data, start + topDict.encoding, charset);
 	    }
@@ -4859,7 +4923,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var sid;
 	
 	    // Is the string in the CFF standard strings?
-	    var i = encoding.cffStandardStrings.indexOf(s);
+	    var i = cffStandardStrings.indexOf(s);
 	    if (i >= 0) {
 	        sid = i;
 	    }
@@ -4867,9 +4931,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    // Is the string already in the string index?
 	    i = strings.indexOf(s);
 	    if (i >= 0) {
-	        sid = i + encoding.cffStandardStrings.length;
+	        sid = i + cffStandardStrings.length;
 	    } else {
-	        sid = encoding.cffStandardStrings.length + strings.length;
+	        sid = cffStandardStrings.length + strings.length;
 	        strings.push(s);
 	    }
 	
@@ -4971,8 +5035,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var x = 0;
 	    var y = 0;
 	    for (var i = 0; i < path.commands.length; i += 1) {
-	        var dx;
-	        var dy;
+	        var dx = (void 0);
+	        var dy = (void 0);
 	        var cmd = path.commands[i];
 	        if (cmd.type === 'Q') {
 	            // CFF only supports bézier curves, so convert the quad to a bézier.
@@ -5026,7 +5090,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	        }
 	
 	        // Contours are closed automatically.
-	
 	    }
 	
 	    ops.push({name: 'endchar', type: 'OP', value: 14});
@@ -5128,518 +5191,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return t;
 	}
 	
-	exports.parse = parseCFFTable;
-	exports.make = makeCFFTable;
-
-
-/***/ },
-/* 14 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// The GlyphSet object
+	var cff = { parse: parseCFFTable, make: makeCFFTable };
 	
-	'use strict';
-	
-	var _glyph = __webpack_require__(15);
-	
-	// Define a property on the glyph that depends on the path being loaded.
-	function defineDependentProperty(glyph, externalName, internalName) {
-	    Object.defineProperty(glyph, externalName, {
-	        get: function() {
-	            // Request the path property to make sure the path is loaded.
-	            glyph.path; // jshint ignore:line
-	            return glyph[internalName];
-	        },
-	        set: function(newValue) {
-	            glyph[internalName] = newValue;
-	        },
-	        enumerable: true,
-	        configurable: true
-	    });
-	}
-	
-	/**
-	 * A GlyphSet represents all glyphs available in the font, but modelled using
-	 * a deferred glyph loader, for retrieving glyphs only once they are absolutely
-	 * necessary, to keep the memory footprint down.
-	 * @exports opentype.GlyphSet
-	 * @class
-	 * @param {opentype.Font}
-	 * @param {Array}
-	 */
-	function GlyphSet(font, glyphs) {
-	    this.font = font;
-	    this.glyphs = {};
-	    if (Array.isArray(glyphs)) {
-	        for (var i = 0; i < glyphs.length; i++) {
-	            this.glyphs[i] = glyphs[i];
-	        }
-	    }
-	
-	    this.length = (glyphs && glyphs.length) || 0;
-	}
-	
-	/**
-	 * @param  {number} index
-	 * @return {opentype.Glyph}
-	 */
-	GlyphSet.prototype.get = function(index) {
-	    if (typeof this.glyphs[index] === 'function') {
-	        this.glyphs[index] = this.glyphs[index]();
-	    }
-	
-	    return this.glyphs[index];
-	};
-	
-	/**
-	 * @param  {number} index
-	 * @param  {Object}
-	 */
-	GlyphSet.prototype.push = function(index, loader) {
-	    this.glyphs[index] = loader;
-	    this.length++;
-	};
-	
-	/**
-	 * @alias opentype.glyphLoader
-	 * @param  {opentype.Font} font
-	 * @param  {number} index
-	 * @return {opentype.Glyph}
-	 */
-	function glyphLoader(font, index) {
-	    return new _glyph.Glyph({index: index, font: font});
-	}
-	
-	/**
-	 * Generate a stub glyph that can be filled with all metadata *except*
-	 * the "points" and "path" properties, which must be loaded only once
-	 * the glyph's path is actually requested for text shaping.
-	 * @alias opentype.ttfGlyphLoader
-	 * @param  {opentype.Font} font
-	 * @param  {number} index
-	 * @param  {Function} parseGlyph
-	 * @param  {Object} data
-	 * @param  {number} position
-	 * @param  {Function} buildPath
-	 * @return {opentype.Glyph}
-	 */
-	function ttfGlyphLoader(font, index, parseGlyph, data, position, buildPath) {
-	    return function() {
-	        var glyph = new _glyph.Glyph({index: index, font: font});
-	
-	        glyph.path = function() {
-	            parseGlyph(glyph, data, position);
-	            var path = buildPath(font.glyphs, glyph);
-	            path.unitsPerEm = font.unitsPerEm;
-	            return path;
-	        };
-	
-	        defineDependentProperty(glyph, 'xMin', '_xMin');
-	        defineDependentProperty(glyph, 'xMax', '_xMax');
-	        defineDependentProperty(glyph, 'yMin', '_yMin');
-	        defineDependentProperty(glyph, 'yMax', '_yMax');
-	
-	        return glyph;
-	    };
-	}
-	/**
-	 * @alias opentype.cffGlyphLoader
-	 * @param  {opentype.Font} font
-	 * @param  {number} index
-	 * @param  {Function} parseCFFCharstring
-	 * @param  {string} charstring
-	 * @return {opentype.Glyph}
-	 */
-	function cffGlyphLoader(font, index, parseCFFCharstring, charstring) {
-	    return function() {
-	        var glyph = new _glyph.Glyph({index: index, font: font});
-	
-	        glyph.path = function() {
-	            var path = parseCFFCharstring(font, glyph, charstring);
-	            path.unitsPerEm = font.unitsPerEm;
-	            return path;
-	        };
-	
-	        return glyph;
-	    };
-	}
-	
-	exports.GlyphSet = GlyphSet;
-	exports.glyphLoader = glyphLoader;
-	exports.ttfGlyphLoader = ttfGlyphLoader;
-	exports.cffGlyphLoader = cffGlyphLoader;
-
-
-/***/ },
-/* 15 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// The Glyph object
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var draw = __webpack_require__(16);
-	var path = __webpack_require__(6);
-	
-	function getPathDefinition(glyph, path) {
-	    var _path = path || { commands: [] };
-	    return {
-	        configurable: true,
-	
-	        get: function() {
-	            if (typeof _path === 'function') {
-	                _path = _path();
-	            }
-	
-	            return _path;
-	        },
-	
-	        set: function(p) {
-	            _path = p;
-	        }
-	    };
-	}
-	/**
-	 * @typedef GlyphOptions
-	 * @type Object
-	 * @property {string} [name] - The glyph name
-	 * @property {number} [unicode]
-	 * @property {Array} [unicodes]
-	 * @property {number} [xMin]
-	 * @property {number} [yMin]
-	 * @property {number} [xMax]
-	 * @property {number} [yMax]
-	 * @property {number} [advanceWidth]
-	 */
-	
-	// A Glyph is an individual mark that often corresponds to a character.
-	// Some glyphs, such as ligatures, are a combination of many characters.
-	// Glyphs are the basic building blocks of a font.
-	//
-	// The `Glyph` class contains utility methods for drawing the path and its points.
-	/**
-	 * @exports opentype.Glyph
-	 * @class
-	 * @param {GlyphOptions}
-	 * @constructor
-	 */
-	function Glyph(options) {
-	    // By putting all the code on a prototype function (which is only declared once)
-	    // we reduce the memory requirements for larger fonts by some 2%
-	    this.bindConstructorValues(options);
-	}
-	
-	/**
-	 * @param  {GlyphOptions}
-	 */
-	Glyph.prototype.bindConstructorValues = function(options) {
-	    this.index = options.index || 0;
-	
-	    // These three values cannnot be deferred for memory optimization:
-	    this.name = options.name || null;
-	    this.unicode = options.unicode || undefined;
-	    this.unicodes = options.unicodes || options.unicode !== undefined ? [options.unicode] : [];
-	
-	    // But by binding these values only when necessary, we reduce can
-	    // the memory requirements by almost 3% for larger fonts.
-	    if (options.xMin) {
-	        this.xMin = options.xMin;
-	    }
-	
-	    if (options.yMin) {
-	        this.yMin = options.yMin;
-	    }
-	
-	    if (options.xMax) {
-	        this.xMax = options.xMax;
-	    }
-	
-	    if (options.yMax) {
-	        this.yMax = options.yMax;
-	    }
-	
-	    if (options.advanceWidth) {
-	        this.advanceWidth = options.advanceWidth;
-	    }
-	
-	    // The path for a glyph is the most memory intensive, and is bound as a value
-	    // with a getter/setter to ensure we actually do path parsing only once the
-	    // path is actually needed by anything.
-	    Object.defineProperty(this, 'path', getPathDefinition(this, options.path));
-	};
-	
-	/**
-	 * @param {number}
-	 */
-	Glyph.prototype.addUnicode = function(unicode) {
-	    if (this.unicodes.length === 0) {
-	        this.unicode = unicode;
-	    }
-	
-	    this.unicodes.push(unicode);
-	};
-	
-	/**
-	 * Convert the glyph to a Path we can draw on a drawing context.
-	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 * @param  {Object=} options - xScale, yScale to strech the glyph.
-	 * @return {opentype.Path}
-	 */
-	Glyph.prototype.getPath = function(x, y, fontSize, options) {
-	    x = x !== undefined ? x : 0;
-	    y = y !== undefined ? y : 0;
-	    options = options !== undefined ? options : {xScale: 1.0, yScale: 1.0};
-	    fontSize = fontSize !== undefined ? fontSize : 72;
-	    var scale = 1 / this.path.unitsPerEm * fontSize;
-	    var xScale = options.xScale * scale;
-	    var yScale = options.yScale * scale;
-	
-	    var p = new path.Path();
-	    var commands = this.path.commands;
-	    for (var i = 0; i < commands.length; i += 1) {
-	        var cmd = commands[i];
-	        if (cmd.type === 'M') {
-	            p.moveTo(x + (cmd.x * xScale), y + (-cmd.y * yScale));
-	        } else if (cmd.type === 'L') {
-	            p.lineTo(x + (cmd.x * xScale), y + (-cmd.y * yScale));
-	        } else if (cmd.type === 'Q') {
-	            p.quadraticCurveTo(x + (cmd.x1 * xScale), y + (-cmd.y1 * yScale),
-	                               x + (cmd.x * xScale), y + (-cmd.y * yScale));
-	        } else if (cmd.type === 'C') {
-	            p.curveTo(x + (cmd.x1 * xScale), y + (-cmd.y1 * yScale),
-	                      x + (cmd.x2 * xScale), y + (-cmd.y2 * yScale),
-	                      x + (cmd.x * xScale), y + (-cmd.y * yScale));
-	        } else if (cmd.type === 'Z') {
-	            p.closePath();
-	        }
-	    }
-	
-	    return p;
-	};
-	
-	/**
-	 * Split the glyph into contours.
-	 * This function is here for backwards compatibility, and to
-	 * provide raw access to the TrueType glyph outlines.
-	 * @return {Array}
-	 */
-	Glyph.prototype.getContours = function() {
-	    if (this.points === undefined) {
-	        return [];
-	    }
-	
-	    var contours = [];
-	    var currentContour = [];
-	    for (var i = 0; i < this.points.length; i += 1) {
-	        var pt = this.points[i];
-	        currentContour.push(pt);
-	        if (pt.lastPointOfContour) {
-	            contours.push(currentContour);
-	            currentContour = [];
-	        }
-	    }
-	
-	    check.argument(currentContour.length === 0, 'There are still points left in the current contour.');
-	    return contours;
-	};
-	
-	/**
-	 * Calculate the xMin/yMin/xMax/yMax/lsb/rsb for a Glyph.
-	 * @return {Object}
-	 */
-	Glyph.prototype.getMetrics = function() {
-	    var commands = this.path.commands;
-	    var xCoords = [];
-	    var yCoords = [];
-	    for (var i = 0; i < commands.length; i += 1) {
-	        var cmd = commands[i];
-	        if (cmd.type !== 'Z') {
-	            xCoords.push(cmd.x);
-	            yCoords.push(cmd.y);
-	        }
-	
-	        if (cmd.type === 'Q' || cmd.type === 'C') {
-	            xCoords.push(cmd.x1);
-	            yCoords.push(cmd.y1);
-	        }
-	
-	        if (cmd.type === 'C') {
-	            xCoords.push(cmd.x2);
-	            yCoords.push(cmd.y2);
-	        }
-	    }
-	
-	    var metrics = {
-	        xMin: Math.min.apply(null, xCoords),
-	        yMin: Math.min.apply(null, yCoords),
-	        xMax: Math.max.apply(null, xCoords),
-	        yMax: Math.max.apply(null, yCoords),
-	        leftSideBearing: this.leftSideBearing
-	    };
-	
-	    if (!isFinite(metrics.xMin)) {
-	        metrics.xMin = 0;
-	    }
-	
-	    if (!isFinite(metrics.xMax)) {
-	        metrics.xMax = this.advanceWidth;
-	    }
-	
-	    if (!isFinite(metrics.yMin)) {
-	        metrics.yMin = 0;
-	    }
-	
-	    if (!isFinite(metrics.yMax)) {
-	        metrics.yMax = 0;
-	    }
-	
-	    metrics.rightSideBearing = this.advanceWidth - metrics.leftSideBearing - (metrics.xMax - metrics.xMin);
-	    return metrics;
-	};
-	
-	/**
-	 * Draw the glyph on the given context.
-	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
-	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 * @param  {Object=} options - xScale, yScale to strech the glyph.
-	 */
-	Glyph.prototype.draw = function(ctx, x, y, fontSize, options) {
-	    this.getPath(x, y, fontSize, options).draw(ctx);
-	};
-	
-	/**
-	 * Draw the points of the glyph.
-	 * On-curve points will be drawn in blue, off-curve points will be drawn in red.
-	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
-	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 */
-	Glyph.prototype.drawPoints = function(ctx, x, y, fontSize) {
-	
-	    function drawCircles(l, x, y, scale) {
-	        var PI_SQ = Math.PI * 2;
-	        ctx.beginPath();
-	        for (var j = 0; j < l.length; j += 1) {
-	            ctx.moveTo(x + (l[j].x * scale), y + (l[j].y * scale));
-	            ctx.arc(x + (l[j].x * scale), y + (l[j].y * scale), 2, 0, PI_SQ, false);
-	        }
-	
-	        ctx.closePath();
-	        ctx.fill();
-	    }
-	
-	    x = x !== undefined ? x : 0;
-	    y = y !== undefined ? y : 0;
-	    fontSize = fontSize !== undefined ? fontSize : 24;
-	    var scale = 1 / this.path.unitsPerEm * fontSize;
-	
-	    var blueCircles = [];
-	    var redCircles = [];
-	    var path = this.path;
-	    for (var i = 0; i < path.commands.length; i += 1) {
-	        var cmd = path.commands[i];
-	        if (cmd.x !== undefined) {
-	            blueCircles.push({x: cmd.x, y: -cmd.y});
-	        }
-	
-	        if (cmd.x1 !== undefined) {
-	            redCircles.push({x: cmd.x1, y: -cmd.y1});
-	        }
-	
-	        if (cmd.x2 !== undefined) {
-	            redCircles.push({x: cmd.x2, y: -cmd.y2});
-	        }
-	    }
-	
-	    ctx.fillStyle = 'blue';
-	    drawCircles(blueCircles, x, y, scale);
-	    ctx.fillStyle = 'red';
-	    drawCircles(redCircles, x, y, scale);
-	};
-	
-	/**
-	 * Draw lines indicating important font measurements.
-	 * Black lines indicate the origin of the coordinate system (point 0,0).
-	 * Blue lines indicate the glyph bounding box.
-	 * Green line indicates the advance width of the glyph.
-	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
-	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
-	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
-	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
-	 */
-	Glyph.prototype.drawMetrics = function(ctx, x, y, fontSize) {
-	    var scale;
-	    x = x !== undefined ? x : 0;
-	    y = y !== undefined ? y : 0;
-	    fontSize = fontSize !== undefined ? fontSize : 24;
-	    scale = 1 / this.path.unitsPerEm * fontSize;
-	    ctx.lineWidth = 1;
-	
-	    // Draw the origin
-	    ctx.strokeStyle = 'black';
-	    draw.line(ctx, x, -10000, x, 10000);
-	    draw.line(ctx, -10000, y, 10000, y);
-	
-	    // This code is here due to memory optimization: by not using
-	    // defaults in the constructor, we save a notable amount of memory.
-	    var xMin = this.xMin || 0;
-	    var yMin = this.yMin || 0;
-	    var xMax = this.xMax || 0;
-	    var yMax = this.yMax || 0;
-	    var advanceWidth = this.advanceWidth || 0;
-	
-	    // Draw the glyph box
-	    ctx.strokeStyle = 'blue';
-	    draw.line(ctx, x + (xMin * scale), -10000, x + (xMin * scale), 10000);
-	    draw.line(ctx, x + (xMax * scale), -10000, x + (xMax * scale), 10000);
-	    draw.line(ctx, -10000, y + (-yMin * scale), 10000, y + (-yMin * scale));
-	    draw.line(ctx, -10000, y + (-yMax * scale), 10000, y + (-yMax * scale));
-	
-	    // Draw the advance width
-	    ctx.strokeStyle = 'green';
-	    draw.line(ctx, x + (advanceWidth * scale), -10000, x + (advanceWidth * scale), 10000);
-	};
-	
-	exports.Glyph = Glyph;
-
-
-/***/ },
-/* 16 */
-/***/ function(module, exports) {
-
-	// Drawing utility functions.
-	
-	'use strict';
-	
-	// Draw a line on the given context from point `x1,y1` to point `x2,y2`.
-	function line(ctx, x1, y1, x2, y2) {
-	    ctx.beginPath();
-	    ctx.moveTo(x1, y1);
-	    ctx.lineTo(x2, y2);
-	    ctx.stroke();
-	}
-	
-	exports.line = line;
-
-
-/***/ },
-/* 17 */
-/***/ function(module, exports, __webpack_require__) {
-
 	// The `head` table contains global information about the font.
 	// https://www.microsoft.com/typography/OTSPEC/head.htm
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	// Parse the header `head` table
 	function parseHeadTable(data, start) {
@@ -5696,21 +5251,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    ], options);
 	}
 	
-	exports.parse = parseHeadTable;
-	exports.make = makeHeadTable;
-
-
-/***/ },
-/* 18 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var head = { parse: parseHeadTable, make: makeHeadTable };
+	
 	// The `hhea` table contains information for horizontal layout.
 	// https://www.microsoft.com/typography/OTSPEC/hhea.htm
-	
-	'use strict';
-	
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	// Parse the horizontal header `hhea` table
 	function parseHheaTable(data, start) {
@@ -5755,21 +5299,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    ], options);
 	}
 	
-	exports.parse = parseHheaTable;
-	exports.make = makeHheaTable;
-
-
-/***/ },
-/* 19 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var hhea = { parse: parseHheaTable, make: makeHheaTable };
+	
 	// The `hmtx` table contains the horizontal metrics for all glyphs.
 	// https://www.microsoft.com/typography/OTSPEC/hmtx.htm
-	
-	'use strict';
-	
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	// Parse the `hmtx` table, which contains the horizontal metrics for all glyphs.
 	// This function augments the glyph array, adding the advanceWidth and leftSideBearing to each glyph.
@@ -5803,25 +5336,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return t;
 	}
 	
-	exports.parse = parseHmtxTable;
-	exports.make = makeHmtxTable;
-
-
-/***/ },
-/* 20 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var hmtx = { parse: parseHmtxTable, make: makeHmtxTable };
+	
 	// The `ltag` table stores IETF BCP-47 language tags. It allows supporting
 	// languages for which TrueType does not assign a numeric code.
 	// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6ltag.html
 	// http://www.w3.org/International/articles/language-tags/
 	// http://www.iana.org/assignments/language-subtag-registry/language-subtag-registry
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	function makeLtagTable(tags) {
 	    var result = new table.Table('ltag', [
@@ -5870,22 +5391,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return tags;
 	}
 	
-	exports.make = makeLtagTable;
-	exports.parse = parseLtagTable;
-
-
-/***/ },
-/* 21 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var ltag = { make: makeLtagTable, parse: parseLtagTable };
+	
 	// The `maxp` table establishes the memory requirements for the font.
 	// We need it just to get the number of glyphs in the font.
 	// https://www.microsoft.com/typography/OTSPEC/maxp.htm
-	
-	'use strict';
-	
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	// Parse the maximum profile `maxp` table.
 	function parseMaxpTable(data, start) {
@@ -5919,24 +5429,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    ]);
 	}
 	
-	exports.parse = parseMaxpTable;
-	exports.make = makeMaxpTable;
-
-
-/***/ },
-/* 22 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var maxp = { parse: parseMaxpTable, make: makeMaxpTable };
+	
 	// The `name` naming table.
 	// https://www.microsoft.com/typography/OTSPEC/name.htm
-	
-	'use strict';
-	
-	var types = __webpack_require__(10);
-	var decode = types.decode;
-	var encode = types.encode;
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	// NameIDs for the name table.
 	var nameTableNames = [
@@ -6576,7 +6072,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var language = getLanguageCode(platformID, languageID, ltag);
 	        var encoding = getEncoding(platformID, encodingID, languageID);
 	        if (encoding !== undefined && language !== undefined) {
-	            var text;
+	            var text = (void 0);
 	            if (encoding === utf16) {
 	                text = decode.UTF16(data, stringOffset + offset, byteLength);
 	            } else {
@@ -6651,7 +6147,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var offset = findSubArray(s, pool);
 	    if (offset < 0) {
 	        offset = pool.length;
-	        for (var i = 0, len = s.length; i < len; ++i) {
+	        var i = 0;
+	        var len = s.length;
+	        for (; i < len; ++i) {
 	            pool.push(s[i]);
 	        }
 	
@@ -6760,21 +6258,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return t;
 	}
 	
-	exports.parse = parseNameTable;
-	exports.make = makeNameTable;
-
-
-/***/ },
-/* 23 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var _name = { parse: parseNameTable, make: makeNameTable };
+	
 	// The `OS/2` table contains metrics required in OpenType fonts.
 	// https://www.microsoft.com/typography/OTSPEC/os2.htm
-	
-	'use strict';
-	
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	var unicodeRanges = [
 	    {begin: 0x0000, end: 0x007F}, // Basic Latin
@@ -7018,30 +6505,15 @@ return /******/ (function(modules) { // webpackBootstrap
 	    ], options);
 	}
 	
-	exports.unicodeRanges = unicodeRanges;
-	exports.getUnicodeRange = getUnicodeRange;
-	exports.parse = parseOS2Table;
-	exports.make = makeOS2Table;
-
-
-/***/ },
-/* 24 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var os2 = { parse: parseOS2Table, make: makeOS2Table, unicodeRanges: unicodeRanges, getUnicodeRange: getUnicodeRange };
+	
 	// The `post` table stores additional PostScript information, such as glyph names.
 	// https://www.microsoft.com/typography/OTSPEC/post.htm
-	
-	'use strict';
-	
-	var encoding = __webpack_require__(4);
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	// Parse the PostScript `post` table
 	function parsePostTable(data, start) {
 	    var post = {};
 	    var p = new parse.Parser(data, start);
-	    var i;
 	    post.version = p.parseVersion();
 	    post.italicAngle = p.parseFixed();
 	    post.underlinePosition = p.parseShort();
@@ -7053,18 +6525,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	    post.maxMemType1 = p.parseULong();
 	    switch (post.version) {
 	        case 1:
-	            post.names = encoding.standardNames.slice();
+	            post.names = standardNames.slice();
 	            break;
 	        case 2:
 	            post.numberOfGlyphs = p.parseUShort();
 	            post.glyphNameIndex = new Array(post.numberOfGlyphs);
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
+	            for (var i = 0; i < post.numberOfGlyphs; i++) {
 	                post.glyphNameIndex[i] = p.parseUShort();
 	            }
 	
 	            post.names = [];
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
-	                if (post.glyphNameIndex[i] >= encoding.standardNames.length) {
+	            for (var i$1 = 0; i$1 < post.numberOfGlyphs; i$1++) {
+	                if (post.glyphNameIndex[i$1] >= standardNames.length) {
 	                    var nameLength = p.parseChar();
 	                    post.names.push(p.parseString(nameLength));
 	                }
@@ -7074,8 +6546,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        case 2.5:
 	            post.numberOfGlyphs = p.parseUShort();
 	            post.offset = new Array(post.numberOfGlyphs);
-	            for (i = 0; i < post.numberOfGlyphs; i++) {
-	                post.offset[i] = p.parseChar();
+	            for (var i$2 = 0; i$2 < post.numberOfGlyphs; i$2++) {
+	                post.offset[i$2] = p.parseChar();
 	            }
 	
 	            break;
@@ -7097,23 +6569,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	    ]);
 	}
 	
-	exports.parse = parsePostTable;
-	exports.make = makePostTable;
-
-
-/***/ },
-/* 25 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var post = { parse: parsePostTable, make: makePostTable };
+	
 	// The `GSUB` table contains ligatures, among other things.
 	// https://www.microsoft.com/typography/OTSPEC/gsub.htm
 	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var Parser = __webpack_require__(12).Parser;
 	var subtableParsers = new Array(9);         // subtableParsers[0] is unused
-	var table = __webpack_require__(9);
 	
 	// https://www.microsoft.com/typography/OTSPEC/GSUB.htm#SS
 	subtableParsers[1] = function parseLookup1() {
@@ -7361,24 +6822,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    ]);
 	}
 	
-	exports.parse = parseGsubTable;
-	exports.make = makeGsubTable;
-
-
-/***/ },
-/* 26 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var gsub = { parse: parseGsubTable, make: makeGsubTable };
+	
 	// The `GPOS` table contains kerning pairs, among other things.
 	// https://www.microsoft.com/typography/OTSPEC/gpos.htm
-	
-	'use strict';
-	
-	var types = __webpack_require__(10);
-	var decode = types.decode;
-	var check = __webpack_require__(8);
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	// Parse the metadata `meta` table.
 	// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6meta.html
@@ -7428,21 +6875,610 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return result;
 	}
 	
-	exports.parse = parseMetaTable;
-	exports.make = makeMetaTable;
-
-
-/***/ },
-/* 27 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var meta = { parse: parseMetaTable, make: makeMetaTable };
+	
+	// The `sfnt` wrapper provides organization for the tables in the font.
+	// It is the top-level data structure in a font.
+	// https://www.microsoft.com/typography/OTSPEC/otff.htm
+	// Recommendations for creating OpenType Fonts:
+	// http://www.microsoft.com/typography/otspec140/recom.htm
+	
+	function log2(v) {
+	    return Math.log(v) / Math.log(2) | 0;
+	}
+	
+	function computeCheckSum(bytes) {
+	    while (bytes.length % 4 !== 0) {
+	        bytes.push(0);
+	    }
+	
+	    var sum = 0;
+	    for (var i = 0; i < bytes.length; i += 4) {
+	        sum += (bytes[i] << 24) +
+	            (bytes[i + 1] << 16) +
+	            (bytes[i + 2] << 8) +
+	            (bytes[i + 3]);
+	    }
+	
+	    sum %= Math.pow(2, 32);
+	    return sum;
+	}
+	
+	function makeTableRecord(tag, checkSum, offset, length) {
+	    return new table.Record('Table Record', [
+	        {name: 'tag', type: 'TAG', value: tag !== undefined ? tag : ''},
+	        {name: 'checkSum', type: 'ULONG', value: checkSum !== undefined ? checkSum : 0},
+	        {name: 'offset', type: 'ULONG', value: offset !== undefined ? offset : 0},
+	        {name: 'length', type: 'ULONG', value: length !== undefined ? length : 0}
+	    ]);
+	}
+	
+	function makeSfntTable(tables) {
+	    var sfnt = new table.Table('sfnt', [
+	        {name: 'version', type: 'TAG', value: 'OTTO'},
+	        {name: 'numTables', type: 'USHORT', value: 0},
+	        {name: 'searchRange', type: 'USHORT', value: 0},
+	        {name: 'entrySelector', type: 'USHORT', value: 0},
+	        {name: 'rangeShift', type: 'USHORT', value: 0}
+	    ]);
+	    sfnt.tables = tables;
+	    sfnt.numTables = tables.length;
+	    var highestPowerOf2 = Math.pow(2, log2(sfnt.numTables));
+	    sfnt.searchRange = 16 * highestPowerOf2;
+	    sfnt.entrySelector = log2(highestPowerOf2);
+	    sfnt.rangeShift = sfnt.numTables * 16 - sfnt.searchRange;
+	
+	    var recordFields = [];
+	    var tableFields = [];
+	
+	    var offset = sfnt.sizeOf() + (makeTableRecord().sizeOf() * sfnt.numTables);
+	    while (offset % 4 !== 0) {
+	        offset += 1;
+	        tableFields.push({name: 'padding', type: 'BYTE', value: 0});
+	    }
+	
+	    for (var i = 0; i < tables.length; i += 1) {
+	        var t = tables[i];
+	        check.argument(t.tableName.length === 4, 'Table name' + t.tableName + ' is invalid.');
+	        var tableLength = t.sizeOf();
+	        var tableRecord = makeTableRecord(t.tableName, computeCheckSum(t.encode()), offset, tableLength);
+	        recordFields.push({name: tableRecord.tag + ' Table Record', type: 'RECORD', value: tableRecord});
+	        tableFields.push({name: t.tableName + ' table', type: 'RECORD', value: t});
+	        offset += tableLength;
+	        check.argument(!isNaN(offset), 'Something went wrong calculating the offset.');
+	        while (offset % 4 !== 0) {
+	            offset += 1;
+	            tableFields.push({name: 'padding', type: 'BYTE', value: 0});
+	        }
+	    }
+	
+	    // Table records need to be sorted alphabetically.
+	    recordFields.sort(function(r1, r2) {
+	        if (r1.value.tag > r2.value.tag) {
+	            return 1;
+	        } else {
+	            return -1;
+	        }
+	    });
+	
+	    sfnt.fields = sfnt.fields.concat(recordFields);
+	    sfnt.fields = sfnt.fields.concat(tableFields);
+	    return sfnt;
+	}
+	
+	// Get the metrics for a character. If the string has more than one character
+	// this function returns metrics for the first available character.
+	// You can provide optional fallback metrics if no characters are available.
+	function metricsForChar(font, chars, notFoundMetrics) {
+	    for (var i = 0; i < chars.length; i += 1) {
+	        var glyphIndex = font.charToGlyphIndex(chars[i]);
+	        if (glyphIndex > 0) {
+	            var glyph = font.glyphs.get(glyphIndex);
+	            return glyph.getMetrics();
+	        }
+	    }
+	
+	    return notFoundMetrics;
+	}
+	
+	function average(vs) {
+	    var sum = 0;
+	    for (var i = 0; i < vs.length; i += 1) {
+	        sum += vs[i];
+	    }
+	
+	    return sum / vs.length;
+	}
+	
+	// Convert the font object to a SFNT data structure.
+	// This structure contains all the necessary tables and metadata to create a binary OTF file.
+	function fontToSfntTable(font) {
+	    var xMins = [];
+	    var yMins = [];
+	    var xMaxs = [];
+	    var yMaxs = [];
+	    var advanceWidths = [];
+	    var leftSideBearings = [];
+	    var rightSideBearings = [];
+	    var firstCharIndex;
+	    var lastCharIndex = 0;
+	    var ulUnicodeRange1 = 0;
+	    var ulUnicodeRange2 = 0;
+	    var ulUnicodeRange3 = 0;
+	    var ulUnicodeRange4 = 0;
+	
+	    for (var i = 0; i < font.glyphs.length; i += 1) {
+	        var glyph = font.glyphs.get(i);
+	        var unicode = glyph.unicode | 0;
+	
+	        if (isNaN(glyph.advanceWidth)) {
+	            throw new Error('Glyph ' + glyph.name + ' (' + i + '): advanceWidth is not a number.');
+	        }
+	
+	        if (firstCharIndex > unicode || firstCharIndex === undefined) {
+	            // ignore .notdef char
+	            if (unicode > 0) {
+	                firstCharIndex = unicode;
+	            }
+	        }
+	
+	        if (lastCharIndex < unicode) {
+	            lastCharIndex = unicode;
+	        }
+	
+	        var position = os2.getUnicodeRange(unicode);
+	        if (position < 32) {
+	            ulUnicodeRange1 |= 1 << position;
+	        } else if (position < 64) {
+	            ulUnicodeRange2 |= 1 << position - 32;
+	        } else if (position < 96) {
+	            ulUnicodeRange3 |= 1 << position - 64;
+	        } else if (position < 123) {
+	            ulUnicodeRange4 |= 1 << position - 96;
+	        } else {
+	            throw new Error('Unicode ranges bits > 123 are reserved for internal usage');
+	        }
+	        // Skip non-important characters.
+	        if (glyph.name === '.notdef') { continue; }
+	        var metrics = glyph.getMetrics();
+	        xMins.push(metrics.xMin);
+	        yMins.push(metrics.yMin);
+	        xMaxs.push(metrics.xMax);
+	        yMaxs.push(metrics.yMax);
+	        leftSideBearings.push(metrics.leftSideBearing);
+	        rightSideBearings.push(metrics.rightSideBearing);
+	        advanceWidths.push(glyph.advanceWidth);
+	    }
+	
+	    var globals = {
+	        xMin: Math.min.apply(null, xMins),
+	        yMin: Math.min.apply(null, yMins),
+	        xMax: Math.max.apply(null, xMaxs),
+	        yMax: Math.max.apply(null, yMaxs),
+	        advanceWidthMax: Math.max.apply(null, advanceWidths),
+	        advanceWidthAvg: average(advanceWidths),
+	        minLeftSideBearing: Math.min.apply(null, leftSideBearings),
+	        maxLeftSideBearing: Math.max.apply(null, leftSideBearings),
+	        minRightSideBearing: Math.min.apply(null, rightSideBearings)
+	    };
+	    globals.ascender = font.ascender;
+	    globals.descender = font.descender;
+	
+	    var headTable = head.make({
+	        flags: 3, // 00000011 (baseline for font at y=0; left sidebearing point at x=0)
+	        unitsPerEm: font.unitsPerEm,
+	        xMin: globals.xMin,
+	        yMin: globals.yMin,
+	        xMax: globals.xMax,
+	        yMax: globals.yMax,
+	        lowestRecPPEM: 3,
+	        createdTimestamp: font.createdTimestamp
+	    });
+	
+	    var hheaTable = hhea.make({
+	        ascender: globals.ascender,
+	        descender: globals.descender,
+	        advanceWidthMax: globals.advanceWidthMax,
+	        minLeftSideBearing: globals.minLeftSideBearing,
+	        minRightSideBearing: globals.minRightSideBearing,
+	        xMaxExtent: globals.maxLeftSideBearing + (globals.xMax - globals.xMin),
+	        numberOfHMetrics: font.glyphs.length
+	    });
+	
+	    var maxpTable = maxp.make(font.glyphs.length);
+	
+	    var os2Table = os2.make({
+	        xAvgCharWidth: Math.round(globals.advanceWidthAvg),
+	        usWeightClass: font.tables.os2.usWeightClass,
+	        usWidthClass: font.tables.os2.usWidthClass,
+	        usFirstCharIndex: firstCharIndex,
+	        usLastCharIndex: lastCharIndex,
+	        ulUnicodeRange1: ulUnicodeRange1,
+	        ulUnicodeRange2: ulUnicodeRange2,
+	        ulUnicodeRange3: ulUnicodeRange3,
+	        ulUnicodeRange4: ulUnicodeRange4,
+	        fsSelection: font.tables.os2.fsSelection, // REGULAR
+	        // See http://typophile.com/node/13081 for more info on vertical metrics.
+	        // We get metrics for typical characters (such as "x" for xHeight).
+	        // We provide some fallback characters if characters are unavailable: their
+	        // ordering was chosen experimentally.
+	        sTypoAscender: globals.ascender,
+	        sTypoDescender: globals.descender,
+	        sTypoLineGap: 0,
+	        usWinAscent: globals.yMax,
+	        usWinDescent: Math.abs(globals.yMin),
+	        ulCodePageRange1: 1, // FIXME: hard-code Latin 1 support for now
+	        sxHeight: metricsForChar(font, 'xyvw', {yMax: Math.round(globals.ascender / 2)}).yMax,
+	        sCapHeight: metricsForChar(font, 'HIKLEFJMNTZBDPRAGOQSUVWXY', globals).yMax,
+	        usDefaultChar: font.hasChar(' ') ? 32 : 0, // Use space as the default character, if available.
+	        usBreakChar: font.hasChar(' ') ? 32 : 0 // Use space as the break character, if available.
+	    });
+	
+	    var hmtxTable = hmtx.make(font.glyphs);
+	    var cmapTable = cmap.make(font.glyphs);
+	
+	    var englishFamilyName = font.getEnglishName('fontFamily');
+	    var englishStyleName = font.getEnglishName('fontSubfamily');
+	    var englishFullName = englishFamilyName + ' ' + englishStyleName;
+	    var postScriptName = font.getEnglishName('postScriptName');
+	    if (!postScriptName) {
+	        postScriptName = englishFamilyName.replace(/\s/g, '') + '-' + englishStyleName;
+	    }
+	
+	    var names = {};
+	    for (var n in font.names) {
+	        names[n] = font.names[n];
+	    }
+	
+	    if (!names.uniqueID) {
+	        names.uniqueID = {en: font.getEnglishName('manufacturer') + ':' + englishFullName};
+	    }
+	
+	    if (!names.postScriptName) {
+	        names.postScriptName = {en: postScriptName};
+	    }
+	
+	    if (!names.preferredFamily) {
+	        names.preferredFamily = font.names.fontFamily;
+	    }
+	
+	    if (!names.preferredSubfamily) {
+	        names.preferredSubfamily = font.names.fontSubfamily;
+	    }
+	
+	    var languageTags = [];
+	    var nameTable = _name.make(names, languageTags);
+	    var ltagTable = (languageTags.length > 0 ? ltag.make(languageTags) : undefined);
+	
+	    var postTable = post.make();
+	    var cffTable = cff.make(font.glyphs, {
+	        version: font.getEnglishName('version'),
+	        fullName: englishFullName,
+	        familyName: englishFamilyName,
+	        weightName: englishStyleName,
+	        postScriptName: postScriptName,
+	        unitsPerEm: font.unitsPerEm,
+	        fontBBox: [0, globals.yMin, globals.ascender, globals.advanceWidthMax]
+	    });
+	
+	    var metaTable = (font.metas && Object.keys(font.metas).length > 0) ? meta.make(font.metas) : undefined;
+	
+	    // The order does not matter because makeSfntTable() will sort them.
+	    var tables = [headTable, hheaTable, maxpTable, os2Table, nameTable, cmapTable, postTable, cffTable, hmtxTable];
+	    if (ltagTable) {
+	        tables.push(ltagTable);
+	    }
+	    // Optional tables
+	    if (font.tables.gsub) {
+	        tables.push(gsub.make(font.tables.gsub));
+	    }
+	    if (metaTable) {
+	        tables.push(metaTable);
+	    }
+	
+	    var sfntTable = makeSfntTable(tables);
+	
+	    // Compute the font's checkSum and store it in head.checkSumAdjustment.
+	    var bytes = sfntTable.encode();
+	    var checkSum = computeCheckSum(bytes);
+	    var tableFields = sfntTable.fields;
+	    var checkSumAdjusted = false;
+	    for (var i$1 = 0; i$1 < tableFields.length; i$1 += 1) {
+	        if (tableFields[i$1].name === 'head table') {
+	            tableFields[i$1].value.checkSumAdjustment = 0xB1B0AFBA - checkSum;
+	            checkSumAdjusted = true;
+	            break;
+	        }
+	    }
+	
+	    if (!checkSumAdjusted) {
+	        throw new Error('Could not find head table with checkSum to adjust.');
+	    }
+	
+	    return sfntTable;
+	}
+	
+	var sfnt = { make: makeSfntTable, fontToTable: fontToSfntTable, computeCheckSum: computeCheckSum };
+	
+	// The Layout object is the prototype of Substitution objects, and provides
+	// utility methods to manipulate common layout tables (GPOS, GSUB, GDEF...)
+	
+	function searchTag(arr, tag) {
+	    /* jshint bitwise: false */
+	    var imin = 0;
+	    var imax = arr.length - 1;
+	    while (imin <= imax) {
+	        var imid = (imin + imax) >>> 1;
+	        var val = arr[imid].tag;
+	        if (val === tag) {
+	            return imid;
+	        } else if (val < tag) {
+	            imin = imid + 1;
+	        } else { imax = imid - 1; }
+	    }
+	    // Not found: return -1-insertion point
+	    return -imin - 1;
+	}
+	
+	function binSearch(arr, value) {
+	    /* jshint bitwise: false */
+	    var imin = 0;
+	    var imax = arr.length - 1;
+	    while (imin <= imax) {
+	        var imid = (imin + imax) >>> 1;
+	        var val = arr[imid];
+	        if (val === value) {
+	            return imid;
+	        } else if (val < value) {
+	            imin = imid + 1;
+	        } else { imax = imid - 1; }
+	    }
+	    // Not found: return -1-insertion point
+	    return -imin - 1;
+	}
+	
+	/**
+	 * @exports opentype.Layout
+	 * @class
+	 */
+	function Layout(font, tableName) {
+	    this.font = font;
+	    this.tableName = tableName;
+	}
+	
+	Layout.prototype = {
+	
+	    /**
+	     * Binary search an object by "tag" property
+	     * @instance
+	     * @function searchTag
+	     * @memberof opentype.Layout
+	     * @param  {Array} arr
+	     * @param  {string} tag
+	     * @return {number}
+	     */
+	    searchTag: searchTag,
+	
+	    /**
+	     * Binary search in a list of numbers
+	     * @instance
+	     * @function binSearch
+	     * @memberof opentype.Layout
+	     * @param  {Array} arr
+	     * @param  {number} value
+	     * @return {number}
+	     */
+	    binSearch: binSearch,
+	
+	    /**
+	     * Get or create the Layout table (GSUB, GPOS etc).
+	     * @param  {boolean} create - Whether to create a new one.
+	     * @return {Object} The GSUB or GPOS table.
+	     */
+	    getTable: function(create) {
+	        var layout = this.font.tables[this.tableName];
+	        if (!layout && create) {
+	            layout = this.font.tables[this.tableName] = this.createDefaultTable();
+	        }
+	        return layout;
+	    },
+	
+	    /**
+	     * Returns all scripts in the substitution table.
+	     * @instance
+	     * @return {Array}
+	     */
+	    getScriptNames: function() {
+	        var layout = this.getTable();
+	        if (!layout) { return []; }
+	        return layout.scripts.map(function(script) {
+	            return script.tag;
+	        });
+	    },
+	
+	    /**
+	     * Returns the best bet for a script name.
+	     * Returns 'DFLT' if it exists.
+	     * If not, returns 'latn' if it exists.
+	     * If neither exist, returns undefined.
+	     */
+	    getDefaultScriptName: function() {
+	        var layout = this.getTable();
+	        if (!layout) { return; }
+	        var hasLatn = false;
+	        for (var i = 0; i < layout.scripts.length; i++) {
+	            var name = layout.scripts[i].tag;
+	            if (name === 'DFLT') { return name; }
+	            if (name === 'latn') { hasLatn = true; }
+	        }
+	        if (hasLatn) { return 'latn'; }
+	    },
+	
+	    /**
+	     * Returns all LangSysRecords in the given script.
+	     * @instance
+	     * @param {string} [script='DFLT']
+	     * @param {boolean} create - forces the creation of this script table if it doesn't exist.
+	     * @return {Object} An object with tag and script properties.
+	     */
+	    getScriptTable: function(script, create) {
+	        var layout = this.getTable(create);
+	        if (layout) {
+	            script = script || 'DFLT';
+	            var scripts = layout.scripts;
+	            var pos = searchTag(layout.scripts, script);
+	            if (pos >= 0) {
+	                return scripts[pos].script;
+	            } else if (create) {
+	                var scr = {
+	                    tag: script,
+	                    script: {
+	                        defaultLangSys: {reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: []},
+	                        langSysRecords: []
+	                    }
+	                };
+	                scripts.splice(-1 - pos, 0, scr);
+	                return scr.script;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Returns a language system table
+	     * @instance
+	     * @param {string} [script='DFLT']
+	     * @param {string} [language='dlft']
+	     * @param {boolean} create - forces the creation of this langSysTable if it doesn't exist.
+	     * @return {Object}
+	     */
+	    getLangSysTable: function(script, language, create) {
+	        var scriptTable = this.getScriptTable(script, create);
+	        if (scriptTable) {
+	            if (!language || language === 'dflt' || language === 'DFLT') {
+	                return scriptTable.defaultLangSys;
+	            }
+	            var pos = searchTag(scriptTable.langSysRecords, language);
+	            if (pos >= 0) {
+	                return scriptTable.langSysRecords[pos].langSys;
+	            } else if (create) {
+	                var langSysRecord = {
+	                    tag: language,
+	                    langSys: {reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: []}
+	                };
+	                scriptTable.langSysRecords.splice(-1 - pos, 0, langSysRecord);
+	                return langSysRecord.langSys;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Get a specific feature table.
+	     * @instance
+	     * @param {string} [script='DFLT']
+	     * @param {string} [language='dlft']
+	     * @param {string} feature - One of the codes listed at https://www.microsoft.com/typography/OTSPEC/featurelist.htm
+	     * @param {boolean} create - forces the creation of the feature table if it doesn't exist.
+	     * @return {Object}
+	     */
+	    getFeatureTable: function(script, language, feature, create) {
+	        var langSysTable = this.getLangSysTable(script, language, create);
+	        if (langSysTable) {
+	            var featureRecord;
+	            var featIndexes = langSysTable.featureIndexes;
+	            var allFeatures = this.font.tables[this.tableName].features;
+	            // The FeatureIndex array of indices is in arbitrary order,
+	            // even if allFeatures is sorted alphabetically by feature tag.
+	            for (var i = 0; i < featIndexes.length; i++) {
+	                featureRecord = allFeatures[featIndexes[i]];
+	                if (featureRecord.tag === feature) {
+	                    return featureRecord.feature;
+	                }
+	            }
+	            if (create) {
+	                var index = allFeatures.length;
+	                // Automatic ordering of features would require to shift feature indexes in the script list.
+	                check.assert(index === 0 || feature >= allFeatures[index - 1].tag, 'Features must be added in alphabetical order.');
+	                featureRecord = {
+	                    tag: feature,
+	                    feature: { params: 0, lookupListIndexes: [] }
+	                };
+	                allFeatures.push(featureRecord);
+	                featIndexes.push(index);
+	                return featureRecord.feature;
+	            }
+	        }
+	    },
+	
+	    /**
+	     * Get the lookup tables of a given type for a script/language/feature.
+	     * @instance
+	     * @param {string} [script='DFLT']
+	     * @param {string} [language='dlft']
+	     * @param {string} feature - 4-letter feature code
+	     * @param {number} lookupType - 1 to 8
+	     * @param {boolean} create - forces the creation of the lookup table if it doesn't exist, with no subtables.
+	     * @return {Object[]}
+	     */
+	    getLookupTables: function(script, language, feature, lookupType, create) {
+	        var featureTable = this.getFeatureTable(script, language, feature, create);
+	        var tables = [];
+	        if (featureTable) {
+	            var lookupTable;
+	            var lookupListIndexes = featureTable.lookupListIndexes;
+	            var allLookups = this.font.tables[this.tableName].lookups;
+	            // lookupListIndexes are in no particular order, so use naive search.
+	            for (var i = 0; i < lookupListIndexes.length; i++) {
+	                lookupTable = allLookups[lookupListIndexes[i]];
+	                if (lookupTable.lookupType === lookupType) {
+	                    tables.push(lookupTable);
+	                }
+	            }
+	            if (tables.length === 0 && create) {
+	                lookupTable = {
+	                    lookupType: lookupType,
+	                    lookupFlag: 0,
+	                    subtables: [],
+	                    markFilteringSet: undefined
+	                };
+	                var index = allLookups.length;
+	                allLookups.push(lookupTable);
+	                lookupListIndexes.push(index);
+	                return [lookupTable];
+	            }
+	        }
+	        return tables;
+	    },
+	
+	    /**
+	     * Returns the list of glyph indexes of a coverage table.
+	     * Format 1: the list is stored raw
+	     * Format 2: compact list as range records.
+	     * @instance
+	     * @param  {Object} coverageTable
+	     * @return {Array}
+	     */
+	    expandCoverage: function(coverageTable) {
+	        if (coverageTable.format === 1) {
+	            return coverageTable.glyphs;
+	        } else {
+	            var glyphs = [];
+	            var ranges = coverageTable.ranges;
+	            for (var i = 0; i < ranges.length; i++) {
+	                var range = ranges[i];
+	                var start = range.start;
+	                var end = range.end;
+	                for (var j = start; j <= end; j++) {
+	                    glyphs.push(j);
+	                }
+	            }
+	            return glyphs;
+	        }
+	    }
+	
+	};
+	
 	// The Substitution object provides utility methods to manipulate
 	// the GSUB substitution table.
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var Layout = __webpack_require__(28);
 	
 	/**
 	 * @exports opentype.Substitution
@@ -7451,9 +7487,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * @param {opentype.Font}
 	 * @constructor
 	 */
-	var Substitution = function(font) {
-	    this.font = font;
-	};
+	function Substitution(font) {
+	    Layout.call(this, font, 'gsub');
+	}
 	
 	// Check if 2 arrays of primitives are equal.
 	function arraysEqual(ar1, ar2) {
@@ -7478,61 +7514,60 @@ return /******/ (function(modules) { // webpackBootstrap
 	        subtables.push(defaultSubtable);
 	        return defaultSubtable;
 	    }
+	    return undefined;
 	}
 	
-	Substitution.prototype = Layout;
+	Substitution.prototype = Layout.prototype;
 	
 	/**
-	 * Get or create the GSUB table.
-	 * @param  {boolean} create - Whether to create a new one.
+	 * Create a default GSUB table.
 	 * @return {Object} gsub - The GSUB table.
 	 */
-	Substitution.prototype.getGsubTable = function(create) {
-	    var gsub = this.font.tables.gsub;
-	    if (!gsub && create) {
-	        // Generate a default empty GSUB table with just a DFLT script and dflt lang sys.
-	        this.font.tables.gsub = gsub = {
-	            version: 1,
-	            scripts: [{
-	                tag: 'DFLT',
-	                script: {
-	                    defaultLangSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] },
-	                    langSysRecords: []
-	                }
-	            }],
-	            features: [],
-	            lookups: []
-	        };
-	    }
-	    return gsub;
+	Substitution.prototype.createDefaultTable = function() {
+	    // Generate a default empty GSUB table with just a DFLT script and dflt lang sys.
+	    return {
+	        version: 1,
+	        scripts: [{
+	            tag: 'DFLT',
+	            script: {
+	                defaultLangSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] },
+	                langSysRecords: []
+	            }
+	        }],
+	        features: [],
+	        lookups: []
+	    };
 	};
 	
 	/**
 	 * List all single substitutions (lookup type 1) for a given script, language, and feature.
-	 * @param {string} script
-	 * @param {string} language
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='dflt']
 	 * @param {string} feature - 4-character feature name ('aalt', 'salt', 'ss01'...)
 	 * @return {Array} substitutions - The list of substitutions.
 	 */
 	Substitution.prototype.getSingle = function(feature, script, language) {
+	    var this$1 = this;
+	
 	    var substitutions = [];
-	    var lookupTable = this.getLookupTable(script, language, feature, 1);
-	    if (!lookupTable) { return substitutions; }
-	    var subtables = lookupTable.subtables;
-	    for (var i = 0; i < subtables.length; i++) {
-	        var subtable = subtables[i];
-	        var glyphs = this.expandCoverage(subtable.coverage);
-	        var j;
-	        if (subtable.substFormat === 1) {
-	            var delta = subtable.deltaGlyphId;
-	            for (j = 0; j < glyphs.length; j++) {
-	                var glyph = glyphs[j];
-	                substitutions.push({ sub: glyph, by: glyph + delta });
-	            }
-	        } else {
-	            var substitute = subtable.substitute;
-	            for (j = 0; j < glyphs.length; j++) {
-	                substitutions.push({ sub: glyphs[j], by: substitute[j] });
+	    var lookupTables = this.getLookupTables(script, language, feature, 1);
+	    for (var idx = 0; idx < lookupTables.length; idx++) {
+	        var subtables = lookupTables[idx].subtables;
+	        for (var i = 0; i < subtables.length; i++) {
+	            var subtable = subtables[i];
+	            var glyphs = this$1.expandCoverage(subtable.coverage);
+	            var j = (void 0);
+	            if (subtable.substFormat === 1) {
+	                var delta = subtable.deltaGlyphId;
+	                for (j = 0; j < glyphs.length; j++) {
+	                    var glyph = glyphs[j];
+	                    substitutions.push({ sub: glyph, by: glyph + delta });
+	                }
+	            } else {
+	                var substitute = subtable.substitute;
+	                for (j = 0; j < glyphs.length; j++) {
+	                    substitutions.push({ sub: glyphs[j], by: substitute[j] });
+	                }
 	            }
 	        }
 	    }
@@ -7541,22 +7576,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	/**
 	 * List all alternates (lookup type 3) for a given script, language, and feature.
-	 * @param {string} script
-	 * @param {string} language
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='dflt']
 	 * @param {string} feature - 4-character feature name ('aalt', 'salt'...)
 	 * @return {Array} alternates - The list of alternates
 	 */
 	Substitution.prototype.getAlternates = function(feature, script, language) {
+	    var this$1 = this;
+	
 	    var alternates = [];
-	    var lookupTable = this.getLookupTable(script, language, feature, 3);
-	    if (!lookupTable) { return alternates; }
-	    var subtables = lookupTable.subtables;
-	    for (var i = 0; i < subtables.length; i++) {
-	        var subtable = subtables[i];
-	        var glyphs = this.expandCoverage(subtable.coverage);
-	        var alternateSets = subtable.alternateSets;
-	        for (var j = 0; j < glyphs.length; j++) {
-	            alternates.push({ sub: glyphs[j], by: alternateSets[j] });
+	    var lookupTables = this.getLookupTables(script, language, feature, 3);
+	    for (var idx = 0; idx < lookupTables.length; idx++) {
+	        var subtables = lookupTables[idx].subtables;
+	        for (var i = 0; i < subtables.length; i++) {
+	            var subtable = subtables[i];
+	            var glyphs = this$1.expandCoverage(subtable.coverage);
+	            var alternateSets = subtable.alternateSets;
+	            for (var j = 0; j < glyphs.length; j++) {
+	                alternates.push({ sub: glyphs[j], by: alternateSets[j] });
+	            }
 	        }
 	    }
 	    return alternates;
@@ -7566,28 +7604,31 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * List all ligatures (lookup type 4) for a given script, language, and feature.
 	 * The result is an array of ligature objects like { sub: [ids], by: id }
 	 * @param {string} feature - 4-letter feature name ('liga', 'rlig', 'dlig'...)
-	 * @param {string} script
-	 * @param {string} language
+	 * @param {string} [script='DFLT']
+	 * @param {string} [language='dflt']
 	 * @return {Array} ligatures - The list of ligatures.
 	 */
 	Substitution.prototype.getLigatures = function(feature, script, language) {
+	    var this$1 = this;
+	
 	    var ligatures = [];
-	    var lookupTable = this.getLookupTable(script, language, feature, 4);
-	    if (!lookupTable) { return []; }
-	    var subtables = lookupTable.subtables;
-	    for (var i = 0; i < subtables.length; i++) {
-	        var subtable = subtables[i];
-	        var glyphs = this.expandCoverage(subtable.coverage);
-	        var ligatureSets = subtable.ligatureSets;
-	        for (var j = 0; j < glyphs.length; j++) {
-	            var startGlyph = glyphs[j];
-	            var ligSet = ligatureSets[j];
-	            for (var k = 0; k < ligSet.length; k++) {
-	                var lig = ligSet[k];
-	                ligatures.push({
-	                    sub: [startGlyph].concat(lig.components),
-	                    by: lig.ligGlyph
-	                });
+	    var lookupTables = this.getLookupTables(script, language, feature, 4);
+	    for (var idx = 0; idx < lookupTables.length; idx++) {
+	        var subtables = lookupTables[idx].subtables;
+	        for (var i = 0; i < subtables.length; i++) {
+	            var subtable = subtables[i];
+	            var glyphs = this$1.expandCoverage(subtable.coverage);
+	            var ligatureSets = subtable.ligatureSets;
+	            for (var j = 0; j < glyphs.length; j++) {
+	                var startGlyph = glyphs[j];
+	                var ligSet = ligatureSets[j];
+	                for (var k = 0; k < ligSet.length; k++) {
+	                    var lig = ligSet[k];
+	                    ligatures.push({
+	                        sub: [startGlyph].concat(lig.components),
+	                        by: lig.ligGlyph
+	                    });
+	                }
 	            }
 	        }
 	    }
@@ -7600,13 +7641,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * @param {string} feature - 4-letter feature name ('liga', 'rlig', 'dlig'...)
 	 * @param {Object} substitution - { sub: id, delta: number } for format 1 or { sub: id, by: id } for format 2.
 	 * @param {string} [script='DFLT']
-	 * @param {string} [language='DFLT']
+	 * @param {string} [language='dflt']
 	 */
 	Substitution.prototype.addSingle = function(feature, substitution, script, language) {
-	    var lookupTable = this.getLookupTable(script, language, feature, 1, true);
+	    var lookupTable = this.getLookupTables(script, language, feature, 1, true)[0];
 	    var subtable = getSubstFormat(lookupTable, 2, {                // lookup type 1 subtable, format 2, coverage format 1
 	        substFormat: 2,
-	        coverage: { format: 1, glyphs: [] },
+	        coverage: {format: 1, glyphs: []},
 	        substitute: []
 	    });
 	    check.assert(subtable.coverage.format === 1, 'Ligature: unable to modify coverage table format ' + subtable.coverage.format);
@@ -7625,13 +7666,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * @param {string} feature - 4-letter feature name ('liga', 'rlig', 'dlig'...)
 	 * @param {Object} substitution - { sub: id, by: [ids] }
 	 * @param {string} [script='DFLT']
-	 * @param {string} [language='DFLT']
+	 * @param {string} [language='dflt']
 	 */
 	Substitution.prototype.addAlternate = function(feature, substitution, script, language) {
-	    var lookupTable = this.getLookupTable(script, language, feature, 3, true);
+	    var lookupTable = this.getLookupTables(script, language, feature, 3, true)[0];
 	    var subtable = getSubstFormat(lookupTable, 1, {                // lookup type 3 subtable, format 1, coverage format 1
 	        substFormat: 1,
-	        coverage: { format: 1, glyphs: [] },
+	        coverage: {format: 1, glyphs: []},
 	        alternateSets: []
 	    });
 	    check.assert(subtable.coverage.format === 1, 'Ligature: unable to modify coverage table format ' + subtable.coverage.format);
@@ -7651,12 +7692,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * @param {string} feature - 4-letter feature name ('liga', 'rlig', 'dlig'...)
 	 * @param {Object} ligature - { sub: [ids], by: id }
 	 * @param {string} [script='DFLT']
-	 * @param {string} [language='DFLT']
+	 * @param {string} [language='dflt']
 	 */
 	Substitution.prototype.addLigature = function(feature, ligature, script, language) {
-	    script = script || 'DFLT';
-	    language = language || 'DFLT';
-	    var lookupTable = this.getLookupTable(script, language, feature, 4, true);
+	    var lookupTable = this.getLookupTables(script, language, feature, 4, true)[0];
 	    var subtable = lookupTable.subtables[0];
 	    if (!subtable) {
 	        subtable = {                // lookup type 4 subtable, format 1, coverage format 1
@@ -7697,12 +7736,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * List all feature data for a given script and language.
 	 * @param {string} feature - 4-letter feature name
 	 * @param {string} [script='DFLT']
-	 * @param {string} [language='DFLT']
+	 * @param {string} [language='dflt']
 	 * @return {Array} substitutions - The list of substitutions.
 	 */
 	Substitution.prototype.getFeature = function(feature, script, language) {
-	    script = script || 'DFLT';
-	    language = language || 'DFLT';
 	    if (/ss\d\d/.test(feature)) {               // ss01 - ss20
 	        return this.getSingle(feature, script, language);
 	    }
@@ -7715,6 +7752,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        case 'liga':
 	        case 'rlig': return this.getLigatures(feature, script, language);
 	    }
+	    return undefined;
 	};
 	
 	/**
@@ -7722,11 +7760,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	 * @param {string} feature - 4-letter feature name
 	 * @param {Object} sub - the substitution to add (an object like { sub: id or [ids], by: id or [ids] })
 	 * @param {string} [script='DFLT']
-	 * @param {string} [language='DFLT']
+	 * @param {string} [language='dflt']
 	 */
 	Substitution.prototype.add = function(feature, sub, script, language) {
-	    script = script || 'DFLT';
-	    language = language || 'DFLT';
 	    if (/ss\d\d/.test(feature)) {               // ss01 - ss20
 	        return this.addSingle(feature, sub, script, language);
 	    }
@@ -7742,274 +7778,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	        case 'rlig':
 	            return this.addLigature(feature, sub, script, language);
 	    }
+	    return undefined;
 	};
 	
-	module.exports = Substitution;
-
-
-/***/ },
-/* 28 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// The Layout object is the prototype of Substition objects, and provides utility methods to manipulate
-	// common layout tables (GPOS, GSUB, GDEF...)
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	
-	function searchTag(arr, tag) {
-	    /* jshint bitwise: false */
-	    var imin = 0;
-	    var imax = arr.length - 1;
-	    while (imin <= imax) {
-	        var imid = (imin + imax) >>> 1;
-	        var val = arr[imid].tag;
-	        if (val === tag) {
-	            return imid;
-	        } else if (val < tag) {
-	            imin = imid + 1;
-	        } else { imax = imid - 1; }
-	    }
-	    // Not found: return -1-insertion point
-	    return -imin - 1;
-	}
-	
-	function binSearch(arr, value) {
-	    /* jshint bitwise: false */
-	    var imin = 0;
-	    var imax = arr.length - 1;
-	    while (imin <= imax) {
-	        var imid = (imin + imax) >>> 1;
-	        var val = arr[imid];
-	        if (val === value) {
-	            return imid;
-	        } else if (val < value) {
-	            imin = imid + 1;
-	        } else { imax = imid - 1; }
-	    }
-	    // Not found: return -1-insertion point
-	    return -imin - 1;
-	}
-	
-	/**
-	 * @exports opentype.Layout
-	 * @class
-	 */
-	var Layout = {
-	
-	    /**
-	     * Binary search an object by "tag" property
-	     * @instance
-	     * @function searchTag
-	     * @memberof opentype.Layout
-	     * @param  {Array} arr
-	     * @param  {string} tag
-	     * @return {number}
-	     */
-	    searchTag: searchTag,
-	    /**
-	     * Binary search in a list of numbers
-	     * @instance
-	     * @function binSearch
-	     * @memberof opentype.Layout
-	     * @param  {Array} arr
-	     * @param  {number} value
-	     * @return {number}
-	     */
-	    binSearch: binSearch,
-	
-	    /**
-	     * Returns all scripts in the substitution table.
-	     * @instance
-	     * @return {Array}
-	     */
-	    getScriptNames: function() {
-	        var gsub = this.getGsubTable();
-	        if (!gsub) { return []; }
-	        return gsub.scripts.map(function(script) {
-	            return script.tag;
-	        });
-	    },
-	
-	    /**
-	     * Returns all LangSysRecords in the given script.
-	     * @instance
-	     * @param {string} script - Use 'DFLT' for default script
-	     * @param {boolean} create - forces the creation of this script table if it doesn't exist.
-	     * @return {Object} An object with tag and script properties.
-	     */
-	    getScriptTable: function(script, create) {
-	        var gsub = this.getGsubTable(create);
-	        if (gsub) {
-	            var scripts = gsub.scripts;
-	            var pos = searchTag(gsub.scripts, script);
-	            if (pos >= 0) {
-	                return scripts[pos].script;
-	            } else {
-	                var scr = {
-	                    tag: script,
-	                    script: {
-	                        defaultLangSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] },
-	                        langSysRecords: []
-	                    }
-	                };
-	                scripts.splice(-1 - pos, 0, scr.script);
-	                return scr;
-	            }
-	        }
-	    },
-	
-	    /**
-	     * Returns a language system table
-	     * @instance
-	     * @param {string} script - Use 'DFLT' for default script
-	     * @param {string} language - Use 'DFLT' for default language
-	     * @param {boolean} create - forces the creation of this langSysTable if it doesn't exist.
-	     * @return {Object}
-	     */
-	    getLangSysTable: function(script, language, create) {
-	        var scriptTable = this.getScriptTable(script, create);
-	        if (scriptTable) {
-	            if (language === 'DFLT') {
-	                return scriptTable.defaultLangSys;
-	            }
-	            var pos = searchTag(scriptTable.langSysRecords, language);
-	            if (pos >= 0) {
-	                return scriptTable.langSysRecords[pos].langSys;
-	            } else if (create) {
-	                var langSysRecord = {
-	                    tag: language,
-	                    langSys: { reserved: 0, reqFeatureIndex: 0xffff, featureIndexes: [] }
-	                };
-	                scriptTable.langSysRecords.splice(-1 - pos, 0, langSysRecord);
-	                return langSysRecord.langSys;
-	            }
-	        }
-	    },
-	
-	    /**
-	     * Get a specific feature table.
-	     * @instance
-	     * @param {string} script - Use 'DFLT' for default script
-	     * @param {string} language - Use 'DFLT' for default language
-	     * @param {string} feature - One of the codes listed at https://www.microsoft.com/typography/OTSPEC/featurelist.htm
-	     * @param {boolean} create - forces the creation of the feature table if it doesn't exist.
-	     * @return {Object}
-	     */
-	    getFeatureTable: function(script, language, feature, create) {
-	        var langSysTable = this.getLangSysTable(script, language, create);
-	        if (langSysTable) {
-	            var featureRecord;
-	            var featIndexes = langSysTable.featureIndexes;
-	            var allFeatures = this.font.tables.gsub.features;
-	            // The FeatureIndex array of indices is in arbitrary order,
-	            // even if allFeatures is sorted alphabetically by feature tag.
-	            for (var i = 0; i < featIndexes.length; i++) {
-	                featureRecord = allFeatures[featIndexes[i]];
-	                if (featureRecord.tag === feature) {
-	                    return featureRecord.feature;
-	                }
-	            }
-	            if (create) {
-	                var index = allFeatures.length;
-	                // Automatic ordering of features would require to shift feature indexes in the script list.
-	                check.assert(index === 0 || feature >= allFeatures[index - 1].tag, 'Features must be added in alphabetical order.');
-	                featureRecord = {
-	                    tag: feature,
-	                    feature: { params: 0, lookupListIndexes: [] }
-	                };
-	                allFeatures.push(featureRecord);
-	                featIndexes.push(index);
-	                return featureRecord.feature;
-	            }
-	        }
-	    },
-	
-	    /**
-	     * Get the first lookup table of a given type for a script/language/feature.
-	     * @instance
-	     * @param {string} script - Use 'DFLT' for default script
-	     * @param {string} language - Use 'DFLT' for default language
-	     * @param {string} feature - 4-letter feature code
-	     * @param {number} lookupType - 1 to 8
-	     * @param {boolean} create - forces the creation of the lookup table if it doesn't exist, with no subtables.
-	     * @return {Object}
-	     */
-	    getLookupTable: function(script, language, feature, lookupType, create) {
-	        var featureTable = this.getFeatureTable(script, language, feature, create);
-	        if (featureTable) {
-	            var lookupTable;
-	            var lookupListIndexes = featureTable.lookupListIndexes;
-	            var allLookups = this.font.tables.gsub.lookups;
-	            // lookupListIndexes are in no particular order, so use naïve search.
-	            for (var i = 0; i < lookupListIndexes.length; i++) {
-	                lookupTable = allLookups[lookupListIndexes[i]];
-	                if (lookupTable.lookupType === lookupType) {
-	                    return lookupTable;
-	                }
-	            }
-	            if (create) {
-	                lookupTable = {
-	                    lookupType: lookupType,
-	                    lookupFlag: 0,
-	                    subtables: [],
-	                    markFilteringSet: undefined
-	                };
-	                var index = allLookups.length;
-	                allLookups.push(lookupTable);
-	                lookupListIndexes.push(index);
-	                return lookupTable;
-	            }
-	        }
-	    },
-	
-	    /**
-	     * Returns the list of glyph indexes of a coverage table.
-	     * Format 1: the list is stored raw
-	     * Format 2: compact list as range records.
-	     * @instance
-	     * @param  {Object} coverageTable
-	     * @return {Array}
-	     */
-	    expandCoverage: function(coverageTable) {
-	        if (coverageTable.format === 1) {
-	            return coverageTable.glyphs;
-	        } else {
-	            var glyphs = [];
-	            var ranges = coverageTable.ranges;
-	            for (var i = 0; i < ranges; i++) {
-	                var range = ranges[i];
-	                var start = range.start;
-	                var end = range.end;
-	                for (var j = start; j <= end; j++) {
-	                    glyphs.push(j);
-	                }
-	            }
-	            return glyphs;
-	        }
-	    }
-	
-	};
-	
-	module.exports = Layout;
-
-
-/***/ },
-/* 29 */
-/***/ function(module, exports) {
-
-	'use strict';
-	
-	exports.isBrowser = function() {
+	function isBrowser() {
 	    return typeof window !== 'undefined';
-	};
+	}
 	
-	exports.isNode = function() {
-	    return typeof window === 'undefined';
-	};
-	
-	exports.nodeBufferToArrayBuffer = function(buffer) {
+	function nodeBufferToArrayBuffer(buffer) {
 	    var ab = new ArrayBuffer(buffer.length);
 	    var view = new Uint8Array(ab);
 	    for (var i = 0; i < buffer.length; ++i) {
@@ -8017,9 +7793,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	
 	    return ab;
-	};
+	}
 	
-	exports.arrayBufferToNodeBuffer = function(ab) {
+	function arrayBufferToNodeBuffer(ab) {
 	    var buffer = new Buffer(ab.byteLength);
 	    var view = new Uint8Array(ab);
 	    for (var i = 0; i < buffer.length; ++i) {
@@ -8027,33 +7803,3609 @@ return /******/ (function(modules) { // webpackBootstrap
 	    }
 	
 	    return buffer;
-	};
+	}
 	
-	exports.checkArgument = function(expression, message) {
+	function checkArgument(expression, message) {
 	    if (!expression) {
 	        throw message;
 	    }
+	}
+	
+	/* A TrueType font hinting interpreter.
+	*
+	* (c) 2017 Axel Kittenberger
+	*
+	* This interpreter has been implemented according to this documentation:
+	* https://developer.apple.com/fonts/TrueType-Reference-Manual/RM05/Chap5.html
+	*
+	* According to the documentation F24DOT6 values are used for pixels.
+	* That means calculation is 1/64 pixel accurate and uses integer operations.
+	* However, Javascript has floating point operations by default and only
+	* those are available. One could make a case to simulate the 1/64 accuracy
+	* exactly by truncating after every division operation
+	* (for example with << 0) to get pixel exactly results as other TrueType
+	* implementations. It may make sense since some fonts are pixel optimized
+	* by hand using DELTAP instructions. The current implementation doesn't
+	* and rather uses full floating point precision.
+	*
+	* xScale, yScale and rotation is currently ignored.
+	*
+	* A few non-trivial instructions are missing as I didn't encounter yet
+	* a font that used them to test a possible implementation.
+	*
+	* Some fonts seem to use undocumented features regarding the twilight zone.
+	* Only some of them are implemented as they were encountered.
+	*
+	* The exports.DEBUG statements are removed on the minified distribution file.
+	*/
+	var instructionTable;
+	var exec;
+	var execGlyph;
+	var execComponent;
+	
+	/*
+	* Creates a hinting object.
+	*
+	* There ought to be exactly one
+	* for each truetype font that is used for hinting.
+	*/
+	function Hinting(font) {
+	    // the font this hinting object is for
+	    this.font = font;
+	
+	    // cached states
+	    this._fpgmState  =
+	    this._prepState  =
+	        undefined;
+	
+	    // errorState
+	    // 0 ... all okay
+	    // 1 ... had an error in a glyf,
+	    //       continue working but stop spamming
+	    //       the console
+	    // 2 ... error at prep, stop hinting at this ppem
+	    // 3 ... error at fpeg, stop hinting for this font at all
+	    this._errorState = 0;
+	}
+	
+	/*
+	* Not rounding.
+	*/
+	function roundOff(v) {
+	    return v;
+	}
+	
+	/*
+	* Rounding to grid.
+	*/
+	function roundToGrid(v) {
+	    //Rounding in TT is supposed to "symmetrical around zero"
+	    return Math.sign(v) * Math.round(Math.abs(v));
+	}
+	
+	/*
+	* Rounding to double grid.
+	*/
+	function roundToDoubleGrid(v) {
+	    return Math.sign(v) * Math.round(Math.abs(v * 2)) / 2;
+	}
+	
+	/*
+	* Rounding to half grid.
+	*/
+	function roundToHalfGrid(v) {
+	    return Math.sign(v) * (Math.round(Math.abs(v) + 0.5) - 0.5);
+	}
+	
+	/*
+	* Rounding to up to grid.
+	*/
+	function roundUpToGrid(v) {
+	    return Math.sign(v) * Math.ceil(Math.abs(v));
+	}
+	
+	/*
+	* Rounding to down to grid.
+	*/
+	function roundDownToGrid(v) {
+	    return Math.sign(v) * Math.floor(Math.abs(v));
+	}
+	
+	/*
+	* Super rounding.
+	*/
+	var roundSuper = function (v) {
+	    var period = this.srPeriod;
+	    var phase = this.srPhase;
+	    var threshold = this.srThreshold;
+	    var sign = 1;
+	
+	    if (v < 0) {
+	        v = -v;
+	        sign = -1;
+	    }
+	
+	    v += threshold - phase;
+	
+	    v = Math.trunc(v / period) * period;
+	
+	    v += phase;
+	
+	    // according to http://xgridfit.sourceforge.net/round.html
+	    if (sign > 0 && v < 0) { return phase; }
+	    if (sign < 0 && v > 0) { return -phase; }
+	
+	    return v * sign;
 	};
-
-
-/***/ },
-/* 30 */
-/***/ function(module, exports) {
-
-	/* (ignored) */
-
-/***/ },
-/* 31 */
-/***/ function(module, exports, __webpack_require__) {
-
+	
+	/*
+	* Unit vector of x-axis.
+	*/
+	var xUnitVector = {
+	    x: 1,
+	
+	    y: 0,
+	
+	    axis: 'x',
+	
+	    // Gets the projected distance between two points.
+	    // o1/o2 ... if true, respective original position is used.
+	    distance: function (p1, p2, o1, o2) {
+	        return (o1 ? p1.xo : p1.x) - (o2 ? p2.xo : p2.x);
+	    },
+	
+	    // Moves point p so the moved position has the same relative
+	    // position to the moved positions of rp1 and rp2 than the
+	    // original positions had.
+	    //
+	    // See APPENDIX on INTERPOLATE at the bottom of this file.
+	    interpolate: function (p, rp1, rp2, pv) {
+	        var do1;
+	        var do2;
+	        var doa1;
+	        var doa2;
+	        var dm1;
+	        var dm2;
+	        var dt;
+	
+	        if (!pv || pv === this) {
+	            do1 = p.xo - rp1.xo;
+	            do2 = p.xo - rp2.xo;
+	            dm1 = rp1.x - rp1.xo;
+	            dm2 = rp2.x - rp2.xo;
+	            doa1 = Math.abs(do1);
+	            doa2 = Math.abs(do2);
+	            dt = doa1 + doa2;
+	
+	            if (dt === 0) {
+	                p.x = p.xo + (dm1 + dm2) / 2;
+	                return;
+	            }
+	
+	            p.x = p.xo + (dm1 * doa2 + dm2 * doa1) / dt;
+	            return;
+	        }
+	
+	        do1 = pv.distance(p, rp1, true, true);
+	        do2 = pv.distance(p, rp2, true, true);
+	        dm1 = pv.distance(rp1, rp1, false, true);
+	        dm2 = pv.distance(rp2, rp2, false, true);
+	        doa1 = Math.abs(do1);
+	        doa2 = Math.abs(do2);
+	        dt = doa1 + doa2;
+	
+	        if (dt === 0) {
+	            xUnitVector.setRelative(p, p, (dm1 + dm2) / 2, pv, true);
+	            return;
+	        }
+	
+	        xUnitVector.setRelative(p, p, (dm1 * doa2 + dm2 * doa1) / dt, pv, true);
+	    },
+	
+	    // Slope of line normal to this
+	    normalSlope: Number.NEGATIVE_INFINITY,
+	
+	    // Sets the point 'p' relative to point 'rp'
+	    // by the distance 'd'.
+	    //
+	    // See APPENDIX on SETRELATIVE at the bottom of this file.
+	    //
+	    // p   ... point to set
+	    // rp  ... reference point
+	    // d   ... distance on projection vector
+	    // pv  ... projection vector (undefined = this)
+	    // org ... if true, uses the original position of rp as reference.
+	    setRelative: function (p, rp, d, pv, org) {
+	        if (!pv || pv === this) {
+	            p.x = (org ? rp.xo : rp.x) + d;
+	            return;
+	        }
+	
+	        var rpx = org ? rp.xo : rp.x;
+	        var rpy = org ? rp.yo : rp.y;
+	        var rpdx = rpx + d * pv.x;
+	        var rpdy = rpy + d * pv.y;
+	
+	        p.x = rpdx + (p.y - rpdy) / pv.normalSlope;
+	    },
+	
+	    // Slope of vector line.
+	    slope: 0,
+	
+	    // Touches the point p.
+	    touch: function (p) {
+	        p.xTouched = true;
+	    },
+	
+	    // Tests if a point p is touched.
+	    touched: function (p) {
+	        return p.xTouched;
+	    },
+	
+	    // Untouches the point p.
+	    untouch: function (p) {
+	        p.xTouched = false;
+	    }
+	};
+	
+	/*
+	* Unit vector of y-axis.
+	*/
+	var yUnitVector = {
+	    x: 0,
+	
+	    y: 1,
+	
+	    axis: 'y',
+	
+	    // Gets the projected distance between two points.
+	    // o1/o2 ... if true, respective original position is used.
+	    distance: function (p1, p2, o1, o2) {
+	        return (o1 ? p1.yo : p1.y) - (o2 ? p2.yo : p2.y);
+	    },
+	
+	    // Moves point p so the moved position has the same relative
+	    // position to the moved positions of rp1 and rp2 than the
+	    // original positions had.
+	    //
+	    // See APPENDIX on INTERPOLATE at the bottom of this file.
+	    interpolate: function (p, rp1, rp2, pv) {
+	        var do1;
+	        var do2;
+	        var doa1;
+	        var doa2;
+	        var dm1;
+	        var dm2;
+	        var dt;
+	
+	        if (!pv || pv === this) {
+	            do1 = p.yo - rp1.yo;
+	            do2 = p.yo - rp2.yo;
+	            dm1 = rp1.y - rp1.yo;
+	            dm2 = rp2.y - rp2.yo;
+	            doa1 = Math.abs(do1);
+	            doa2 = Math.abs(do2);
+	            dt = doa1 + doa2;
+	
+	            if (dt === 0) {
+	                p.y = p.yo + (dm1 + dm2) / 2;
+	                return;
+	            }
+	
+	            p.y = p.yo + (dm1 * doa2 + dm2 * doa1) / dt;
+	            return;
+	        }
+	
+	        do1 = pv.distance(p, rp1, true, true);
+	        do2 = pv.distance(p, rp2, true, true);
+	        dm1 = pv.distance(rp1, rp1, false, true);
+	        dm2 = pv.distance(rp2, rp2, false, true);
+	        doa1 = Math.abs(do1);
+	        doa2 = Math.abs(do2);
+	        dt = doa1 + doa2;
+	
+	        if (dt === 0) {
+	            yUnitVector.setRelative(p, p, (dm1 + dm2) / 2, pv, true);
+	            return;
+	        }
+	
+	        yUnitVector.setRelative(p, p, (dm1 * doa2 + dm2 * doa1) / dt, pv, true);
+	    },
+	
+	    // Slope of line normal to this.
+	    normalSlope: 0,
+	
+	    // Sets the point 'p' relative to point 'rp'
+	    // by the distance 'd'
+	    //
+	    // See APPENDIX on SETRELATIVE at the bottom of this file.
+	    //
+	    // p   ... point to set
+	    // rp  ... reference point
+	    // d   ... distance on projection vector
+	    // pv  ... projection vector (undefined = this)
+	    // org ... if true, uses the original position of rp as reference.
+	    setRelative: function (p, rp, d, pv, org) {
+	        if (!pv || pv === this) {
+	            p.y = (org ? rp.yo : rp.y) + d;
+	            return;
+	        }
+	
+	        var rpx = org ? rp.xo : rp.x;
+	        var rpy = org ? rp.yo : rp.y;
+	        var rpdx = rpx + d * pv.x;
+	        var rpdy = rpy + d * pv.y;
+	
+	        p.y = rpdy + pv.normalSlope * (p.x - rpdx);
+	    },
+	
+	    // Slope of vector line.
+	    slope: Number.POSITIVE_INFINITY,
+	
+	    // Touches the point p.
+	    touch: function (p) {
+	        p.yTouched = true;
+	    },
+	
+	    // Tests if a point p is touched.
+	    touched: function (p) {
+	        return p.yTouched;
+	    },
+	
+	    // Untouches the point p.
+	    untouch: function (p) {
+	        p.yTouched = false;
+	    }
+	};
+	
+	Object.freeze(xUnitVector);
+	Object.freeze(yUnitVector);
+	
+	/*
+	* Creates a unit vector that is not x- or y-axis.
+	*/
+	function UnitVector(x, y) {
+	    this.x = x;
+	    this.y = y;
+	    this.axis = undefined;
+	    this.slope = y / x;
+	    this.normalSlope = -x / y;
+	    Object.freeze(this);
+	}
+	
+	/*
+	* Gets the projected distance between two points.
+	* o1/o2 ... if true, respective original position is used.
+	*/
+	UnitVector.prototype.distance = function(p1, p2, o1, o2) {
+	    return (
+	        this.x * xUnitVector.distance(p1, p2, o1, o2) +
+	        this.y * yUnitVector.distance(p1, p2, o1, o2)
+	    );
+	};
+	
+	/*
+	* Moves point p so the moved position has the same relative
+	* position to the moved positions of rp1 and rp2 than the
+	* original positions had.
+	*
+	* See APPENDIX on INTERPOLATE at the bottom of this file.
+	*/
+	UnitVector.prototype.interpolate = function(p, rp1, rp2, pv) {
+	    var dm1;
+	    var dm2;
+	    var do1;
+	    var do2;
+	    var doa1;
+	    var doa2;
+	    var dt;
+	
+	    do1 = pv.distance(p, rp1, true, true);
+	    do2 = pv.distance(p, rp2, true, true);
+	    dm1 = pv.distance(rp1, rp1, false, true);
+	    dm2 = pv.distance(rp2, rp2, false, true);
+	    doa1 = Math.abs(do1);
+	    doa2 = Math.abs(do2);
+	    dt = doa1 + doa2;
+	
+	    if (dt === 0) {
+	        this.setRelative(p, p, (dm1 + dm2) / 2, pv, true);
+	        return;
+	    }
+	
+	    this.setRelative(p, p, (dm1 * doa2 + dm2 * doa1) / dt, pv, true);
+	};
+	
+	/*
+	* Sets the point 'p' relative to point 'rp'
+	* by the distance 'd'
+	*
+	* See APPENDIX on SETRELATIVE at the bottom of this file.
+	*
+	* p   ...  point to set
+	* rp  ... reference point
+	* d   ... distance on projection vector
+	* pv  ... projection vector (undefined = this)
+	* org ... if true, uses the original position of rp as reference.
+	*/
+	UnitVector.prototype.setRelative = function(p, rp, d, pv, org) {
+	    pv = pv || this;
+	
+	    var rpx = org ? rp.xo : rp.x;
+	    var rpy = org ? rp.yo : rp.y;
+	    var rpdx = rpx + d * pv.x;
+	    var rpdy = rpy + d * pv.y;
+	
+	    var pvns = pv.normalSlope;
+	    var fvs = this.slope;
+	
+	    var px = p.x;
+	    var py = p.y;
+	
+	    p.x = (fvs * px - pvns * rpdx + rpdy - py) / (fvs - pvns);
+	    p.y = fvs * (p.x - px) + py;
+	};
+	
+	/*
+	* Touches the point p.
+	*/
+	UnitVector.prototype.touch = function(p) {
+	    p.xTouched = true;
+	    p.yTouched = true;
+	};
+	
+	/*
+	* Returns a unit vector with x/y coordinates.
+	*/
+	function getUnitVector(x, y) {
+	    var d = Math.sqrt(x * x + y * y);
+	
+	    x /= d;
+	    y /= d;
+	
+	    if (x === 1 && y === 0) { return xUnitVector; }
+	    else if (x === 0 && y === 1) { return yUnitVector; }
+	    else { return new UnitVector(x, y); }
+	}
+	
+	/*
+	* Creates a point in the hinting engine.
+	*/
+	function HPoint(
+	    x,
+	    y,
+	    lastPointOfContour,
+	    onCurve
+	) {
+	    this.x = this.xo = Math.round(x * 64) / 64; // hinted x value and original x-value
+	    this.y = this.yo = Math.round(y * 64) / 64; // hinted y value and original y-value
+	
+	    this.lastPointOfContour = lastPointOfContour;
+	    this.onCurve = onCurve;
+	    this.prevPointOnContour = undefined;
+	    this.nextPointOnContour = undefined;
+	    this.xTouched = false;
+	    this.yTouched = false;
+	
+	    Object.preventExtensions(this);
+	}
+	
+	/*
+	* Returns the next touched point on the contour.
+	*
+	* v  ... unit vector to test touch axis.
+	*/
+	HPoint.prototype.nextTouched = function(v) {
+	    var p = this.nextPointOnContour;
+	
+	    while (!v.touched(p) && p !== this) { p = p.nextPointOnContour; }
+	
+	    return p;
+	};
+	
+	/*
+	* Returns the previous touched point on the contour
+	*
+	* v  ... unit vector to test touch axis.
+	*/
+	HPoint.prototype.prevTouched = function(v) {
+	    var p = this.prevPointOnContour;
+	
+	    while (!v.touched(p) && p !== this) { p = p.prevPointOnContour; }
+	
+	    return p;
+	};
+	
+	/*
+	* The zero point.
+	*/
+	var HPZero = Object.freeze(new HPoint(0, 0));
+	
+	/*
+	* The default state of the interpreter.
+	*
+	* Note: Freezing the defaultState and then deriving from it
+	* makes the V8 Javascript engine going awkward,
+	* so this is avoided, albeit the defaultState shouldn't
+	* ever change.
+	*/
+	var defaultState = {
+	    cvCutIn: 17 / 16,    // control value cut in
+	    deltaBase: 9,
+	    deltaShift: 0.125,
+	    loop: 1,             // loops some instructions
+	    minDis: 1,           // minimum distance
+	    autoFlip: true
+	};
+	
+	/*
+	* The current state of the interpreter.
+	*
+	* env  ... 'fpgm' or 'prep' or 'glyf'
+	* prog ... the program
+	*/
+	function State(env, prog) {
+	    this.env = env;
+	    this.stack = [];
+	    this.prog = prog;
+	
+	    switch (env) {
+	        case 'glyf' :
+	            this.zp0 = this.zp1 = this.zp2 = 1;
+	            this.rp0 = this.rp1 = this.rp2 = 0;
+	            /* fall through */
+	        case 'prep' :
+	            this.fv = this.pv = this.dpv = xUnitVector;
+	            this.round = roundToGrid;
+	    }
+	}
+	
+	/*
+	* Executes a glyph program.
+	*
+	* This does the hinting for each glyph.
+	*
+	* Returns an array of moved points.
+	*
+	* glyph: the glyph to hint
+	* ppem: the size the glyph is rendered for
+	*/
+	Hinting.prototype.exec = function(glyph, ppem) {
+	    if (typeof ppem !== 'number') {
+	        throw new Error('Point size is not a number!');
+	    }
+	
+	    // Received a fatal error, don't do any hinting anymore.
+	    if (this._errorState > 2) { return; }
+	
+	    var font = this.font;
+	    var prepState = this._prepState;
+	
+	    if (!prepState || prepState.ppem !== ppem) {
+	        var fpgmState = this._fpgmState;
+	
+	        if (!fpgmState) {
+	            // Executes the fpgm state.
+	            // This is used by fonts to define functions.
+	            State.prototype = defaultState;
+	
+	            fpgmState =
+	            this._fpgmState =
+	                new State('fpgm', font.tables.fpgm);
+	
+	            fpgmState.funcs = [ ];
+	            fpgmState.font = font;
+	
+	            if (exports.DEBUG) {
+	                console.log('---EXEC FPGM---');
+	                fpgmState.step = -1;
+	            }
+	
+	            try {
+	                exec(fpgmState);
+	            } catch (e) {
+	                console.log('Hinting error in FPGM:' + e);
+	                this._errorState = 3;
+	                return;
+	            }
+	        }
+	
+	        // Executes the prep program for this ppem setting.
+	        // This is used by fonts to set cvt values
+	        // depending on to be rendered font size.
+	
+	        State.prototype = fpgmState;
+	        prepState =
+	        this._prepState =
+	            new State('prep', font.tables.prep);
+	
+	        prepState.ppem = ppem;
+	
+	        // Creates a copy of the cvt table
+	        // and scales it to the current ppem setting.
+	        var oCvt = font.tables.cvt;
+	        if (oCvt) {
+	            var cvt = prepState.cvt = new Array(oCvt.length);
+	            var scale = ppem / font.unitsPerEm;
+	            for (var c = 0; c < oCvt.length; c++) {
+	                cvt[c] = oCvt[c] * scale;
+	            }
+	        } else {
+	            prepState.cvt = [];
+	        }
+	
+	        if (exports.DEBUG) {
+	            console.log('---EXEC PREP---');
+	            prepState.step = -1;
+	        }
+	
+	        try {
+	            exec(prepState);
+	        } catch (e) {
+	            if (this._errorState < 2) {
+	                console.log('Hinting error in PREP:' + e);
+	            }
+	            this._errorState = 2;
+	        }
+	    }
+	
+	    if (this._errorState > 1) { return; }
+	
+	    try {
+	        return execGlyph(glyph, prepState);
+	    } catch (e) {
+	        if (this._errorState < 1) {
+	            console.log('Hinting error:' + e);
+	            console.log('Note: further hinting errors are silenced');
+	        }
+	        this._errorState = 1;
+	        return undefined;
+	    }
+	};
+	
+	/*
+	* Executes the hinting program for a glyph.
+	*/
+	execGlyph = function(glyph, prepState) {
+	    // original point positions
+	    var xScale = prepState.ppem / prepState.font.unitsPerEm;
+	    var yScale = xScale;
+	    var components = glyph.components;
+	    var contours;
+	    var gZone;
+	    var state;
+	
+	    State.prototype = prepState;
+	    if (!components) {
+	        state = new State('glyf', glyph.instructions);
+	        if (exports.DEBUG) {
+	            console.log('---EXEC GLYPH---');
+	            state.step = -1;
+	        }
+	        execComponent(glyph, state, xScale, yScale);
+	        gZone = state.gZone;
+	    } else {
+	        var font = prepState.font;
+	        gZone = [];
+	        contours = [];
+	        for (var i = 0; i < components.length; i++) {
+	            var c = components[i];
+	            var cg = font.glyphs.get(c.glyphIndex);
+	
+	            state = new State('glyf', cg.instructions);
+	
+	            if (exports.DEBUG) {
+	                console.log('---EXEC COMP ' + i + '---');
+	                state.step = -1;
+	            }
+	
+	            execComponent(cg, state, xScale, yScale);
+	            // appends the computed points to the result array
+	            // post processes the component points
+	            var dx = Math.round(c.dx * xScale);
+	            var dy = Math.round(c.dy * yScale);
+	            var gz = state.gZone;
+	            var cc = state.contours;
+	            for (var pi = 0; pi < gz.length; pi++) {
+	                var p = gz[pi];
+	                p.xTouched = p.yTouched = false;
+	                p.xo = p.x = p.x + dx;
+	                p.yo = p.y = p.y + dy;
+	            }
+	
+	            var gLen = gZone.length;
+	            gZone.push.apply(gZone, gz);
+	            for (var j = 0; j < cc.length; j++) {
+	                contours.push(cc[j] + gLen);
+	            }
+	        }
+	
+	        if (glyph.instructions && !state.inhibitGridFit) {
+	            // the composite has instructions on its own
+	            state = new State('glyf', glyph.instructions);
+	
+	            state.gZone = state.z0 = state.z1 = state.z2 = gZone;
+	
+	            state.contours = contours;
+	
+	            // note: HPZero cannot be used here, since
+	            //       the point might be modified
+	            gZone.push(
+	                new HPoint(0, 0),
+	                new HPoint(Math.round(glyph.advanceWidth * xScale), 0)
+	            );
+	
+	            if (exports.DEBUG) {
+	                console.log('---EXEC COMPOSITE---');
+	                state.step = -1;
+	            }
+	
+	            exec(state);
+	
+	            gZone.length -= 2;
+	        }
+	    }
+	
+	    return gZone;
+	};
+	
+	/*
+	* Executes the hinting program for a component of a multi-component glyph
+	* or of the glyph itself by a non-component glyph.
+	*/
+	execComponent = function(glyph, state, xScale, yScale)
+	{
+	    var points = glyph.points || [];
+	    var pLen = points.length;
+	    var gZone = state.gZone = state.z0 = state.z1 = state.z2 = [];
+	    var contours = state.contours = [];
+	
+	    // Scales the original points and
+	    // makes copies for the hinted points.
+	    var cp; // current point
+	    for (var i = 0; i < pLen; i++) {
+	        cp = points[i];
+	
+	        gZone[i] = new HPoint(
+	            cp.x * xScale,
+	            cp.y * yScale,
+	            cp.lastPointOfContour,
+	            cp.onCurve
+	        );
+	    }
+	
+	    // Chain links the contours.
+	    var sp; // start point
+	    var np; // next point
+	
+	    for (var i$1 = 0; i$1 < pLen; i$1++) {
+	        cp = gZone[i$1];
+	
+	        if (!sp) {
+	            sp = cp;
+	            contours.push(i$1);
+	        }
+	
+	        if (cp.lastPointOfContour) {
+	            cp.nextPointOnContour = sp;
+	            sp.prevPointOnContour = cp;
+	            sp = undefined;
+	        } else {
+	            np = gZone[i$1 + 1];
+	            cp.nextPointOnContour = np;
+	            np.prevPointOnContour = cp;
+	        }
+	    }
+	
+	    if (state.inhibitGridFit) { return; }
+	
+	    gZone.push(
+	        new HPoint(0, 0),
+	        new HPoint(Math.round(glyph.advanceWidth * xScale), 0)
+	    );
+	
+	    exec(state);
+	
+	    // Removes the extra points.
+	    gZone.length -= 2;
+	
+	    if (exports.DEBUG) {
+	        console.log('FINISHED GLYPH', state.stack);
+	        for (var i$2 = 0; i$2 < pLen; i$2++) {
+	            console.log(i$2, gZone[i$2].x, gZone[i$2].y);
+	        }
+	    }
+	};
+	
+	/*
+	* Executes the program loaded in state.
+	*/
+	exec = function(state) {
+	    var prog = state.prog;
+	
+	    if (!prog) { return; }
+	
+	    var pLen = prog.length;
+	    var ins;
+	
+	    for (state.ip = 0; state.ip < pLen; state.ip++) {
+	        if (exports.DEBUG) { state.step++; }
+	        ins = instructionTable[prog[state.ip]];
+	
+	        if (!ins) {
+	            throw new Error(
+	                'unknown instruction: 0x' +
+	                Number(prog[state.ip]).toString(16)
+	            );
+	        }
+	
+	        ins(state);
+	
+	        // very extensive debugging for each step
+	        /*
+	        if (exports.DEBUG) {
+	            var da;
+	            if (state.gZone) {
+	                da = [];
+	                for (let i = 0; i < state.gZone.length; i++)
+	                {
+	                    da.push(i + ' ' +
+	                        state.gZone[i].x * 64 + ' ' +
+	                        state.gZone[i].y * 64 + ' ' +
+	                        (state.gZone[i].xTouched ? 'x' : '') +
+	                        (state.gZone[i].yTouched ? 'y' : '')
+	                    );
+	                }
+	                console.log('GZ', da);
+	            }
+	
+	            if (state.tZone) {
+	                da = [];
+	                for (let i = 0; i < state.tZone.length; i++) {
+	                    da.push(i + ' ' +
+	                        state.tZone[i].x * 64 + ' ' +
+	                        state.tZone[i].y * 64 + ' ' +
+	                        (state.tZone[i].xTouched ? 'x' : '') +
+	                        (state.tZone[i].yTouched ? 'y' : '')
+	                    );
+	                }
+	                console.log('TZ', da);
+	            }
+	
+	            if (state.stack.length > 10) {
+	                console.log(
+	                    state.stack.length,
+	                    '...', state.stack.slice(state.stack.length - 10)
+	                );
+	            } else {
+	                console.log(state.stack.length, state.stack);
+	            }
+	        }
+	        */
+	    }
+	};
+	
+	/*
+	* Initializes the twilight zone.
+	*
+	* This is only done if a SZPx instruction
+	* refers to the twilight zone.
+	*/
+	function initTZone(state)
+	{
+	    var tZone = state.tZone = new Array(state.gZone.length);
+	
+	    // no idea if this is actually correct...
+	    for (var i = 0; i < tZone.length; i++)
+	    {
+	        tZone[i] = new HPoint(0, 0);
+	    }
+	}
+	
+	/*
+	* Skips the instruction pointer ahead over an IF/ELSE block.
+	* handleElse .. if true breaks on matching ELSE
+	*/
+	function skip(state, handleElse)
+	{
+	    var prog = state.prog;
+	    var ip = state.ip;
+	    var nesting = 1;
+	    var ins;
+	
+	    do {
+	        ins = prog[++ip];
+	        if (ins === 0x58) // IF
+	            { nesting++; }
+	        else if (ins === 0x59) // EIF
+	            { nesting--; }
+	        else if (ins === 0x40) // NPUSHB
+	            { ip += prog[ip + 1] + 1; }
+	        else if (ins === 0x41) // NPUSHW
+	            { ip += 2 * prog[ip + 1] + 1; }
+	        else if (ins >= 0xB0 && ins <= 0xB7) // PUSHB
+	            { ip += ins - 0xB0 + 1; }
+	        else if (ins >= 0xB8 && ins <= 0xBF) // PUSHW
+	            { ip += (ins - 0xB8 + 1) * 2; }
+	        else if (handleElse && nesting === 1 && ins === 0x1B) // ELSE
+	            { break; }
+	    } while (nesting > 0);
+	
+	    state.ip = ip;
+	}
+	
+	/*----------------------------------------------------------*
+	*          And then a lot of instructions...                *
+	*----------------------------------------------------------*/
+	
+	// SVTCA[a] Set freedom and projection Vectors To Coordinate Axis
+	// 0x00-0x01
+	function SVTCA(v, state) {
+	    if (exports.DEBUG) { console.log(state.step, 'SVTCA[' + v.axis + ']'); }
+	
+	    state.fv = state.pv = state.dpv = v;
+	}
+	
+	// SPVTCA[a] Set Projection Vector to Coordinate Axis
+	// 0x02-0x03
+	function SPVTCA(v, state) {
+	    if (exports.DEBUG) { console.log(state.step, 'SPVTCA[' + v.axis + ']'); }
+	
+	    state.pv = state.dpv = v;
+	}
+	
+	// SFVTCA[a] Set Freedom Vector to Coordinate Axis
+	// 0x04-0x05
+	function SFVTCA(v, state) {
+	    if (exports.DEBUG) { console.log(state.step, 'SFVTCA[' + v.axis + ']'); }
+	
+	    state.fv = v;
+	}
+	
+	// SPVTL[a] Set Projection Vector To Line
+	// 0x06-0x07
+	function SPVTL(a, state) {
+	    var stack = state.stack;
+	    var p2i = stack.pop();
+	    var p1i = stack.pop();
+	    var p2 = state.z2[p2i];
+	    var p1 = state.z1[p1i];
+	
+	    if (exports.DEBUG) { console.log('SPVTL[' + a + ']', p2i, p1i); }
+	
+	    var dx;
+	    var dy;
+	
+	    if (!a) {
+	        dx = p1.x - p2.x;
+	        dy = p1.y - p2.y;
+	    } else {
+	        dx = p2.y - p1.y;
+	        dy = p1.x - p2.x;
+	    }
+	
+	    state.pv = state.dpv = getUnitVector(dx, dy);
+	}
+	
+	// SFVTL[a] Set Freedom Vector To Line
+	// 0x08-0x09
+	function SFVTL(a, state) {
+	    var stack = state.stack;
+	    var p2i = stack.pop();
+	    var p1i = stack.pop();
+	    var p2 = state.z2[p2i];
+	    var p1 = state.z1[p1i];
+	
+	    if (exports.DEBUG) { console.log('SFVTL[' + a + ']', p2i, p1i); }
+	
+	    var dx;
+	    var dy;
+	
+	    if (!a) {
+	        dx = p1.x - p2.x;
+	        dy = p1.y - p2.y;
+	    } else {
+	        dx = p2.y - p1.y;
+	        dy = p1.x - p2.x;
+	    }
+	
+	    state.fv = getUnitVector(dx, dy);
+	}
+	
+	// SPVFS[] Set Projection Vector From Stack
+	// 0x0A
+	function SPVFS(state) {
+	    var stack = state.stack;
+	    var y = stack.pop();
+	    var x = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SPVFS[]', y, x); }
+	
+	    state.pv = state.dpv = getUnitVector(x, y);
+	}
+	
+	// SFVFS[] Set Freedom Vector From Stack
+	// 0x0B
+	function SFVFS(state) {
+	    var stack = state.stack;
+	    var y = stack.pop();
+	    var x = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SPVFS[]', y, x); }
+	
+	    state.fv = getUnitVector(x, y);
+	}
+	
+	// GPV[] Get Projection Vector
+	// 0x0C
+	function GPV(state) {
+	    var stack = state.stack;
+	    var pv = state.pv;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'GPV[]'); }
+	
+	    stack.push(pv.x * 0x4000);
+	    stack.push(pv.y * 0x4000);
+	}
+	
+	// GFV[] Get Freedom Vector
+	// 0x0C
+	function GFV(state) {
+	    var stack = state.stack;
+	    var fv = state.fv;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'GFV[]'); }
+	
+	    stack.push(fv.x * 0x4000);
+	    stack.push(fv.y * 0x4000);
+	}
+	
+	// SFVTPV[] Set Freedom Vector To Projection Vector
+	// 0x0E
+	function SFVTPV(state) {
+	    state.fv = state.pv;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SFVTPV[]'); }
+	}
+	
+	// ISECT[] moves point p to the InterSECTion of two lines
+	// 0x0F
+	function ISECT(state)
+	{
+	    var stack = state.stack;
+	    var pa0i = stack.pop();
+	    var pa1i = stack.pop();
+	    var pb0i = stack.pop();
+	    var pb1i = stack.pop();
+	    var pi = stack.pop();
+	    var z0 = state.z0;
+	    var z1 = state.z1;
+	    var pa0 = z0[pa0i];
+	    var pa1 = z0[pa1i];
+	    var pb0 = z1[pb0i];
+	    var pb1 = z1[pb1i];
+	    var p = state.z2[pi];
+	
+	    if (exports.DEBUG) { console.log('ISECT[], ', pa0i, pa1i, pb0i, pb1i, pi); }
+	
+	    // math from
+	    // en.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line
+	
+	    var x1 = pa0.x;
+	    var y1 = pa0.y;
+	    var x2 = pa1.x;
+	    var y2 = pa1.y;
+	    var x3 = pb0.x;
+	    var y3 = pb0.y;
+	    var x4 = pb1.x;
+	    var y4 = pb1.y;
+	
+	    var div = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+	    var f1 = x1 * y2 - y1 * x2;
+	    var f2 = x3 * y4 - y3 * x4;
+	
+	    p.x = (f1 * (x3 - x4) - f2 * (x1 - x2)) / div;
+	    p.y = (f1 * (y3 - y4) - f2 * (y1 - y2)) / div;
+	}
+	
+	// SRP0[] Set Reference Point 0
+	// 0x10
+	function SRP0(state) {
+	    state.rp0 = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SRP0[]', state.rp0); }
+	}
+	
+	// SRP1[] Set Reference Point 1
+	// 0x11
+	function SRP1(state) {
+	    state.rp1 = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SRP1[]', state.rp1); }
+	}
+	
+	// SRP1[] Set Reference Point 2
+	// 0x12
+	function SRP2(state) {
+	    state.rp2 = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SRP2[]', state.rp2); }
+	}
+	
+	// SZP0[] Set Zone Pointer 0
+	// 0x13
+	function SZP0(state) {
+	    var n = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SZP0[]', n); }
+	
+	    state.zp0 = n;
+	
+	    switch (n) {
+	        case 0:
+	            if (!state.tZone) { initTZone(state); }
+	            state.z0 = state.tZone;
+	            break;
+	        case 1 :
+	            state.z0 = state.gZone;
+	            break;
+	        default :
+	            throw new Error('Invalid zone pointer');
+	    }
+	}
+	
+	// SZP1[] Set Zone Pointer 1
+	// 0x14
+	function SZP1(state) {
+	    var n = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SZP1[]', n); }
+	
+	    state.zp1 = n;
+	
+	    switch (n) {
+	        case 0:
+	            if (!state.tZone) { initTZone(state); }
+	            state.z1 = state.tZone;
+	            break;
+	        case 1 :
+	            state.z1 = state.gZone;
+	            break;
+	        default :
+	            throw new Error('Invalid zone pointer');
+	    }
+	}
+	
+	// SZP2[] Set Zone Pointer 2
+	// 0x15
+	function SZP2(state) {
+	    var n = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SZP2[]', n); }
+	
+	    state.zp2 = n;
+	
+	    switch (n) {
+	        case 0:
+	            if (!state.tZone) { initTZone(state); }
+	            state.z2 = state.tZone;
+	            break;
+	        case 1 :
+	            state.z2 = state.gZone;
+	            break;
+	        default :
+	            throw new Error('Invalid zone pointer');
+	    }
+	}
+	
+	// SZPS[] Set Zone PointerS
+	// 0x16
+	function SZPS(state) {
+	    var n = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SZPS[]', n); }
+	
+	    state.zp0 = state.zp1 = state.zp2 = n;
+	
+	    switch (n) {
+	        case 0:
+	            if (!state.tZone) { initTZone(state); }
+	            state.z0 = state.z1 = state.z2 = state.tZone;
+	            break;
+	        case 1 :
+	            state.z0 = state.z1 = state.z2 = state.gZone;
+	            break;
+	        default :
+	            throw new Error('Invalid zone pointer');
+	    }
+	}
+	
+	// SLOOP[] Set LOOP variable
+	// 0x17
+	function SLOOP(state) {
+	    state.loop = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SLOOP[]', state.loop); }
+	}
+	
+	// RTG[] Round To Grid
+	// 0x18
+	function RTG(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'RTG[]'); }
+	
+	    state.round = roundToGrid;
+	}
+	
+	// RTHG[] Round To Half Grid
+	// 0x19
+	function RTHG(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'RTHG[]'); }
+	
+	    state.round = roundToHalfGrid;
+	}
+	
+	// SMD[] Set Minimum Distance
+	// 0x1A
+	function SMD(state) {
+	    var d = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SMD[]', d); }
+	
+	    state.minDis = d / 0x40;
+	}
+	
+	// ELSE[] ELSE clause
+	// 0x1B
+	function ELSE(state) {
+	    // This instruction has been reached by executing a then branch
+	    // so it just skips ahead until matching EIF.
+	    //
+	    // In case the IF was negative the IF[] instruction already
+	    // skipped forward over the ELSE[]
+	
+	    if (exports.DEBUG) { console.log(state.step, 'ELSE[]'); }
+	
+	    skip(state, false);
+	}
+	
+	// JMPR[] JuMP Relative
+	// 0x1C
+	function JMPR(state) {
+	    var o = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'JMPR[]', o); }
+	
+	    // A jump by 1 would do nothing.
+	    state.ip += o - 1;
+	}
+	
+	// SCVTCI[] Set Control Value Table Cut-In
+	// 0x1D
+	function SCVTCI(state) {
+	    var n = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SCVTCI[]', n); }
+	
+	    state.cvCutIn = n / 0x40;
+	}
+	
+	// DUP[] DUPlicate top stack element
+	// 0x20
+	function DUP(state) {
+	    var stack = state.stack;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'DUP[]'); }
+	
+	    stack.push(stack[stack.length - 1]);
+	}
+	
+	// POP[] POP top stack element
+	// 0x21
+	function POP(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'POP[]'); }
+	
+	    state.stack.pop();
+	}
+	
+	// CLEAR[] CLEAR the stack
+	// 0x22
+	function CLEAR(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'CLEAR[]'); }
+	
+	    state.stack.length = 0;
+	}
+	
+	// SWAP[] SWAP the top two elements on the stack
+	// 0x23
+	function SWAP(state) {
+	    var stack = state.stack;
+	
+	    var a = stack.pop();
+	    var b = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SWAP[]'); }
+	
+	    stack.push(a);
+	    stack.push(b);
+	}
+	
+	// DEPTH[] DEPTH of the stack
+	// 0x24
+	function DEPTH(state) {
+	    var stack = state.stack;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'DEPTH[]'); }
+	
+	    stack.push(stack.length);
+	}
+	
+	// LOOPCALL[] LOOPCALL function
+	// 0x2A
+	function LOOPCALL(state) {
+	    var stack = state.stack;
+	    var fn = stack.pop();
+	    var c = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'LOOPCALL[]', fn, c); }
+	
+	    // saves callers program
+	    var cip = state.ip;
+	    var cprog = state.prog;
+	
+	    state.prog = state.funcs[fn];
+	
+	    // executes the function
+	    for (var i = 0; i < c; i++) {
+	        exec(state);
+	
+	        if (exports.DEBUG) { console.log(
+	            ++state.step,
+	            i + 1 < c ? 'next loopcall' : 'done loopcall',
+	            i
+	        ); }
+	    }
+	
+	    // restores the callers program
+	    state.ip = cip;
+	    state.prog = cprog;
+	}
+	
+	// CALL[] CALL function
+	// 0x2B
+	function CALL(state) {
+	    var fn = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'CALL[]', fn); }
+	
+	    // saves callers program
+	    var cip = state.ip;
+	    var cprog = state.prog;
+	
+	    state.prog = state.funcs[fn];
+	
+	    // executes the function
+	    exec(state);
+	
+	    // restores the callers program
+	    state.ip = cip;
+	    state.prog = cprog;
+	
+	    if (exports.DEBUG) { console.log(++state.step, 'returning from', fn); }
+	}
+	
+	// CINDEX[] Copy the INDEXed element to the top of the stack
+	// 0x25
+	function CINDEX(state) {
+	    var stack = state.stack;
+	    var k = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'CINDEX[]', k); }
+	
+	    // In case of k == 1, it copies the last element after popping
+	    // thus stack.length - k.
+	    stack.push(stack[stack.length - k]);
+	}
+	
+	// MINDEX[] Move the INDEXed element to the top of the stack
+	// 0x26
+	function MINDEX(state) {
+	    var stack = state.stack;
+	    var k = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'MINDEX[]', k); }
+	
+	    stack.push(stack.splice(stack.length - k, 1)[0]);
+	}
+	
+	// FDEF[] Function DEFinition
+	// 0x2C
+	function FDEF(state) {
+	    if (state.env !== 'fpgm') { throw new Error('FDEF not allowed here'); }
+	    var stack = state.stack;
+	    var prog = state.prog;
+	    var ip = state.ip;
+	
+	    var fn = stack.pop();
+	    var ipBegin = ip;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'FDEF[]', fn); }
+	
+	    while (prog[++ip] !== 0x2D){  }
+	
+	    state.ip = ip;
+	    state.funcs[fn] = prog.slice(ipBegin + 1, ip);
+	}
+	
+	// MDAP[a] Move Direct Absolute Point
+	// 0x2E-0x2F
+	function MDAP(round, state) {
+	    var pi = state.stack.pop();
+	    var p = state.z0[pi];
+	    var fv = state.fv;
+	    var pv = state.pv;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'MDAP[' + round + ']', pi); }
+	
+	    var d = pv.distance(p, HPZero);
+	
+	    if (round) { d = state.round(d); }
+	
+	    fv.setRelative(p, HPZero, d, pv);
+	    fv.touch(p);
+	
+	    state.rp0 = state.rp1 = pi;
+	}
+	
+	// IUP[a] Interpolate Untouched Points through the outline
+	// 0x30
+	function IUP(v, state) {
+	    var z2 = state.z2;
+	    var pLen = z2.length - 2;
+	    var cp;
+	    var pp;
+	    var np;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'IUP[' + v.axis + ']'); }
+	
+	    for (var i = 0; i < pLen; i++) {
+	        cp = z2[i]; // current point
+	
+	        // if this point has been touched go on
+	        if (v.touched(cp)) { continue; }
+	
+	        pp = cp.prevTouched(v);
+	
+	        // no point on the contour has been touched?
+	        if (pp === cp) { continue; }
+	
+	        np = cp.nextTouched(v);
+	
+	        if (pp === np) {
+	            // only one point on the contour has been touched
+	            // so simply moves the point like that
+	
+	            v.setRelative(cp, cp, v.distance(pp, pp, false, true), v, true);
+	        }
+	
+	        v.interpolate(cp, pp, np, v);
+	    }
+	}
+	
+	// SHP[] SHift Point using reference point
+	// 0x32-0x33
+	function SHP(a, state) {
+	    var stack = state.stack;
+	    var rpi = a ? state.rp1 : state.rp2;
+	    var rp = (a ? state.z0 : state.z1)[rpi];
+	    var fv = state.fv;
+	    var pv = state.pv;
+	    var loop = state.loop;
+	    var z2 = state.z2;
+	
+	    while (loop--)
+	    {
+	        var pi = stack.pop();
+	        var p = z2[pi];
+	
+	        var d = pv.distance(rp, rp, false, true);
+	        fv.setRelative(p, p, d, pv);
+	        fv.touch(p);
+	
+	        if (exports.DEBUG) {
+	            console.log(
+	                state.step,
+	                (state.loop > 1 ?
+	                   'loop ' + (state.loop - loop) + ': ' :
+	                   ''
+	                ) +
+	                'SHP[' + (a ? 'rp1' : 'rp2') + ']', pi
+	            );
+	        }
+	    }
+	
+	    state.loop = 1;
+	}
+	
+	// SHC[] SHift Contour using reference point
+	// 0x36-0x37
+	function SHC(a, state) {
+	    var stack = state.stack;
+	    var rpi = a ? state.rp1 : state.rp2;
+	    var rp = (a ? state.z0 : state.z1)[rpi];
+	    var fv = state.fv;
+	    var pv = state.pv;
+	    var ci = stack.pop();
+	    var sp = state.z2[state.contours[ci]];
+	    var p = sp;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SHC[' + a + ']', ci); }
+	
+	    var d = pv.distance(rp, rp, false, true);
+	
+	    do {
+	        if (p !== rp) { fv.setRelative(p, p, d, pv); }
+	        p = p.nextPointOnContour;
+	    } while (p !== sp);
+	}
+	
+	// SHZ[] SHift Zone using reference point
+	// 0x36-0x37
+	function SHZ(a, state) {
+	    var stack = state.stack;
+	    var rpi = a ? state.rp1 : state.rp2;
+	    var rp = (a ? state.z0 : state.z1)[rpi];
+	    var fv = state.fv;
+	    var pv = state.pv;
+	
+	    var e = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SHZ[' + a + ']', e); }
+	
+	    var z;
+	    switch (e) {
+	        case 0 : z = state.tZone; break;
+	        case 1 : z = state.gZone; break;
+	        default : throw new Error('Invalid zone');
+	    }
+	
+	    var p;
+	    var d = pv.distance(rp, rp, false, true);
+	    var pLen = z.length - 2;
+	    for (var i = 0; i < pLen; i++)
+	    {
+	        p = z[i];
+	        if (p !== rp) { fv.setRelative(p, p, d, pv); }
+	    }
+	}
+	
+	// SHPIX[] SHift point by a PIXel amount
+	// 0x38
+	function SHPIX(state) {
+	    var stack = state.stack;
+	    var loop = state.loop;
+	    var fv = state.fv;
+	    var d = stack.pop() / 0x40;
+	    var z2 = state.z2;
+	
+	    while (loop--) {
+	        var pi = stack.pop();
+	        var p = z2[pi];
+	
+	        if (exports.DEBUG) {
+	            console.log(
+	                state.step,
+	                (state.loop > 1 ? 'loop ' + (state.loop - loop) + ': ' : '') +
+	                'SHPIX[]', pi, d
+	            );
+	        }
+	
+	        fv.setRelative(p, p, d);
+	        fv.touch(p);
+	    }
+	
+	    state.loop = 1;
+	}
+	
+	// IP[] Interpolate Point
+	// 0x39
+	function IP(state) {
+	    var stack = state.stack;
+	    var rp1i = state.rp1;
+	    var rp2i = state.rp2;
+	    var loop = state.loop;
+	    var rp1 = state.z0[rp1i];
+	    var rp2 = state.z1[rp2i];
+	    var fv = state.fv;
+	    var pv = state.dpv;
+	    var z2 = state.z2;
+	
+	    while (loop--) {
+	        var pi = stack.pop();
+	        var p = z2[pi];
+	
+	        if (exports.DEBUG) {
+	            console.log(
+	                state.step,
+	                (state.loop > 1 ? 'loop ' + (state.loop - loop) + ': ' : '') +
+	                'IP[]', pi, rp1i, '<->', rp2i
+	            );
+	        }
+	
+	        fv.interpolate(p, rp1, rp2, pv);
+	
+	        fv.touch(p);
+	    }
+	
+	    state.loop = 1;
+	}
+	
+	// MSIRP[a] Move Stack Indirect Relative Point
+	// 0x3A-0x3B
+	function MSIRP(a, state) {
+	    var stack = state.stack;
+	    var d = stack.pop() / 64;
+	    var pi = stack.pop();
+	    var p = state.z1[pi];
+	    var rp0 = state.z0[state.rp0];
+	    var fv = state.fv;
+	    var pv = state.pv;
+	
+	    fv.setRelative(p, rp0, d, pv);
+	    fv.touch(p);
+	
+	    if (exports.DEBUG) { console.log(state.step, 'MSIRP[' + a + ']', d, pi); }
+	
+	    state.rp1 = state.rp0;
+	    state.rp2 = pi;
+	    if (a) { state.rp0 = pi; }
+	}
+	
+	// ALIGNRP[] Align to reference point.
+	// 0x3C
+	function ALIGNRP(state) {
+	    var stack = state.stack;
+	    var rp0i = state.rp0;
+	    var rp0 = state.z0[rp0i];
+	    var loop = state.loop;
+	    var fv = state.fv;
+	    var pv = state.pv;
+	    var z1 = state.z1;
+	
+	    while (loop--) {
+	        var pi = stack.pop();
+	        var p = z1[pi];
+	
+	        if (exports.DEBUG) {
+	            console.log(
+	                state.step,
+	                (state.loop > 1 ? 'loop ' + (state.loop - loop) + ': ' : '') +
+	                'ALIGNRP[]', pi
+	            );
+	        }
+	
+	        fv.setRelative(p, rp0, 0, pv);
+	        fv.touch(p);
+	    }
+	
+	    state.loop = 1;
+	}
+	
+	// RTG[] Round To Double Grid
+	// 0x3D
+	function RTDG(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'RTDG[]'); }
+	
+	    state.round = roundToDoubleGrid;
+	}
+	
+	// MIAP[a] Move Indirect Absolute Point
+	// 0x3E-0x3F
+	function MIAP(round, state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	    var pi = stack.pop();
+	    var p = state.z0[pi];
+	    var fv = state.fv;
+	    var pv = state.pv;
+	    var cv = state.cvt[n];
+	
+	    // TODO cvtcutin should be considered here
+	    if (round) { cv = state.round(cv); }
+	
+	    if (exports.DEBUG) {
+	        console.log(
+	            state.step,
+	            'MIAP[' + round + ']',
+	            n, '(', cv, ')', pi
+	        );
+	    }
+	
+	    fv.setRelative(p, HPZero, cv, pv);
+	
+	    if (state.zp0 === 0) {
+	        p.xo = p.x;
+	        p.yo = p.y;
+	    }
+	
+	    fv.touch(p);
+	
+	    state.rp0 = state.rp1 = pi;
+	}
+	
+	// NPUSB[] PUSH N Bytes
+	// 0x40
+	function NPUSHB(state) {
+	    var prog = state.prog;
+	    var ip = state.ip;
+	    var stack = state.stack;
+	
+	    var n = prog[++ip];
+	
+	    if (exports.DEBUG) { console.log(state.step, 'NPUSHB[]', n); }
+	
+	    for (var i = 0; i < n; i++) { stack.push(prog[++ip]); }
+	
+	    state.ip = ip;
+	}
+	
+	// NPUSHW[] PUSH N Words
+	// 0x41
+	function NPUSHW(state) {
+	    var ip = state.ip;
+	    var prog = state.prog;
+	    var stack = state.stack;
+	    var n = prog[++ip];
+	
+	    if (exports.DEBUG) { console.log(state.step, 'NPUSHW[]', n); }
+	
+	    for (var i = 0; i < n; i++) {
+	        var w = (prog[++ip] << 8) | prog[++ip];
+	        if (w & 0x8000) { w = -((w ^ 0xffff) + 1); }
+	        stack.push(w);
+	    }
+	
+	    state.ip = ip;
+	}
+	
+	// WS[] Write Store
+	// 0x42
+	function WS(state) {
+	    var stack = state.stack;
+	    var store = state.store;
+	
+	    if (!store) { store = state.store = []; }
+	
+	    var v = stack.pop();
+	    var l = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'WS', v, l); }
+	
+	    store[l] = v;
+	}
+	
+	// RS[] Read Store
+	// 0x43
+	function RS(state) {
+	    var stack = state.stack;
+	    var store = state.store;
+	
+	    var l = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'RS', l); }
+	
+	    var v = (store && store[l]) || 0;
+	
+	    stack.push(v);
+	}
+	
+	// WCVTP[] Write Control Value Table in Pixel units
+	// 0x44
+	function WCVTP(state) {
+	    var stack = state.stack;
+	
+	    var v = stack.pop();
+	    var l = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'WCVTP', v, l); }
+	
+	    state.cvt[l] = v / 0x40;
+	}
+	
+	// RCVT[] Read Control Value Table entry
+	// 0x45
+	function RCVT(state) {
+	    var stack = state.stack;
+	    var cvte = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'RCVT', cvte); }
+	
+	    stack.push(state.cvt[cvte] * 0x40);
+	}
+	
+	// GC[] Get Coordinate projected onto the projection vector
+	// 0x46-0x47
+	function GC(a, state) {
+	    var stack = state.stack;
+	    var pi = stack.pop();
+	    var p = state.z2[pi];
+	
+	    if (exports.DEBUG) { console.log(state.step, 'GC[' + a + ']', pi); }
+	
+	    stack.push(state.dpv.distance(p, HPZero, a, false) * 0x40);
+	}
+	
+	// MD[a] Measure Distance
+	// 0x49-0x4A
+	function MD(a, state) {
+	    var stack = state.stack;
+	    var pi2 = stack.pop();
+	    var pi1 = stack.pop();
+	    var p2 = state.z1[pi2];
+	    var p1 = state.z0[pi1];
+	    var d = state.dpv.distance(p1, p2, a, a);
+	
+	    if (exports.DEBUG) { console.log(state.step, 'MD[' + a + ']', pi2, pi1, '->', d); }
+	
+	    state.stack.push(Math.round(d * 64));
+	}
+	
+	// MPPEM[] Measure Pixels Per EM
+	// 0x4B
+	function MPPEM(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'MPPEM[]'); }
+	    state.stack.push(state.ppem);
+	}
+	
+	// FLIPON[] set the auto FLIP Boolean to ON
+	// 0x4D
+	function FLIPON(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'FLIPON[]'); }
+	    state.autoFlip = true;
+	}
+	
+	// LT[] Less Than
+	// 0x50
+	function LT(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'LT[]', e2, e1); }
+	
+	    stack.push(e1 < e2 ? 1 : 0);
+	}
+	
+	// LTEQ[] Less Than or EQual
+	// 0x53
+	function LTEQ(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'LTEQ[]', e2, e1); }
+	
+	    stack.push(e1 <= e2 ? 1 : 0);
+	}
+	
+	// GTEQ[] Greater Than
+	// 0x52
+	function GT(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'GT[]', e2, e1); }
+	
+	    stack.push(e1 > e2 ? 1 : 0);
+	}
+	
+	// GTEQ[] Greater Than or EQual
+	// 0x53
+	function GTEQ(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'GTEQ[]', e2, e1); }
+	
+	    stack.push(e1 >= e2 ? 1 : 0);
+	}
+	
+	// EQ[] EQual
+	// 0x54
+	function EQ(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'EQ[]', e2, e1); }
+	
+	    stack.push(e2 === e1 ? 1 : 0);
+	}
+	
+	// NEQ[] Not EQual
+	// 0x55
+	function NEQ(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'NEQ[]', e2, e1); }
+	
+	    stack.push(e2 !== e1 ? 1 : 0);
+	}
+	
+	// ODD[] ODD
+	// 0x56
+	function ODD(state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'ODD[]', n); }
+	
+	    stack.push(Math.trunc(n) % 2 ? 1 : 0);
+	}
+	
+	// EVEN[] EVEN
+	// 0x57
+	function EVEN(state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'EVEN[]', n); }
+	
+	    stack.push(Math.trunc(n) % 2 ? 0 : 1);
+	}
+	
+	// IF[] IF test
+	// 0x58
+	function IF(state) {
+	    var test = state.stack.pop();
+	    var ins;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'IF[]', test); }
+	
+	    // if test is true it just continues
+	    // if not the ip is skipped until matching ELSE or EIF
+	    if (!test) {
+	        skip(state, true);
+	
+	        if (exports.DEBUG) { console.log(state.step, ins === 0x1B ? 'ELSE[]' : 'EIF[]'); }
+	    }
+	}
+	
+	// EIF[] End IF
+	// 0x59
+	function EIF(state) {
+	    // this can be reached normally when
+	    // executing an else branch.
+	    // -> just ignore it
+	
+	    if (exports.DEBUG) { console.log(state.step, 'EIF[]'); }
+	}
+	
+	// AND[] logical AND
+	// 0x5A
+	function AND(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'AND[]', e2, e1); }
+	
+	    stack.push(e2 && e1 ? 1 : 0);
+	}
+	
+	// OR[] logical OR
+	// 0x5B
+	function OR(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'OR[]', e2, e1); }
+	
+	    stack.push(e2 || e1 ? 1 : 0);
+	}
+	
+	// NOT[] logical NOT
+	// 0x5C
+	function NOT(state) {
+	    var stack = state.stack;
+	    var e = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'NOT[]', e); }
+	
+	    stack.push(e ? 0 : 1);
+	}
+	
+	// DELTAP1[] DELTA exception P1
+	// DELTAP2[] DELTA exception P2
+	// DELTAP3[] DELTA exception P3
+	// 0x5D, 0x71, 0x72
+	function DELTAP123(b, state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	    var fv = state.fv;
+	    var pv = state.pv;
+	    var ppem = state.ppem;
+	    var base = state.deltaBase + (b - 1) * 16;
+	    var ds = state.deltaShift;
+	    var z0 = state.z0;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'DELTAP[' + b + ']', n, stack); }
+	
+	    for (var i = 0; i < n; i++)
+	    {
+	        var pi = stack.pop();
+	        var arg = stack.pop();
+	        var appem = base + ((arg & 0xF0) >> 4);
+	        if (appem !== ppem) { continue; }
+	
+	        var mag = (arg & 0x0F) - 8;
+	        if (mag >= 0) { mag++; }
+	        if (exports.DEBUG) { console.log(state.step, 'DELTAPFIX', pi, 'by', mag * ds); }
+	
+	        var p = z0[pi];
+	        fv.setRelative(p, p, mag * ds, pv);
+	    }
+	}
+	
+	// SDB[] Set Delta Base in the graphics state
+	// 0x5E
+	function SDB(state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SDB[]', n); }
+	
+	    state.deltaBase = n;
+	}
+	
+	// SDS[] Set Delta Shift in the graphics state
+	// 0x5F
+	function SDS(state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SDS[]', n); }
+	
+	    state.deltaShift = Math.pow(0.5, n);
+	}
+	
+	// ADD[] ADD
+	// 0x60
+	function ADD(state) {
+	    var stack = state.stack;
+	    var n2 = stack.pop();
+	    var n1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'ADD[]', n2, n1); }
+	
+	    stack.push(n1 + n2);
+	}
+	
+	// SUB[] SUB
+	// 0x61
+	function SUB(state) {
+	    var stack = state.stack;
+	    var n2 = stack.pop();
+	    var n1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SUB[]', n2, n1); }
+	
+	    stack.push(n1 - n2);
+	}
+	
+	// DIV[] DIV
+	// 0x62
+	function DIV(state) {
+	    var stack = state.stack;
+	    var n2 = stack.pop();
+	    var n1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'DIV[]', n2, n1); }
+	
+	    stack.push(n1 * 64 / n2);
+	}
+	
+	// MUL[] MUL
+	// 0x63
+	function MUL(state) {
+	    var stack = state.stack;
+	    var n2 = stack.pop();
+	    var n1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'MUL[]', n2, n1); }
+	
+	    stack.push(n1 * n2 / 64);
+	}
+	
+	// ABS[] ABSolute value
+	// 0x64
+	function ABS(state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'ABS[]', n); }
+	
+	    stack.push(Math.abs(n));
+	}
+	
+	// NEG[] NEGate
+	// 0x65
+	function NEG(state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'NEG[]', n); }
+	
+	    stack.push(-n);
+	}
+	
+	// FLOOR[] FLOOR
+	// 0x66
+	function FLOOR(state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'FLOOR[]', n); }
+	
+	    stack.push(Math.floor(n / 0x40) * 0x40);
+	}
+	
+	// CEILING[] CEILING
+	// 0x67
+	function CEILING(state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'CEILING[]', n); }
+	
+	    stack.push(Math.ceil(n / 0x40) * 0x40);
+	}
+	
+	// ROUND[ab] ROUND value
+	// 0x68-0x6B
+	function ROUND(dt, state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'ROUND[]'); }
+	
+	    stack.push(state.round(n / 0x40) * 0x40);
+	}
+	
+	// WCVTF[] Write Control Value Table in Funits
+	// 0x70
+	function WCVTF(state) {
+	    var stack = state.stack;
+	    var v = stack.pop();
+	    var l = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'WCVTF[]', v, l); }
+	
+	    state.cvt[l] = v * state.ppem / state.font.unitsPerEm;
+	}
+	
+	// DELTAC1[] DELTA exception C1
+	// DELTAC2[] DELTA exception C2
+	// DELTAC3[] DELTA exception C3
+	// 0x73, 0x74, 0x75
+	function DELTAC123(b, state) {
+	    var stack = state.stack;
+	    var n = stack.pop();
+	    var ppem = state.ppem;
+	    var base = state.deltaBase + (b - 1) * 16;
+	    var ds = state.deltaShift;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'DELTAC[' + b + ']', n, stack); }
+	
+	    for (var i = 0; i < n; i++) {
+	        var c = stack.pop();
+	        var arg = stack.pop();
+	        var appem = base + ((arg & 0xF0) >> 4);
+	        if (appem !== ppem) { continue; }
+	
+	        var mag = (arg & 0x0F) - 8;
+	        if (mag >= 0) { mag++; }
+	
+	        var delta = mag * ds;
+	
+	        if (exports.DEBUG) { console.log(state.step, 'DELTACFIX', c, 'by', delta); }
+	
+	        state.cvt[c] += delta;
+	    }
+	}
+	
+	// SROUND[] Super ROUND
+	// 0x76
+	function SROUND(state) {
+	    var n = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SROUND[]', n); }
+	
+	    state.round = roundSuper;
+	
+	    var period;
+	
+	    switch (n & 0xC0) {
+	        case 0x00:
+	            period = 0.5;
+	            break;
+	        case 0x40:
+	            period = 1;
+	            break;
+	        case 0x80:
+	            period = 2;
+	            break;
+	        default:
+	            throw new Error('invalid SROUND value');
+	    }
+	
+	    state.srPeriod = period;
+	
+	    switch (n & 0x30) {
+	        case 0x00:
+	            state.srPhase = 0;
+	            break;
+	        case 0x10:
+	            state.srPhase = 0.25 * period;
+	            break;
+	        case 0x20:
+	            state.srPhase = 0.5  * period;
+	            break;
+	        case 0x30:
+	            state.srPhase = 0.75 * period;
+	            break;
+	        default: throw new Error('invalid SROUND value');
+	    }
+	
+	    n &= 0x0F;
+	
+	    if (n === 0) { state.srThreshold = 0; }
+	    else { state.srThreshold = (n / 8 - 0.5) * period; }
+	}
+	
+	// S45ROUND[] Super ROUND 45 degrees
+	// 0x77
+	function S45ROUND(state) {
+	    var n = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'S45ROUND[]', n); }
+	
+	    state.round = roundSuper;
+	
+	    var period;
+	
+	    switch (n & 0xC0) {
+	        case 0x00:
+	            period = Math.sqrt(2) / 2;
+	            break;
+	        case 0x40:
+	            period = Math.sqrt(2);
+	            break;
+	        case 0x80:
+	            period = 2 * Math.sqrt(2);
+	            break;
+	        default:
+	            throw new Error('invalid S45ROUND value');
+	    }
+	
+	    state.srPeriod = period;
+	
+	    switch (n & 0x30) {
+	        case 0x00:
+	            state.srPhase = 0;
+	            break;
+	        case 0x10:
+	            state.srPhase = 0.25 * period;
+	            break;
+	        case 0x20:
+	            state.srPhase = 0.5  * period;
+	            break;
+	        case 0x30:
+	            state.srPhase = 0.75 * period;
+	            break;
+	        default:
+	            throw new Error('invalid S45ROUND value');
+	    }
+	
+	    n &= 0x0F;
+	
+	    if (n === 0) { state.srThreshold = 0; }
+	    else { state.srThreshold = (n / 8 - 0.5) * period; }
+	}
+	
+	// ROFF[] Round Off
+	// 0x7A
+	function ROFF(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'ROFF[]'); }
+	
+	    state.round = roundOff;
+	}
+	
+	// RUTG[] Round Up To Grid
+	// 0x7C
+	function RUTG(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'RUTG[]'); }
+	
+	    state.round = roundUpToGrid;
+	}
+	
+	// RDTG[] Round Down To Grid
+	// 0x7D
+	function RDTG(state) {
+	    if (exports.DEBUG) { console.log(state.step, 'RDTG[]'); }
+	
+	    state.round = roundDownToGrid;
+	}
+	
+	// SCANCTRL[] SCAN conversion ConTRoL
+	// 0x85
+	function SCANCTRL(state) {
+	    var n = state.stack.pop();
+	
+	    // ignored by opentype.js
+	
+	    if (exports.DEBUG) { console.log(state.step, 'SCANCTRL[]', n); }
+	}
+	
+	// SDPVTL[a] Set Dual Projection Vector To Line
+	// 0x86-0x87
+	function SDPVTL(a, state) {
+	    var stack = state.stack;
+	    var p2i = stack.pop();
+	    var p1i = stack.pop();
+	    var p2 = state.z2[p2i];
+	    var p1 = state.z1[p1i];
+	
+	    if (exports.DEBUG) { console.log('SDPVTL[' + a + ']', p2i, p1i); }
+	
+	    var dx;
+	    var dy;
+	
+	    if (!a) {
+	        dx = p1.x - p2.x;
+	        dy = p1.y - p2.y;
+	    } else {
+	        dx = p2.y - p1.y;
+	        dy = p1.x - p2.x;
+	    }
+	
+	    state.dpv = getUnitVector(dx, dy);
+	}
+	
+	// GETINFO[] GET INFOrmation
+	// 0x88
+	function GETINFO(state) {
+	    var stack = state.stack;
+	    var sel = stack.pop();
+	    var r = 0;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'GETINFO[]', sel); }
+	
+	    // v35 as in no subpixel hinting
+	    if (sel & 0x01) { r = 35; }
+	
+	    // TODO rotation and stretch currently not supported
+	    // and thus those GETINFO are always 0.
+	
+	    // opentype.js is always gray scaling
+	    if (sel & 0x20) { r |= 0x1000; }
+	
+	    stack.push(r);
+	}
+	
+	// ROLL[] ROLL the top three stack elements
+	// 0x8A
+	function ROLL(state) {
+	    var stack = state.stack;
+	    var a = stack.pop();
+	    var b = stack.pop();
+	    var c = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'ROLL[]'); }
+	
+	    stack.push(b);
+	    stack.push(a);
+	    stack.push(c);
+	}
+	
+	// MAX[] MAXimum of top two stack elements
+	// 0x8B
+	function MAX(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'MAX[]', e2, e1); }
+	
+	    stack.push(Math.max(e1, e2));
+	}
+	
+	// MIN[] MINimum of top two stack elements
+	// 0x8C
+	function MIN(state) {
+	    var stack = state.stack;
+	    var e2 = stack.pop();
+	    var e1 = stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'MIN[]', e2, e1); }
+	
+	    stack.push(Math.min(e1, e2));
+	}
+	
+	// SCANTYPE[] SCANTYPE
+	// 0x8D
+	function SCANTYPE(state) {
+	    var n = state.stack.pop();
+	    // ignored by opentype.js
+	    if (exports.DEBUG) { console.log(state.step, 'SCANTYPE[]', n); }
+	}
+	
+	// INSTCTRL[] INSTCTRL
+	// 0x8D
+	function INSTCTRL(state) {
+	    var s = state.stack.pop();
+	    var v = state.stack.pop();
+	
+	    if (exports.DEBUG) { console.log(state.step, 'INSTCTRL[]', s, v); }
+	
+	    switch (s) {
+	        case 1 : state.inhibitGridFit = !!v; return;
+	        case 2 : state.ignoreCvt = !!v; return;
+	        default: throw new Error('invalid INSTCTRL[] selector');
+	    }
+	}
+	
+	// PUSHB[abc] PUSH Bytes
+	// 0xB0-0xB7
+	function PUSHB(n, state) {
+	    var stack = state.stack;
+	    var prog = state.prog;
+	    var ip = state.ip;
+	
+	    if (exports.DEBUG) { console.log(state.step, 'PUSHB[' + n + ']'); }
+	
+	    for (var i = 0; i < n; i++) { stack.push(prog[++ip]); }
+	
+	    state.ip = ip;
+	}
+	
+	// PUSHW[abc] PUSH Words
+	// 0xB8-0xBF
+	function PUSHW(n, state) {
+	    var ip = state.ip;
+	    var prog = state.prog;
+	    var stack = state.stack;
+	
+	    if (exports.DEBUG) { console.log(state.ip, 'PUSHW[' + n + ']'); }
+	
+	    for (var i = 0; i < n; i++) {
+	        var w = (prog[++ip] << 8) | prog[++ip];
+	        if (w & 0x8000) { w = -((w ^ 0xffff) + 1); }
+	        stack.push(w);
+	    }
+	
+	    state.ip = ip;
+	}
+	
+	// MDRP[abcde] Move Direct Relative Point
+	// 0xD0-0xEF
+	// (if indirect is 0)
+	//
+	// and
+	//
+	// MIRP[abcde] Move Indirect Relative Point
+	// 0xE0-0xFF
+	// (if indirect is 1)
+	
+	function MDRP_MIRP(indirect, setRp0, keepD, ro, dt, state) {
+	    var stack = state.stack;
+	    var cvte = indirect && stack.pop();
+	    var pi = stack.pop();
+	    var rp0i = state.rp0;
+	    var rp = state.z0[rp0i];
+	    var p = state.z1[pi];
+	
+	    var md = state.minDis;
+	    var fv = state.fv;
+	    var pv = state.dpv;
+	    var od; // original distance
+	    var d; // moving distance
+	    var sign; // sign of distance
+	    var cv;
+	
+	    d = od = pv.distance(p, rp, true, true);
+	    sign = d >= 0 ? 1 : -1; // Math.sign would be 0 in case of 0
+	
+	    // TODO consider autoFlip
+	    d = Math.abs(d);
+	
+	    if (indirect) {
+	        cv = state.cvt[cvte];
+	
+	        if (ro && Math.abs(d - cv) < state.cvCutIn) { d = cv; }
+	    }
+	
+	    if (keepD && d < md) { d = md; }
+	
+	    if (ro) { d = state.round(d); }
+	
+	    fv.setRelative(p, rp, sign * d, pv);
+	    fv.touch(p);
+	
+	    if (exports.DEBUG) {
+	        console.log(
+	            state.step,
+	            (indirect ? 'MIRP[' : 'MDRP[') +
+	            (setRp0 ? 'M' : 'm') +
+	            (keepD ? '>' : '_') +
+	            (ro ? 'R' : '_') +
+	            (dt === 0 ? 'Gr' : (dt === 1 ? 'Bl' : (dt === 2 ? 'Wh' : ''))) +
+	            ']',
+	            indirect ?
+	                cvte + '(' + state.cvt[cvte] + ',' +  cv + ')' :
+	                '',
+	            pi,
+	            '(d =', od, '->', sign * d, ')'
+	        );
+	    }
+	
+	    state.rp1 = state.rp0;
+	    state.rp2 = pi;
+	    if (setRp0) { state.rp0 = pi; }
+	}
+	
+	/*
+	* The instruction table.
+	*/
+	instructionTable = [
+	    /* 0x00 */ SVTCA.bind(undefined, yUnitVector),
+	    /* 0x01 */ SVTCA.bind(undefined, xUnitVector),
+	    /* 0x02 */ SPVTCA.bind(undefined, yUnitVector),
+	    /* 0x03 */ SPVTCA.bind(undefined, xUnitVector),
+	    /* 0x04 */ SFVTCA.bind(undefined, yUnitVector),
+	    /* 0x05 */ SFVTCA.bind(undefined, xUnitVector),
+	    /* 0x06 */ SPVTL.bind(undefined, 0),
+	    /* 0x07 */ SPVTL.bind(undefined, 1),
+	    /* 0x08 */ SFVTL.bind(undefined, 0),
+	    /* 0x09 */ SFVTL.bind(undefined, 1),
+	    /* 0x0A */ SPVFS,
+	    /* 0x0B */ SFVFS,
+	    /* 0x0C */ GPV,
+	    /* 0x0D */ GFV,
+	    /* 0x0E */ SFVTPV,
+	    /* 0x0F */ ISECT,
+	    /* 0x10 */ SRP0,
+	    /* 0x11 */ SRP1,
+	    /* 0x12 */ SRP2,
+	    /* 0x13 */ SZP0,
+	    /* 0x14 */ SZP1,
+	    /* 0x15 */ SZP2,
+	    /* 0x16 */ SZPS,
+	    /* 0x17 */ SLOOP,
+	    /* 0x18 */ RTG,
+	    /* 0x19 */ RTHG,
+	    /* 0x1A */ SMD,
+	    /* 0x1B */ ELSE,
+	    /* 0x1C */ JMPR,
+	    /* 0x1D */ SCVTCI,
+	    /* 0x1E */ undefined,   // TODO SSWCI
+	    /* 0x1F */ undefined,   // TODO SSW
+	    /* 0x20 */ DUP,
+	    /* 0x21 */ POP,
+	    /* 0x22 */ CLEAR,
+	    /* 0x23 */ SWAP,
+	    /* 0x24 */ DEPTH,
+	    /* 0x25 */ CINDEX,
+	    /* 0x26 */ MINDEX,
+	    /* 0x27 */ undefined,   // TODO ALIGNPTS
+	    /* 0x28 */ undefined,
+	    /* 0x29 */ undefined,   // TODO UTP
+	    /* 0x2A */ LOOPCALL,
+	    /* 0x2B */ CALL,
+	    /* 0x2C */ FDEF,
+	    /* 0x2D */ undefined,   // ENDF (eaten by FDEF)
+	    /* 0x2E */ MDAP.bind(undefined, 0),
+	    /* 0x2F */ MDAP.bind(undefined, 1),
+	    /* 0x30 */ IUP.bind(undefined, yUnitVector),
+	    /* 0x31 */ IUP.bind(undefined, xUnitVector),
+	    /* 0x32 */ SHP.bind(undefined, 0),
+	    /* 0x33 */ SHP.bind(undefined, 1),
+	    /* 0x34 */ SHC.bind(undefined, 0),
+	    /* 0x35 */ SHC.bind(undefined, 1),
+	    /* 0x36 */ SHZ.bind(undefined, 0),
+	    /* 0x37 */ SHZ.bind(undefined, 1),
+	    /* 0x38 */ SHPIX,
+	    /* 0x39 */ IP,
+	    /* 0x3A */ MSIRP.bind(undefined, 0),
+	    /* 0x3B */ MSIRP.bind(undefined, 1),
+	    /* 0x3C */ ALIGNRP,
+	    /* 0x3D */ RTDG,
+	    /* 0x3E */ MIAP.bind(undefined, 0),
+	    /* 0x3F */ MIAP.bind(undefined, 1),
+	    /* 0x40 */ NPUSHB,
+	    /* 0x41 */ NPUSHW,
+	    /* 0x42 */ WS,
+	    /* 0x43 */ RS,
+	    /* 0x44 */ WCVTP,
+	    /* 0x45 */ RCVT,
+	    /* 0x46 */ GC.bind(undefined, 0),
+	    /* 0x47 */ GC.bind(undefined, 1),
+	    /* 0x48 */ undefined,   // TODO SCFS
+	    /* 0x49 */ MD.bind(undefined, 0),
+	    /* 0x4A */ MD.bind(undefined, 1),
+	    /* 0x4B */ MPPEM,
+	    /* 0x4C */ undefined,   // TODO MPS
+	    /* 0x4D */ FLIPON,
+	    /* 0x4E */ undefined,   // TODO FLIPOFF
+	    /* 0x4F */ undefined,   // TODO DEBUG
+	    /* 0x50 */ LT,
+	    /* 0x51 */ LTEQ,
+	    /* 0x52 */ GT,
+	    /* 0x53 */ GTEQ,
+	    /* 0x54 */ EQ,
+	    /* 0x55 */ NEQ,
+	    /* 0x56 */ ODD,
+	    /* 0x57 */ EVEN,
+	    /* 0x58 */ IF,
+	    /* 0x59 */ EIF,
+	    /* 0x5A */ AND,
+	    /* 0x5B */ OR,
+	    /* 0x5C */ NOT,
+	    /* 0x5D */ DELTAP123.bind(undefined, 1),
+	    /* 0x5E */ SDB,
+	    /* 0x5F */ SDS,
+	    /* 0x60 */ ADD,
+	    /* 0x61 */ SUB,
+	    /* 0x62 */ DIV,
+	    /* 0x63 */ MUL,
+	    /* 0x64 */ ABS,
+	    /* 0x65 */ NEG,
+	    /* 0x66 */ FLOOR,
+	    /* 0x67 */ CEILING,
+	    /* 0x68 */ ROUND.bind(undefined, 0),
+	    /* 0x69 */ ROUND.bind(undefined, 1),
+	    /* 0x6A */ ROUND.bind(undefined, 2),
+	    /* 0x6B */ ROUND.bind(undefined, 3),
+	    /* 0x6C */ undefined,   // TODO NROUND[ab]
+	    /* 0x6D */ undefined,   // TODO NROUND[ab]
+	    /* 0x6E */ undefined,   // TODO NROUND[ab]
+	    /* 0x6F */ undefined,   // TODO NROUND[ab]
+	    /* 0x70 */ WCVTF,
+	    /* 0x71 */ DELTAP123.bind(undefined, 2),
+	    /* 0x72 */ DELTAP123.bind(undefined, 3),
+	    /* 0x73 */ DELTAC123.bind(undefined, 1),
+	    /* 0x74 */ DELTAC123.bind(undefined, 2),
+	    /* 0x75 */ DELTAC123.bind(undefined, 3),
+	    /* 0x76 */ SROUND,
+	    /* 0x77 */ S45ROUND,
+	    /* 0x78 */ undefined,   // TODO JROT[]
+	    /* 0x79 */ undefined,   // TODO JROF[]
+	    /* 0x7A */ ROFF,
+	    /* 0x7B */ undefined,
+	    /* 0x7C */ RUTG,
+	    /* 0x7D */ RDTG,
+	    /* 0x7E */ POP, // actually SANGW, supposed to do only a pop though
+	    /* 0x7F */ POP, // actually AA, supposed to do only a pop though
+	    /* 0x80 */ undefined,   // TODO FLIPPT
+	    /* 0x81 */ undefined,   // TODO FLIPRGON
+	    /* 0x82 */ undefined,   // TODO FLIPRGOFF
+	    /* 0x83 */ undefined,
+	    /* 0x84 */ undefined,
+	    /* 0x85 */ SCANCTRL,
+	    /* 0x86 */ SDPVTL.bind(undefined, 0),
+	    /* 0x87 */ SDPVTL.bind(undefined, 1),
+	    /* 0x88 */ GETINFO,
+	    /* 0x89 */ undefined,   // TODO IDEF
+	    /* 0x8A */ ROLL,
+	    /* 0x8B */ MAX,
+	    /* 0x8C */ MIN,
+	    /* 0x8D */ SCANTYPE,
+	    /* 0x8E */ INSTCTRL,
+	    /* 0x8F */ undefined,
+	    /* 0x90 */ undefined,
+	    /* 0x91 */ undefined,
+	    /* 0x92 */ undefined,
+	    /* 0x93 */ undefined,
+	    /* 0x94 */ undefined,
+	    /* 0x95 */ undefined,
+	    /* 0x96 */ undefined,
+	    /* 0x97 */ undefined,
+	    /* 0x98 */ undefined,
+	    /* 0x99 */ undefined,
+	    /* 0x9A */ undefined,
+	    /* 0x9B */ undefined,
+	    /* 0x9C */ undefined,
+	    /* 0x9D */ undefined,
+	    /* 0x9E */ undefined,
+	    /* 0x9F */ undefined,
+	    /* 0xA0 */ undefined,
+	    /* 0xA1 */ undefined,
+	    /* 0xA2 */ undefined,
+	    /* 0xA3 */ undefined,
+	    /* 0xA4 */ undefined,
+	    /* 0xA5 */ undefined,
+	    /* 0xA6 */ undefined,
+	    /* 0xA7 */ undefined,
+	    /* 0xA8 */ undefined,
+	    /* 0xA9 */ undefined,
+	    /* 0xAA */ undefined,
+	    /* 0xAB */ undefined,
+	    /* 0xAC */ undefined,
+	    /* 0xAD */ undefined,
+	    /* 0xAE */ undefined,
+	    /* 0xAF */ undefined,
+	    /* 0xB0 */ PUSHB.bind(undefined, 1),
+	    /* 0xB1 */ PUSHB.bind(undefined, 2),
+	    /* 0xB2 */ PUSHB.bind(undefined, 3),
+	    /* 0xB3 */ PUSHB.bind(undefined, 4),
+	    /* 0xB4 */ PUSHB.bind(undefined, 5),
+	    /* 0xB5 */ PUSHB.bind(undefined, 6),
+	    /* 0xB6 */ PUSHB.bind(undefined, 7),
+	    /* 0xB7 */ PUSHB.bind(undefined, 8),
+	    /* 0xB8 */ PUSHW.bind(undefined, 1),
+	    /* 0xB9 */ PUSHW.bind(undefined, 2),
+	    /* 0xBA */ PUSHW.bind(undefined, 3),
+	    /* 0xBB */ PUSHW.bind(undefined, 4),
+	    /* 0xBC */ PUSHW.bind(undefined, 5),
+	    /* 0xBD */ PUSHW.bind(undefined, 6),
+	    /* 0xBE */ PUSHW.bind(undefined, 7),
+	    /* 0xBF */ PUSHW.bind(undefined, 8),
+	    /* 0xC0 */ MDRP_MIRP.bind(undefined, 0, 0, 0, 0, 0),
+	    /* 0xC1 */ MDRP_MIRP.bind(undefined, 0, 0, 0, 0, 1),
+	    /* 0xC2 */ MDRP_MIRP.bind(undefined, 0, 0, 0, 0, 2),
+	    /* 0xC3 */ MDRP_MIRP.bind(undefined, 0, 0, 0, 0, 3),
+	    /* 0xC4 */ MDRP_MIRP.bind(undefined, 0, 0, 0, 1, 0),
+	    /* 0xC5 */ MDRP_MIRP.bind(undefined, 0, 0, 0, 1, 1),
+	    /* 0xC6 */ MDRP_MIRP.bind(undefined, 0, 0, 0, 1, 2),
+	    /* 0xC7 */ MDRP_MIRP.bind(undefined, 0, 0, 0, 1, 3),
+	    /* 0xC8 */ MDRP_MIRP.bind(undefined, 0, 0, 1, 0, 0),
+	    /* 0xC9 */ MDRP_MIRP.bind(undefined, 0, 0, 1, 0, 1),
+	    /* 0xCA */ MDRP_MIRP.bind(undefined, 0, 0, 1, 0, 2),
+	    /* 0xCB */ MDRP_MIRP.bind(undefined, 0, 0, 1, 0, 3),
+	    /* 0xCC */ MDRP_MIRP.bind(undefined, 0, 0, 1, 1, 0),
+	    /* 0xCD */ MDRP_MIRP.bind(undefined, 0, 0, 1, 1, 1),
+	    /* 0xCE */ MDRP_MIRP.bind(undefined, 0, 0, 1, 1, 2),
+	    /* 0xCF */ MDRP_MIRP.bind(undefined, 0, 0, 1, 1, 3),
+	    /* 0xD0 */ MDRP_MIRP.bind(undefined, 0, 1, 0, 0, 0),
+	    /* 0xD1 */ MDRP_MIRP.bind(undefined, 0, 1, 0, 0, 1),
+	    /* 0xD2 */ MDRP_MIRP.bind(undefined, 0, 1, 0, 0, 2),
+	    /* 0xD3 */ MDRP_MIRP.bind(undefined, 0, 1, 0, 0, 3),
+	    /* 0xD4 */ MDRP_MIRP.bind(undefined, 0, 1, 0, 1, 0),
+	    /* 0xD5 */ MDRP_MIRP.bind(undefined, 0, 1, 0, 1, 1),
+	    /* 0xD6 */ MDRP_MIRP.bind(undefined, 0, 1, 0, 1, 2),
+	    /* 0xD7 */ MDRP_MIRP.bind(undefined, 0, 1, 0, 1, 3),
+	    /* 0xD8 */ MDRP_MIRP.bind(undefined, 0, 1, 1, 0, 0),
+	    /* 0xD9 */ MDRP_MIRP.bind(undefined, 0, 1, 1, 0, 1),
+	    /* 0xDA */ MDRP_MIRP.bind(undefined, 0, 1, 1, 0, 2),
+	    /* 0xDB */ MDRP_MIRP.bind(undefined, 0, 1, 1, 0, 3),
+	    /* 0xDC */ MDRP_MIRP.bind(undefined, 0, 1, 1, 1, 0),
+	    /* 0xDD */ MDRP_MIRP.bind(undefined, 0, 1, 1, 1, 1),
+	    /* 0xDE */ MDRP_MIRP.bind(undefined, 0, 1, 1, 1, 2),
+	    /* 0xDF */ MDRP_MIRP.bind(undefined, 0, 1, 1, 1, 3),
+	    /* 0xE0 */ MDRP_MIRP.bind(undefined, 1, 0, 0, 0, 0),
+	    /* 0xE1 */ MDRP_MIRP.bind(undefined, 1, 0, 0, 0, 1),
+	    /* 0xE2 */ MDRP_MIRP.bind(undefined, 1, 0, 0, 0, 2),
+	    /* 0xE3 */ MDRP_MIRP.bind(undefined, 1, 0, 0, 0, 3),
+	    /* 0xE4 */ MDRP_MIRP.bind(undefined, 1, 0, 0, 1, 0),
+	    /* 0xE5 */ MDRP_MIRP.bind(undefined, 1, 0, 0, 1, 1),
+	    /* 0xE6 */ MDRP_MIRP.bind(undefined, 1, 0, 0, 1, 2),
+	    /* 0xE7 */ MDRP_MIRP.bind(undefined, 1, 0, 0, 1, 3),
+	    /* 0xE8 */ MDRP_MIRP.bind(undefined, 1, 0, 1, 0, 0),
+	    /* 0xE9 */ MDRP_MIRP.bind(undefined, 1, 0, 1, 0, 1),
+	    /* 0xEA */ MDRP_MIRP.bind(undefined, 1, 0, 1, 0, 2),
+	    /* 0xEB */ MDRP_MIRP.bind(undefined, 1, 0, 1, 0, 3),
+	    /* 0xEC */ MDRP_MIRP.bind(undefined, 1, 0, 1, 1, 0),
+	    /* 0xED */ MDRP_MIRP.bind(undefined, 1, 0, 1, 1, 1),
+	    /* 0xEE */ MDRP_MIRP.bind(undefined, 1, 0, 1, 1, 2),
+	    /* 0xEF */ MDRP_MIRP.bind(undefined, 1, 0, 1, 1, 3),
+	    /* 0xF0 */ MDRP_MIRP.bind(undefined, 1, 1, 0, 0, 0),
+	    /* 0xF1 */ MDRP_MIRP.bind(undefined, 1, 1, 0, 0, 1),
+	    /* 0xF2 */ MDRP_MIRP.bind(undefined, 1, 1, 0, 0, 2),
+	    /* 0xF3 */ MDRP_MIRP.bind(undefined, 1, 1, 0, 0, 3),
+	    /* 0xF4 */ MDRP_MIRP.bind(undefined, 1, 1, 0, 1, 0),
+	    /* 0xF5 */ MDRP_MIRP.bind(undefined, 1, 1, 0, 1, 1),
+	    /* 0xF6 */ MDRP_MIRP.bind(undefined, 1, 1, 0, 1, 2),
+	    /* 0xF7 */ MDRP_MIRP.bind(undefined, 1, 1, 0, 1, 3),
+	    /* 0xF8 */ MDRP_MIRP.bind(undefined, 1, 1, 1, 0, 0),
+	    /* 0xF9 */ MDRP_MIRP.bind(undefined, 1, 1, 1, 0, 1),
+	    /* 0xFA */ MDRP_MIRP.bind(undefined, 1, 1, 1, 0, 2),
+	    /* 0xFB */ MDRP_MIRP.bind(undefined, 1, 1, 1, 0, 3),
+	    /* 0xFC */ MDRP_MIRP.bind(undefined, 1, 1, 1, 1, 0),
+	    /* 0xFD */ MDRP_MIRP.bind(undefined, 1, 1, 1, 1, 1),
+	    /* 0xFE */ MDRP_MIRP.bind(undefined, 1, 1, 1, 1, 2),
+	    /* 0xFF */ MDRP_MIRP.bind(undefined, 1, 1, 1, 1, 3)
+	];
+	
+	
+	
+	/*****************************
+	  Mathematical Considerations
+	******************************
+	
+	fv ... refers to freedom vector
+	pv ... refers to projection vector
+	rp ... refers to reference point
+	p  ... refers to to point being operated on
+	d  ... refers to distance
+	
+	SETRELATIVE:
+	============
+	
+	case freedom vector == x-axis:
+	------------------------------
+	
+	                        (pv)
+	                     .-'
+	              rpd .-'
+	               .-*
+	          d .-'90°'
+	         .-'       '
+	      .-'           '
+	   *-'               ' b
+	  rp                  '
+	                       '
+	                        '
+	            p *----------*-------------- (fv)
+	                          pm
+	
+	  rpdx = rpx + d * pv.x
+	  rpdy = rpy + d * pv.y
+	
+	  equation of line b
+	
+	   y - rpdy = pvns * (x- rpdx)
+	
+	   y = p.y
+	
+	   x = rpdx + ( p.y - rpdy ) / pvns
+	
+	
+	case freedom vector == y-axis:
+	------------------------------
+	
+	    * pm
+	    |\
+	    | \
+	    |  \
+	    |   \
+	    |    \
+	    |     \
+	    |      \
+	    |       \
+	    |        \
+	    |         \ b
+	    |          \
+	    |           \
+	    |            \    .-' (pv)
+	    |         90° \.-'
+	    |           .-'* rpd
+	    |        .-'
+	    *     *-'  d
+	    p     rp
+	
+	  rpdx = rpx + d * pv.x
+	  rpdy = rpy + d * pv.y
+	
+	  equation of line b:
+	           pvns ... normal slope to pv
+	
+	   y - rpdy = pvns * (x - rpdx)
+	
+	   x = p.x
+	
+	   y = rpdy +  pvns * (p.x - rpdx)
+	
+	
+	
+	generic case:
+	-------------
+	
+	
+	                              .'(fv)
+	                            .'
+	                          .* pm
+	                        .' !
+	                      .'    .
+	                    .'      !
+	                  .'         . b
+	                .'           !
+	               *              .
+	              p               !
+	                         90°   .    ... (pv)
+	                           ...-*-'''
+	                  ...---'''    rpd
+	         ...---'''   d
+	   *--'''
+	  rp
+	
+	    rpdx = rpx + d * pv.x
+	    rpdy = rpy + d * pv.y
+	
+	 equation of line b:
+	    pvns... normal slope to pv
+	
+	    y - rpdy = pvns * (x - rpdx)
+	
+	 equation of freedom vector line:
+	    fvs ... slope of freedom vector (=fy/fx)
+	
+	    y - py = fvs * (x - px)
+	
+	
+	  on pm both equations are true for same x/y
+	
+	    y - rpdy = pvns * (x - rpdx)
+	
+	    y - py = fvs * (x - px)
+	
+	  form to y and set equal:
+	
+	    pvns * (x - rpdx) + rpdy = fvs * (x - px) + py
+	
+	  expand:
+	
+	    pvns * x - pvns * rpdx + rpdy = fvs * x - fvs * px + py
+	
+	  switch:
+	
+	    fvs * x - fvs * px + py = pvns * x - pvns * rpdx + rpdy
+	
+	  solve for x:
+	
+	    fvs * x - pvns * x = fvs * px - pvns * rpdx - py + rpdy
+	
+	
+	
+	          fvs * px - pvns * rpdx + rpdy - py
+	    x =  -----------------------------------
+	                 fvs - pvns
+	
+	  and:
+	
+	    y = fvs * (x - px) + py
+	
+	
+	
+	INTERPOLATE:
+	============
+	
+	Examples of point interpolation.
+	
+	The weight of the movement of the reference point gets bigger
+	the further the other reference point is away, thus the safest
+	option (that is avoiding 0/0 divisions) is to weight the
+	original distance of the other point by the sum of both distances.
+	
+	If the sum of both distances is 0, then move the point by the
+	arithmetic average of the movement of both reference points.
+	
+	
+	
+	
+	           (+6)
+	    rp1o *---->*rp1
+	         .     .                          (+12)
+	         .     .                  rp2o *---------->* rp2
+	         .     .                       .           .
+	         .     .                       .           .
+	         .    10          20           .           .
+	         |.........|...................|           .
+	               .   .                               .
+	               .   . (+8)                          .
+	                po *------>*p                      .
+	               .           .                       .
+	               .    12     .          24           .
+	               |...........|.......................|
+	                                  36
+	
+	
+	-------
+	
+	
+	
+	           (+10)
+	    rp1o *-------->*rp1
+	         .         .                      (-10)
+	         .         .              rp2 *<---------* rpo2
+	         .         .                   .         .
+	         .         .                   .         .
+	         .    10   .          30       .         .
+	         |.........|.............................|
+	                   .                   .
+	                   . (+5)              .
+	                po *--->* p            .
+	                   .    .              .
+	                   .    .   20         .
+	                   |....|..............|
+	                     5        15
+	
+	
+	-------
+	
+	
+	           (+10)
+	    rp1o *-------->*rp1
+	         .         .
+	         .         .
+	    rp2o *-------->*rp2
+	
+	
+	                               (+10)
+	                          po *-------->* p
+	
+	-------
+	
+	
+	           (+10)
+	    rp1o *-------->*rp1
+	         .         .
+	         .         .(+30)
+	    rp2o *---------------------------->*rp2
+	
+	
+	                                        (+25)
+	                          po *----------------------->* p
+	
+	
+	
+	vim: set ts=4 sw=4 expandtab:
+	*****/
+	
+	// The Font object
+	
+	/**
+	 * @typedef FontOptions
+	 * @type Object
+	 * @property {Boolean} empty - whether to create a new empty font
+	 * @property {string} familyName
+	 * @property {string} styleName
+	 * @property {string=} fullName
+	 * @property {string=} postScriptName
+	 * @property {string=} designer
+	 * @property {string=} designerURL
+	 * @property {string=} manufacturer
+	 * @property {string=} manufacturerURL
+	 * @property {string=} license
+	 * @property {string=} licenseURL
+	 * @property {string=} version
+	 * @property {string=} description
+	 * @property {string=} copyright
+	 * @property {string=} trademark
+	 * @property {Number} unitsPerEm
+	 * @property {Number} ascender
+	 * @property {Number} descender
+	 * @property {Number} createdTimestamp
+	 * @property {string=} weightClass
+	 * @property {string=} widthClass
+	 * @property {string=} fsSelection
+	 */
+	
+	/**
+	 * A Font represents a loaded OpenType font file.
+	 * It contains a set of glyphs and methods to draw text on a drawing context,
+	 * or to get a path representing the text.
+	 * @exports opentype.Font
+	 * @class
+	 * @param {FontOptions}
+	 * @constructor
+	 */
+	function Font(options) {
+	    options = options || {};
+	
+	    if (!options.empty) {
+	        // Check that we've provided the minimum set of names.
+	        checkArgument(options.familyName, 'When creating a new Font object, familyName is required.');
+	        checkArgument(options.styleName, 'When creating a new Font object, styleName is required.');
+	        checkArgument(options.unitsPerEm, 'When creating a new Font object, unitsPerEm is required.');
+	        checkArgument(options.ascender, 'When creating a new Font object, ascender is required.');
+	        checkArgument(options.descender, 'When creating a new Font object, descender is required.');
+	        checkArgument(options.descender < 0, 'Descender should be negative (e.g. -512).');
+	
+	        // OS X will complain if the names are empty, so we put a single space everywhere by default.
+	        this.names = {
+	            fontFamily: {en: options.familyName || ' '},
+	            fontSubfamily: {en: options.styleName || ' '},
+	            fullName: {en: options.fullName || options.familyName + ' ' + options.styleName},
+	            postScriptName: {en: options.postScriptName || options.familyName + options.styleName},
+	            designer: {en: options.designer || ' '},
+	            designerURL: {en: options.designerURL || ' '},
+	            manufacturer: {en: options.manufacturer || ' '},
+	            manufacturerURL: {en: options.manufacturerURL || ' '},
+	            license: {en: options.license || ' '},
+	            licenseURL: {en: options.licenseURL || ' '},
+	            version: {en: options.version || 'Version 0.1'},
+	            description: {en: options.description || ' '},
+	            copyright: {en: options.copyright || ' '},
+	            trademark: {en: options.trademark || ' '}
+	        };
+	        this.unitsPerEm = options.unitsPerEm || 1000;
+	        this.ascender = options.ascender;
+	        this.descender = options.descender;
+	        this.createdTimestamp = options.createdTimestamp;
+	        this.tables = { os2: {
+	            usWeightClass: options.weightClass || this.usWeightClasses.MEDIUM,
+	            usWidthClass: options.widthClass || this.usWidthClasses.MEDIUM,
+	            fsSelection: options.fsSelection || this.fsSelectionValues.REGULAR
+	        } };
+	    }
+	
+	    this.supported = true; // Deprecated: parseBuffer will throw an error if font is not supported.
+	    this.glyphs = new glyphset.GlyphSet(this, options.glyphs || []);
+	    this.encoding = new DefaultEncoding(this);
+	    this.substitution = new Substitution(this);
+	    this.tables = this.tables || {};
+	
+	    Object.defineProperty(this, 'hinting', {
+	        get: function() {
+	            if (this._hinting) { return this._hinting; }
+	            if (this.outlinesFormat === 'truetype') {
+	                return (this._hinting = new Hinting(this));
+	            }
+	        }
+	    });
+	}
+	
+	/**
+	 * Check if the font has a glyph for the given character.
+	 * @param  {string}
+	 * @return {Boolean}
+	 */
+	Font.prototype.hasChar = function(c) {
+	    return this.encoding.charToGlyphIndex(c) !== null;
+	};
+	
+	/**
+	 * Convert the given character to a single glyph index.
+	 * Note that this function assumes that there is a one-to-one mapping between
+	 * the given character and a glyph; for complex scripts this might not be the case.
+	 * @param  {string}
+	 * @return {Number}
+	 */
+	Font.prototype.charToGlyphIndex = function(s) {
+	    return this.encoding.charToGlyphIndex(s);
+	};
+	
+	/**
+	 * Convert the given character to a single Glyph object.
+	 * Note that this function assumes that there is a one-to-one mapping between
+	 * the given character and a glyph; for complex scripts this might not be the case.
+	 * @param  {string}
+	 * @return {opentype.Glyph}
+	 */
+	Font.prototype.charToGlyph = function(c) {
+	    var glyphIndex = this.charToGlyphIndex(c);
+	    var glyph = this.glyphs.get(glyphIndex);
+	    if (!glyph) {
+	        // .notdef
+	        glyph = this.glyphs.get(0);
+	    }
+	
+	    return glyph;
+	};
+	
+	/**
+	 * Convert the given text to a list of Glyph objects.
+	 * Note that there is no strict one-to-one mapping between characters and
+	 * glyphs, so the list of returned glyphs can be larger or smaller than the
+	 * length of the given string.
+	 * @param  {string}
+	 * @param  {GlyphRenderOptions} [options]
+	 * @return {opentype.Glyph[]}
+	 */
+	Font.prototype.stringToGlyphs = function(s, options) {
+	    var this$1 = this;
+	
+	    options = options || this.defaultRenderOptions;
+	    // Get glyph indexes
+	    var indexes = [];
+	    for (var i = 0; i < s.length; i += 1) {
+	        var c = s[i];
+	        indexes.push(this$1.charToGlyphIndex(c));
+	    }
+	    var length = indexes.length;
+	
+	    // Apply substitutions on glyph indexes
+	    if (options.features) {
+	        var script = options.script || this.substitution.getDefaultScriptName();
+	        var manyToOne = [];
+	        if (options.features.liga) { manyToOne = manyToOne.concat(this.substitution.getFeature('liga', script, options.language)); }
+	        if (options.features.rlig) { manyToOne = manyToOne.concat(this.substitution.getFeature('rlig', script, options.language)); }
+	        for (var i$1 = 0; i$1 < length; i$1 += 1) {
+	            for (var j = 0; j < manyToOne.length; j++) {
+	                var ligature = manyToOne[j];
+	                var components = ligature.sub;
+	                var compCount = components.length;
+	                var k = 0;
+	                while (k < compCount && components[k] === indexes[i$1 + k]) { k++; }
+	                if (k === compCount) {
+	                    indexes.splice(i$1, compCount, ligature.by);
+	                    length = length - compCount + 1;
+	                }
+	            }
+	        }
+	    }
+	
+	    // convert glyph indexes to glyph objects
+	    var glyphs = new Array(length);
+	    var notdef = this.glyphs.get(0);
+	    for (var i$2 = 0; i$2 < length; i$2 += 1) {
+	        glyphs[i$2] = this$1.glyphs.get(indexes[i$2]) || notdef;
+	    }
+	    return glyphs;
+	};
+	
+	/**
+	 * @param  {string}
+	 * @return {Number}
+	 */
+	Font.prototype.nameToGlyphIndex = function(name) {
+	    return this.glyphNames.nameToGlyphIndex(name);
+	};
+	
+	/**
+	 * @param  {string}
+	 * @return {opentype.Glyph}
+	 */
+	Font.prototype.nameToGlyph = function(name) {
+	    var glyphIndex = this.nameToGlyphIndex(name);
+	    var glyph = this.glyphs.get(glyphIndex);
+	    if (!glyph) {
+	        // .notdef
+	        glyph = this.glyphs.get(0);
+	    }
+	
+	    return glyph;
+	};
+	
+	/**
+	 * @param  {Number}
+	 * @return {String}
+	 */
+	Font.prototype.glyphIndexToName = function(gid) {
+	    if (!this.glyphNames.glyphIndexToName) {
+	        return '';
+	    }
+	
+	    return this.glyphNames.glyphIndexToName(gid);
+	};
+	
+	/**
+	 * Retrieve the value of the kerning pair between the left glyph (or its index)
+	 * and the right glyph (or its index). If no kerning pair is found, return 0.
+	 * The kerning value gets added to the advance width when calculating the spacing
+	 * between glyphs.
+	 * @param  {opentype.Glyph} leftGlyph
+	 * @param  {opentype.Glyph} rightGlyph
+	 * @return {Number}
+	 */
+	Font.prototype.getKerningValue = function(leftGlyph, rightGlyph) {
+	    leftGlyph = leftGlyph.index || leftGlyph;
+	    rightGlyph = rightGlyph.index || rightGlyph;
+	    var gposKerning = this.getGposKerningValue;
+	    return gposKerning ? gposKerning(leftGlyph, rightGlyph) :
+	        (this.kerningPairs[leftGlyph + ',' + rightGlyph] || 0);
+	};
+	
+	/**
+	 * @typedef GlyphRenderOptions
+	 * @type Object
+	 * @property {string} [script] - script used to determine which features to apply. By default, 'DFLT' or 'latn' is used.
+	 *                               See https://www.microsoft.com/typography/otspec/scripttags.htm
+	 * @property {string} [language='dflt'] - language system used to determine which features to apply.
+	 *                                        See https://www.microsoft.com/typography/developers/opentype/languagetags.aspx
+	 * @property {boolean} [kerning=true] - whether to include kerning values
+	 * @property {object} [features] - OpenType Layout feature tags. Used to enable or disable the features of the given script/language system.
+	 *                                 See https://www.microsoft.com/typography/otspec/featuretags.htm
+	 */
+	Font.prototype.defaultRenderOptions = {
+	    kerning: true,
+	    features: {
+	        liga: true,
+	        rlig: true
+	    }
+	};
+	
+	/**
+	 * Helper function that invokes the given callback for each glyph in the given text.
+	 * The callback gets `(glyph, x, y, fontSize, options)`.* @param  {string} text
+	 * @param {string} text - The text to apply.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {GlyphRenderOptions=} options
+	 * @param  {Function} callback
+	 */
+	Font.prototype.forEachGlyph = function(text, x, y, fontSize, options, callback) {
+	    var this$1 = this;
+	
+	    x = x !== undefined ? x : 0;
+	    y = y !== undefined ? y : 0;
+	    fontSize = fontSize !== undefined ? fontSize : 72;
+	    options = options || this.defaultRenderOptions;
+	    var fontScale = 1 / this.unitsPerEm * fontSize;
+	    var glyphs = this.stringToGlyphs(text, options);
+	    for (var i = 0; i < glyphs.length; i += 1) {
+	        var glyph = glyphs[i];
+	        callback.call(this$1, glyph, x, y, fontSize, options);
+	        if (glyph.advanceWidth) {
+	            x += glyph.advanceWidth * fontScale;
+	        }
+	
+	        if (options.kerning && i < glyphs.length - 1) {
+	            var kerningValue = this$1.getKerningValue(glyph, glyphs[i + 1]);
+	            x += kerningValue * fontScale;
+	        }
+	
+	        if (options.letterSpacing) {
+	            x += options.letterSpacing * fontSize;
+	        } else if (options.tracking) {
+	            x += (options.tracking / 1000) * fontSize;
+	        }
+	    }
+	    return x;
+	};
+	
+	/**
+	 * Create a Path object that represents the given text.
+	 * @param  {string} text - The text to create.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {GlyphRenderOptions=} options
+	 * @return {opentype.Path}
+	 */
+	Font.prototype.getPath = function(text, x, y, fontSize, options) {
+	    var fullPath = new Path();
+	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
+	        var glyphPath = glyph.getPath(gX, gY, gFontSize, options, this);
+	        fullPath.extend(glyphPath);
+	    });
+	    return fullPath;
+	};
+	
+	/**
+	 * Create an array of Path objects that represent the glyphs of a given text.
+	 * @param  {string} text - The text to create.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {GlyphRenderOptions=} options
+	 * @return {opentype.Path[]}
+	 */
+	Font.prototype.getPaths = function(text, x, y, fontSize, options) {
+	    var glyphPaths = [];
+	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
+	        var glyphPath = glyph.getPath(gX, gY, gFontSize, options, this);
+	        glyphPaths.push(glyphPath);
+	    });
+	
+	    return glyphPaths;
+	};
+	
+	/**
+	 * Returns the advance width of a text.
+	 *
+	 * This is something different than Path.getBoundingBox() as for example a
+	 * suffixed whitespace increases the advanceWidth but not the bounding box
+	 * or an overhanging letter like a calligraphic 'f' might have a quite larger
+	 * bounding box than its advance width.
+	 *
+	 * This corresponds to canvas2dContext.measureText(text).width
+	 *
+	 * @param  {string} text - The text to create.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {GlyphRenderOptions=} options
+	 * @return advance width
+	 */
+	Font.prototype.getAdvanceWidth = function(text, fontSize, options) {
+	    return this.forEachGlyph(text, 0, 0, fontSize, options, function() {});
+	};
+	
+	/**
+	 * Draw the text on the given drawing context.
+	 * @param  {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param  {string} text - The text to create.
+	 * @param  {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param  {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param  {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param  {GlyphRenderOptions=} options
+	 */
+	Font.prototype.draw = function(ctx, text, x, y, fontSize, options) {
+	    this.getPath(text, x, y, fontSize, options).draw(ctx);
+	};
+	
+	/**
+	 * Draw the points of all glyphs in the text.
+	 * On-curve points will be drawn in blue, off-curve points will be drawn in red.
+	 * @param {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param {string} text - The text to create.
+	 * @param {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param {GlyphRenderOptions=} options
+	 */
+	Font.prototype.drawPoints = function(ctx, text, x, y, fontSize, options) {
+	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
+	        glyph.drawPoints(ctx, gX, gY, gFontSize);
+	    });
+	};
+	
+	/**
+	 * Draw lines indicating important font measurements for all glyphs in the text.
+	 * Black lines indicate the origin of the coordinate system (point 0,0).
+	 * Blue lines indicate the glyph bounding box.
+	 * Green line indicates the advance width of the glyph.
+	 * @param {CanvasRenderingContext2D} ctx - A 2D drawing context, like Canvas.
+	 * @param {string} text - The text to create.
+	 * @param {number} [x=0] - Horizontal position of the beginning of the text.
+	 * @param {number} [y=0] - Vertical position of the *baseline* of the text.
+	 * @param {number} [fontSize=72] - Font size in pixels. We scale the glyph units by `1 / unitsPerEm * fontSize`.
+	 * @param {GlyphRenderOptions=} options
+	 */
+	Font.prototype.drawMetrics = function(ctx, text, x, y, fontSize, options) {
+	    this.forEachGlyph(text, x, y, fontSize, options, function(glyph, gX, gY, gFontSize) {
+	        glyph.drawMetrics(ctx, gX, gY, gFontSize);
+	    });
+	};
+	
+	/**
+	 * @param  {string}
+	 * @return {string}
+	 */
+	Font.prototype.getEnglishName = function(name) {
+	    var translations = this.names[name];
+	    if (translations) {
+	        return translations.en;
+	    }
+	};
+	
+	/**
+	 * Validate
+	 */
+	Font.prototype.validate = function() {
+	    var warnings = [];
+	    var _this = this;
+	
+	    function assert(predicate, message) {
+	        if (!predicate) {
+	            warnings.push(message);
+	        }
+	    }
+	
+	    function assertNamePresent(name) {
+	        var englishName = _this.getEnglishName(name);
+	        assert(englishName && englishName.trim().length > 0,
+	               'No English ' + name + ' specified.');
+	    }
+	
+	    // Identification information
+	    assertNamePresent('fontFamily');
+	    assertNamePresent('weightName');
+	    assertNamePresent('manufacturer');
+	    assertNamePresent('copyright');
+	    assertNamePresent('version');
+	
+	    // Dimension information
+	    assert(this.unitsPerEm > 0, 'No unitsPerEm specified.');
+	};
+	
+	/**
+	 * Convert the font object to a SFNT data structure.
+	 * This structure contains all the necessary tables and metadata to create a binary OTF file.
+	 * @return {opentype.Table}
+	 */
+	Font.prototype.toTables = function() {
+	    return sfnt.fontToTable(this);
+	};
+	/**
+	 * @deprecated Font.toBuffer is deprecated. Use Font.toArrayBuffer instead.
+	 */
+	Font.prototype.toBuffer = function() {
+	    console.warn('Font.toBuffer is deprecated. Use Font.toArrayBuffer instead.');
+	    return this.toArrayBuffer();
+	};
+	/**
+	 * Converts a `opentype.Font` into an `ArrayBuffer`
+	 * @return {ArrayBuffer}
+	 */
+	Font.prototype.toArrayBuffer = function() {
+	    var sfntTable = this.toTables();
+	    var bytes = sfntTable.encode();
+	    var buffer = new ArrayBuffer(bytes.length);
+	    var intArray = new Uint8Array(buffer);
+	    for (var i = 0; i < bytes.length; i++) {
+	        intArray[i] = bytes[i];
+	    }
+	
+	    return buffer;
+	};
+	
+	/**
+	 * Initiate a download of the OpenType font.
+	 */
+	Font.prototype.download = function(fileName) {
+	    var familyName = this.getEnglishName('fontFamily');
+	    var styleName = this.getEnglishName('fontSubfamily');
+	    fileName = fileName || familyName.replace(/\s/g, '') + '-' + styleName + '.otf';
+	    var arrayBuffer = this.toArrayBuffer();
+	
+	    if (isBrowser()) {
+	        window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
+	        window.requestFileSystem(window.TEMPORARY, arrayBuffer.byteLength, function(fs) {
+	            fs.root.getFile(fileName, {create: true}, function(fileEntry) {
+	                fileEntry.createWriter(function(writer) {
+	                    var dataView = new DataView(arrayBuffer);
+	                    var blob = new Blob([dataView], {type: 'font/opentype'});
+	                    writer.write(blob);
+	
+	                    writer.addEventListener('writeend', function() {
+	                        // Navigating to the file will download it.
+	                        location.href = fileEntry.toURL();
+	                    }, false);
+	                });
+	            });
+	        },
+	        function(err) {
+	            throw new Error(err.name + ': ' + err.message);
+	        });
+	    } else {
+	        var fs = __webpack_require__(3);
+	        var buffer = arrayBufferToNodeBuffer(arrayBuffer);
+	        fs.writeFileSync(fileName, buffer);
+	    }
+	};
+	/**
+	 * @private
+	 */
+	Font.prototype.fsSelectionValues = {
+	    ITALIC:              0x001, //1
+	    UNDERSCORE:          0x002, //2
+	    NEGATIVE:            0x004, //4
+	    OUTLINED:            0x008, //8
+	    STRIKEOUT:           0x010, //16
+	    BOLD:                0x020, //32
+	    REGULAR:             0x040, //64
+	    USER_TYPO_METRICS:   0x080, //128
+	    WWS:                 0x100, //256
+	    OBLIQUE:             0x200  //512
+	};
+	
+	/**
+	 * @private
+	 */
+	Font.prototype.usWidthClasses = {
+	    ULTRA_CONDENSED: 1,
+	    EXTRA_CONDENSED: 2,
+	    CONDENSED: 3,
+	    SEMI_CONDENSED: 4,
+	    MEDIUM: 5,
+	    SEMI_EXPANDED: 6,
+	    EXPANDED: 7,
+	    EXTRA_EXPANDED: 8,
+	    ULTRA_EXPANDED: 9
+	};
+	
+	/**
+	 * @private
+	 */
+	Font.prototype.usWeightClasses = {
+	    THIN: 100,
+	    EXTRA_LIGHT: 200,
+	    LIGHT: 300,
+	    NORMAL: 400,
+	    MEDIUM: 500,
+	    SEMI_BOLD: 600,
+	    BOLD: 700,
+	    EXTRA_BOLD: 800,
+	    BLACK:    900
+	};
+	
 	// The `fvar` table stores font variation axes and instances.
 	// https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6fvar.html
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var parse = __webpack_require__(12);
-	var table = __webpack_require__(9);
 	
 	function addName(name, names) {
 	    var nameString = JSON.stringify(name);
@@ -8183,362 +11535,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return {axes: axes, instances: instances};
 	}
 	
-	exports.make = makeFvarTable;
-	exports.parse = parseFvarTable;
-
-
-/***/ },
-/* 32 */
-/***/ function(module, exports, __webpack_require__) {
-
-	// The `glyf` table describes the glyphs in TrueType outline format.
-	// http://www.microsoft.com/typography/otspec/glyf.htm
+	var fvar = { make: makeFvarTable, parse: parseFvarTable };
 	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var glyphset = __webpack_require__(14);
-	var parse = __webpack_require__(12);
-	var path = __webpack_require__(6);
-	
-	// Parse the coordinate data for a glyph.
-	function parseGlyphCoordinate(p, flag, previousValue, shortVectorBitMask, sameBitMask) {
-	    var v;
-	    if ((flag & shortVectorBitMask) > 0) {
-	        // The coordinate is 1 byte long.
-	        v = p.parseByte();
-	        // The `same` bit is re-used for short values to signify the sign of the value.
-	        if ((flag & sameBitMask) === 0) {
-	            v = -v;
-	        }
-	
-	        v = previousValue + v;
-	    } else {
-	        //  The coordinate is 2 bytes long.
-	        // If the `same` bit is set, the coordinate is the same as the previous coordinate.
-	        if ((flag & sameBitMask) > 0) {
-	            v = previousValue;
-	        } else {
-	            // Parse the coordinate as a signed 16-bit delta value.
-	            v = previousValue + p.parseShort();
-	        }
-	    }
-	
-	    return v;
-	}
-	
-	// Parse a TrueType glyph.
-	function parseGlyph(glyph, data, start) {
-	    var p = new parse.Parser(data, start);
-	    glyph.numberOfContours = p.parseShort();
-	    glyph._xMin = p.parseShort();
-	    glyph._yMin = p.parseShort();
-	    glyph._xMax = p.parseShort();
-	    glyph._yMax = p.parseShort();
-	    var flags;
-	    var flag;
-	    if (glyph.numberOfContours > 0) {
-	        var i;
-	        // This glyph is not a composite.
-	        var endPointIndices = glyph.endPointIndices = [];
-	        for (i = 0; i < glyph.numberOfContours; i += 1) {
-	            endPointIndices.push(p.parseUShort());
-	        }
-	
-	        glyph.instructionLength = p.parseUShort();
-	        glyph.instructions = [];
-	        for (i = 0; i < glyph.instructionLength; i += 1) {
-	            glyph.instructions.push(p.parseByte());
-	        }
-	
-	        var numberOfCoordinates = endPointIndices[endPointIndices.length - 1] + 1;
-	        flags = [];
-	        for (i = 0; i < numberOfCoordinates; i += 1) {
-	            flag = p.parseByte();
-	            flags.push(flag);
-	            // If bit 3 is set, we repeat this flag n times, where n is the next byte.
-	            if ((flag & 8) > 0) {
-	                var repeatCount = p.parseByte();
-	                for (var j = 0; j < repeatCount; j += 1) {
-	                    flags.push(flag);
-	                    i += 1;
-	                }
-	            }
-	        }
-	
-	        check.argument(flags.length === numberOfCoordinates, 'Bad flags.');
-	
-	        if (endPointIndices.length > 0) {
-	            var points = [];
-	            var point;
-	            // X/Y coordinates are relative to the previous point, except for the first point which is relative to 0,0.
-	            if (numberOfCoordinates > 0) {
-	                for (i = 0; i < numberOfCoordinates; i += 1) {
-	                    flag = flags[i];
-	                    point = {};
-	                    point.onCurve = !!(flag & 1);
-	                    point.lastPointOfContour = endPointIndices.indexOf(i) >= 0;
-	                    points.push(point);
-	                }
-	
-	                var px = 0;
-	                for (i = 0; i < numberOfCoordinates; i += 1) {
-	                    flag = flags[i];
-	                    point = points[i];
-	                    point.x = parseGlyphCoordinate(p, flag, px, 2, 16);
-	                    px = point.x;
-	                }
-	
-	                var py = 0;
-	                for (i = 0; i < numberOfCoordinates; i += 1) {
-	                    flag = flags[i];
-	                    point = points[i];
-	                    point.y = parseGlyphCoordinate(p, flag, py, 4, 32);
-	                    py = point.y;
-	                }
-	            }
-	
-	            glyph.points = points;
-	        } else {
-	            glyph.points = [];
-	        }
-	    } else if (glyph.numberOfContours === 0) {
-	        glyph.points = [];
-	    } else {
-	        glyph.isComposite = true;
-	        glyph.points = [];
-	        glyph.components = [];
-	        var moreComponents = true;
-	        while (moreComponents) {
-	            flags = p.parseUShort();
-	            var component = {
-	                glyphIndex: p.parseUShort(),
-	                xScale: 1,
-	                scale01: 0,
-	                scale10: 0,
-	                yScale: 1,
-	                dx: 0,
-	                dy: 0
-	            };
-	            if ((flags & 1) > 0) {
-	                // The arguments are words
-	                if ((flags & 2) > 0) {
-	                    // values are offset
-	                    component.dx = p.parseShort();
-	                    component.dy = p.parseShort();
-	                } else {
-	                    // values are matched points
-	                    component.matchedPoints = [p.parseUShort(), p.parseUShort()];
-	                }
-	
-	            } else {
-	                // The arguments are bytes
-	                if ((flags & 2) > 0) {
-	                    // values are offset
-	                    component.dx = p.parseChar();
-	                    component.dy = p.parseChar();
-	                } else {
-	                    // values are matched points
-	                    component.matchedPoints = [p.parseByte(), p.parseByte()];
-	                }
-	            }
-	
-	            if ((flags & 8) > 0) {
-	                // We have a scale
-	                component.xScale = component.yScale = p.parseF2Dot14();
-	            } else if ((flags & 64) > 0) {
-	                // We have an X / Y scale
-	                component.xScale = p.parseF2Dot14();
-	                component.yScale = p.parseF2Dot14();
-	            } else if ((flags & 128) > 0) {
-	                // We have a 2x2 transformation
-	                component.xScale = p.parseF2Dot14();
-	                component.scale01 = p.parseF2Dot14();
-	                component.scale10 = p.parseF2Dot14();
-	                component.yScale = p.parseF2Dot14();
-	            }
-	
-	            glyph.components.push(component);
-	            moreComponents = !!(flags & 32);
-	        }
-	    }
-	}
-	
-	// Transform an array of points and return a new array.
-	function transformPoints(points, transform) {
-	    var newPoints = [];
-	    for (var i = 0; i < points.length; i += 1) {
-	        var pt = points[i];
-	        var newPt = {
-	            x: transform.xScale * pt.x + transform.scale01 * pt.y + transform.dx,
-	            y: transform.scale10 * pt.x + transform.yScale * pt.y + transform.dy,
-	            onCurve: pt.onCurve,
-	            lastPointOfContour: pt.lastPointOfContour
-	        };
-	        newPoints.push(newPt);
-	    }
-	
-	    return newPoints;
-	}
-	
-	function getContours(points) {
-	    var contours = [];
-	    var currentContour = [];
-	    for (var i = 0; i < points.length; i += 1) {
-	        var pt = points[i];
-	        currentContour.push(pt);
-	        if (pt.lastPointOfContour) {
-	            contours.push(currentContour);
-	            currentContour = [];
-	        }
-	    }
-	
-	    check.argument(currentContour.length === 0, 'There are still points left in the current contour.');
-	    return contours;
-	}
-	
-	// Convert the TrueType glyph outline to a Path.
-	function getPath(points) {
-	    var p = new path.Path();
-	    if (!points) {
-	        return p;
-	    }
-	
-	    var contours = getContours(points);
-	    for (var i = 0; i < contours.length; i += 1) {
-	        var contour = contours[i];
-	        var firstPt = contour[0];
-	        var lastPt = contour[contour.length - 1];
-	        var curvePt;
-	        var realFirstPoint;
-	        if (firstPt.onCurve) {
-	            curvePt = null;
-	            // The first point will be consumed by the moveTo command,
-	            // so skip it in the loop.
-	            realFirstPoint = true;
-	        } else {
-	            if (lastPt.onCurve) {
-	                // If the first point is off-curve and the last point is on-curve,
-	                // start at the last point.
-	                firstPt = lastPt;
-	            } else {
-	                // If both first and last points are off-curve, start at their middle.
-	                firstPt = { x: (firstPt.x + lastPt.x) / 2, y: (firstPt.y + lastPt.y) / 2 };
-	            }
-	
-	            curvePt = firstPt;
-	            // The first point is synthesized, so don't skip the real first point.
-	            realFirstPoint = false;
-	        }
-	
-	        p.moveTo(firstPt.x, firstPt.y);
-	
-	        for (var j = realFirstPoint ? 1 : 0; j < contour.length; j += 1) {
-	            var pt = contour[j];
-	            var prevPt = j === 0 ? firstPt : contour[j - 1];
-	            if (prevPt.onCurve && pt.onCurve) {
-	                // This is a straight line.
-	                p.lineTo(pt.x, pt.y);
-	            } else if (prevPt.onCurve && !pt.onCurve) {
-	                curvePt = pt;
-	            } else if (!prevPt.onCurve && !pt.onCurve) {
-	                var midPt = { x: (prevPt.x + pt.x) / 2, y: (prevPt.y + pt.y) / 2 };
-	                p.quadraticCurveTo(prevPt.x, prevPt.y, midPt.x, midPt.y);
-	                curvePt = pt;
-	            } else if (!prevPt.onCurve && pt.onCurve) {
-	                // Previous point off-curve, this point on-curve.
-	                p.quadraticCurveTo(curvePt.x, curvePt.y, pt.x, pt.y);
-	                curvePt = null;
-	            } else {
-	                throw new Error('Invalid state.');
-	            }
-	        }
-	
-	        if (firstPt !== lastPt) {
-	            // Connect the last and first points
-	            if (curvePt) {
-	                p.quadraticCurveTo(curvePt.x, curvePt.y, firstPt.x, firstPt.y);
-	            } else {
-	                p.lineTo(firstPt.x, firstPt.y);
-	            }
-	        }
-	    }
-	
-	    p.closePath();
-	    return p;
-	}
-	
-	function buildPath(glyphs, glyph) {
-	    if (glyph.isComposite) {
-	        for (var j = 0; j < glyph.components.length; j += 1) {
-	            var component = glyph.components[j];
-	            var componentGlyph = glyphs.get(component.glyphIndex);
-	            // Force the ttfGlyphLoader to parse the glyph.
-	            componentGlyph.getPath();
-	            if (componentGlyph.points) {
-	                var transformedPoints;
-	                if (component.matchedPoints === undefined) {
-	                    // component positioned by offset
-	                    transformedPoints = transformPoints(componentGlyph.points, component);
-	                } else {
-	                    // component positioned by matched points
-	                    if ((component.matchedPoints[0] > glyph.points.length - 1) ||
-	                        (component.matchedPoints[1] > componentGlyph.points.length - 1)) {
-	                        throw Error('Matched points out of range in ' + glyph.name);
-	                    }
-	                    var firstPt = glyph.points[component.matchedPoints[0]];
-	                    var secondPt = componentGlyph.points[component.matchedPoints[1]];
-	                    var transform = {
-	                        xScale: component.xScale, scale01: component.scale01,
-	                        scale10: component.scale10, yScale: component.yScale,
-	                        dx: 0, dy: 0
-	                    };
-	                    secondPt = transformPoints([secondPt], transform)[0];
-	                    transform.dx = firstPt.x - secondPt.x;
-	                    transform.dy = firstPt.y - secondPt.y;
-	                    transformedPoints = transformPoints(componentGlyph.points, transform);
-	                }
-	                glyph.points = glyph.points.concat(transformedPoints);
-	            }
-	        }
-	    }
-	
-	    return getPath(glyph.points);
-	}
-	
-	// Parse all the glyphs according to the offsets from the `loca` table.
-	function parseGlyfTable(data, start, loca, font) {
-	    var glyphs = new glyphset.GlyphSet(font);
-	    var i;
-	
-	    // The last element of the loca table is invalid.
-	    for (i = 0; i < loca.length - 1; i += 1) {
-	        var offset = loca[i];
-	        var nextOffset = loca[i + 1];
-	        if (offset !== nextOffset) {
-	            glyphs.push(i, glyphset.ttfGlyphLoader(font, i, parseGlyph, data, start + offset, buildPath));
-	        } else {
-	            glyphs.push(i, glyphset.glyphLoader(font, i));
-	        }
-	    }
-	
-	    return glyphs;
-	}
-	
-	exports.parse = parseGlyfTable;
-
-
-/***/ },
-/* 33 */
-/***/ function(module, exports, __webpack_require__) {
-
 	// The `GPOS` table contains kerning pairs, among other things.
 	// https://www.microsoft.com/typography/OTSPEC/gpos.htm
-	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var parse = __webpack_require__(12);
 	
 	// Parse ScriptList and FeatureList tables of GPOS, GSUB, GDEF, BASE, JSTF tables.
 	// These lists are unused by now, this function is just the basis for a real parsing.
@@ -8559,7 +11559,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	function parseCoverageTable(data, start) {
 	    var p = new parse.Parser(data, start);
 	    var format = p.parseUShort();
-	    var count =  p.parseUShort();
+	    var count = p.parseUShort();
 	    if (format === 1) {
 	        return p.parseUShortList(count);
 	    } else if (format === 2) {
@@ -8637,7 +11637,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var valueFormat2 = p.parseUShort();
 	    var value1;
 	    var value2;
-	    if (valueFormat1 !== 4 || valueFormat2 !== 0) return;
+	    if (valueFormat1 !== 4 || valueFormat2 !== 0) { return; }
 	    var sharedPairSets = {};
 	    if (format === 1) {
 	        // Pair Positioning Adjustment: Format 1
@@ -8655,8 +11655,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	                var pairValueCount = p.parseUShort();
 	                for (; pairValueCount--;) {
 	                    var secondGlyph = p.parseUShort();
-	                    if (valueFormat1) value1 = p.parseShort();
-	                    if (valueFormat2) value2 = p.parseShort();
+	                    if (valueFormat1) { value1 = p.parseShort(); }
+	                    if (valueFormat2) { value2 = p.parseShort(); }
 	                    // We only support valueFormat1 = 4 and valueFormat2 = 0,
 	                    // so value1 is the XAdvance and value2 is empty.
 	                    sharedPairSet[secondGlyph] = value1;
@@ -8668,7 +11668,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        return function(leftGlyph, rightGlyph) {
 	            var pairs = pairSet[leftGlyph];
-	            if (pairs) return pairs[rightGlyph];
+	            if (pairs) { return pairs[rightGlyph]; }
 	        };
 	    } else if (format === 2) {
 	        // Pair Positioning Adjustment: Format 2
@@ -8684,8 +11684,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        for (var i = 0; i < class1Count; i++) {
 	            var kerningRow = kerningMatrix[i] = [];
 	            for (var j = 0; j < class2Count; j++) {
-	                if (valueFormat1) value1 = p.parseShort();
-	                if (valueFormat2) value2 = p.parseShort();
+	                if (valueFormat1) { value1 = p.parseShort(); }
+	                if (valueFormat2) { value2 = p.parseShort(); }
 	                // We only support valueFormat1 = 4 and valueFormat2 = 0,
 	                // so value1 is the XAdvance and value2 is empty.
 	                kerningRow[j] = value1;
@@ -8694,11 +11694,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	        // Convert coverage list to a hash
 	        var covered = {};
-	        for (i = 0; i < coverage.length; i++) covered[coverage[i]] = 1;
+	        for (var i$1 = 0; i$1 < coverage.length; i$1++) {
+	            covered[coverage[i$1]] = 1;
+	        }
 	
 	        // Get the kerning value for a specific glyph pair.
 	        return function(leftGlyph, rightGlyph) {
-	            if (!covered[leftGlyph]) return;
+	            if (!covered[leftGlyph]) { return; }
 	            var class1 = getClass1(leftGlyph);
 	            var class2 = getClass2(rightGlyph);
 	            var kerningRow = kerningMatrix[class1];
@@ -8727,13 +11729,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	    if (lookupType === 2) {
 	        var subtables = [];
 	        for (var i = 0; i < subTableCount; i++) {
-	            subtables.push(parsePairPosSubTable(data, start + subTableOffsets[i]));
+	            var pairPosSubTable = parsePairPosSubTable(data, start + subTableOffsets[i]);
+	            if (pairPosSubTable) { subtables.push(pairPosSubTable); }
 	        }
 	        // Return a function which finds the kerning values in the subtables.
 	        table.getKerningValue = function(leftGlyph, rightGlyph) {
 	            for (var i = subtables.length; i--;) {
 	                var value = subtables[i](leftGlyph, rightGlyph);
-	                if (value !== undefined) return value;
+	                if (value !== undefined) { return value; }
 	            }
 	
 	            return 0;
@@ -8763,37 +11766,23 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var lookupListAbsoluteOffset = start + lookupListOffset;
 	    for (var i = 0; i < lookupCount; i++) {
 	        var table = parseLookupTable(data, lookupListAbsoluteOffset + lookupTableOffsets[i]);
-	        if (table.lookupType === 2 && !font.getGposKerningValue) font.getGposKerningValue = table.getKerningValue;
+	        if (table.lookupType === 2 && !font.getGposKerningValue) { font.getGposKerningValue = table.getKerningValue; }
 	    }
 	}
 	
-	exports.parse = parseGposTable;
-
-
-/***/ },
-/* 34 */
-/***/ function(module, exports, __webpack_require__) {
-
+	var gpos = { parse: parseGposTable };
+	
 	// The `kern` table contains kerning pairs.
 	// Note that some fonts use the GPOS OpenType layout table to specify kerning.
 	// https://www.microsoft.com/typography/OTSPEC/kern.htm
 	
-	'use strict';
-	
-	var check = __webpack_require__(8);
-	var parse = __webpack_require__(12);
-	
-	// Parse the `kern` table which contains kerning pairs.
-	function parseKernTable(data, start) {
+	function parseWindowsKernTable(p) {
 	    var pairs = {};
-	    var p = new parse.Parser(data, start);
-	    var tableVersion = p.parseUShort();
-	    check.argument(tableVersion === 0, 'Unsupported kern table version.');
 	    // Skip nTables.
-	    p.skip('uShort', 1);
-	    var subTableVersion = p.parseUShort();
-	    check.argument(subTableVersion === 0, 'Unsupported kern sub-table version.');
-	    // Skip subTableLength, subTableCoverage
+	    p.skip('uShort');
+	    var subtableVersion = p.parseUShort();
+	    check.argument(subtableVersion === 0, 'Unsupported kern sub-table version.');
+	    // Skip subtableLength, subtableCoverage
 	    p.skip('uShort', 2);
 	    var nPairs = p.parseUShort();
 	    // Skip searchRange, entrySelector, rangeShift.
@@ -8804,23 +11793,54 @@ return /******/ (function(modules) { // webpackBootstrap
 	        var value = p.parseShort();
 	        pairs[leftIndex + ',' + rightIndex] = value;
 	    }
-	
 	    return pairs;
 	}
 	
-	exports.parse = parseKernTable;
-
-
-/***/ },
-/* 35 */
-/***/ function(module, exports, __webpack_require__) {
-
+	function parseMacKernTable(p) {
+	    var pairs = {};
+	    // The Mac kern table stores the version as a fixed (32 bits) but we only loaded the first 16 bits.
+	    // Skip the rest.
+	    p.skip('uShort');
+	    var nTables = p.parseULong();
+	    //check.argument(nTables === 1, 'Only 1 subtable is supported (got ' + nTables + ').');
+	    if (nTables > 1) {
+	        console.warn('Only the first kern subtable is supported.');
+	    }
+	    p.skip('uLong');
+	    var coverage = p.parseUShort();
+	    var subtableVersion = coverage & 0xFF;
+	    p.skip('uShort');
+	    if (subtableVersion === 0) {
+	        var nPairs = p.parseUShort();
+	        // Skip searchRange, entrySelector, rangeShift.
+	        p.skip('uShort', 3);
+	        for (var i = 0; i < nPairs; i += 1) {
+	            var leftIndex = p.parseUShort();
+	            var rightIndex = p.parseUShort();
+	            var value = p.parseShort();
+	            pairs[leftIndex + ',' + rightIndex] = value;
+	        }
+	    }
+	    return pairs;
+	}
+	
+	// Parse the `kern` table which contains kerning pairs.
+	function parseKernTable(data, start) {
+	    var p = new parse.Parser(data, start);
+	    var tableVersion = p.parseUShort();
+	    if (tableVersion === 0) {
+	        return parseWindowsKernTable(p);
+	    } else if (tableVersion === 1) {
+	        return parseMacKernTable(p);
+	    } else {
+	        throw new Error('Unsupported kern table version (' + tableVersion + ').');
+	    }
+	}
+	
+	var kern = { parse: parseKernTable };
+	
 	// The `loca` table stores the offsets to the locations of the glyphs in the font.
 	// https://www.microsoft.com/typography/OTSPEC/loca.htm
-	
-	'use strict';
-	
-	var parse = __webpack_require__(12);
 	
 	// Parse the `loca` table. This table stores the offsets to the locations of the glyphs in the font,
 	// relative to the beginning of the glyphData table.
@@ -8847,15 +11867,407 @@ return /******/ (function(modules) { // webpackBootstrap
 	    return glyphOffsets;
 	}
 	
-	exports.parse = parseLocaTable;
+	var loca = { parse: parseLocaTable };
+	
+	// opentype.js
+	// https://github.com/nodebox/opentype.js
+	// (c) 2015 Frederik De Bleser
+	// opentype.js may be freely distributed under the MIT license.
+	
+	/* global DataView, Uint8Array, XMLHttpRequest  */
+	
+	/**
+	 * The opentype library.
+	 * @namespace opentype
+	 */
+	
+	// File loaders /////////////////////////////////////////////////////////
+	/**
+	 * Loads a font from a file. The callback throws an error message as the first parameter if it fails
+	 * and the font as an ArrayBuffer in the second parameter if it succeeds.
+	 * @param  {string} path - The path of the file
+	 * @param  {Function} callback - The function to call when the font load completes
+	 */
+	function loadFromFile(path, callback) {
+	    var fs = __webpack_require__(3);
+	    fs.readFile(path, function(err, buffer) {
+	        if (err) {
+	            return callback(err.message);
+	        }
+	
+	        callback(null, nodeBufferToArrayBuffer(buffer));
+	    });
+	}
+	/**
+	 * Loads a font from a URL. The callback throws an error message as the first parameter if it fails
+	 * and the font as an ArrayBuffer in the second parameter if it succeeds.
+	 * @param  {string} url - The URL of the font file.
+	 * @param  {Function} callback - The function to call when the font load completes
+	 */
+	function loadFromUrl(url, callback) {
+	    var request = new XMLHttpRequest();
+	    request.open('GET', url, true);
+	    request.responseType = 'arraybuffer';
+	    request.onload = function() {
+	        if (request.status !== 200) {
+	            return callback('Font could not be loaded: ' + request.statusText);
+	        }
+	
+	        return callback(null, request.response);
+	    };
+	
+	    request.onerror = function () {
+	        callback('Font could not be loaded');
+	    };
+	
+	    request.send();
+	}
+	
+	// Table Directory Entries //////////////////////////////////////////////
+	/**
+	 * Parses OpenType table entries.
+	 * @param  {DataView}
+	 * @param  {Number}
+	 * @return {Object[]}
+	 */
+	function parseOpenTypeTableEntries(data, numTables) {
+	    var tableEntries = [];
+	    var p = 12;
+	    for (var i = 0; i < numTables; i += 1) {
+	        var tag = parse.getTag(data, p);
+	        var checksum = parse.getULong(data, p + 4);
+	        var offset = parse.getULong(data, p + 8);
+	        var length = parse.getULong(data, p + 12);
+	        tableEntries.push({tag: tag, checksum: checksum, offset: offset, length: length, compression: false});
+	        p += 16;
+	    }
+	
+	    return tableEntries;
+	}
+	
+	/**
+	 * Parses WOFF table entries.
+	 * @param  {DataView}
+	 * @param  {Number}
+	 * @return {Object[]}
+	 */
+	function parseWOFFTableEntries(data, numTables) {
+	    var tableEntries = [];
+	    var p = 44; // offset to the first table directory entry.
+	    for (var i = 0; i < numTables; i += 1) {
+	        var tag = parse.getTag(data, p);
+	        var offset = parse.getULong(data, p + 4);
+	        var compLength = parse.getULong(data, p + 8);
+	        var origLength = parse.getULong(data, p + 12);
+	        var compression = (void 0);
+	        if (compLength < origLength) {
+	            compression = 'WOFF';
+	        } else {
+	            compression = false;
+	        }
+	
+	        tableEntries.push({tag: tag, offset: offset, compression: compression,
+	            compressedLength: compLength, length: origLength});
+	        p += 20;
+	    }
+	
+	    return tableEntries;
+	}
+	
+	/**
+	 * @typedef TableData
+	 * @type Object
+	 * @property {DataView} data - The DataView
+	 * @property {number} offset - The data offset.
+	 */
+	
+	/**
+	 * @param  {DataView}
+	 * @param  {Object}
+	 * @return {TableData}
+	 */
+	function uncompressTable(data, tableEntry) {
+	    if (tableEntry.compression === 'WOFF') {
+	        var inBuffer = new Uint8Array(data.buffer, tableEntry.offset + 2, tableEntry.compressedLength - 2);
+	        var outBuffer = new Uint8Array(tableEntry.length);
+	        index(inBuffer, outBuffer);
+	        if (outBuffer.byteLength !== tableEntry.length) {
+	            throw new Error('Decompression error: ' + tableEntry.tag + ' decompressed length doesn\'t match recorded length');
+	        }
+	
+	        var view = new DataView(outBuffer.buffer, 0);
+	        return {data: view, offset: 0};
+	    } else {
+	        return {data: data, offset: tableEntry.offset};
+	    }
+	}
+	
+	// Public API ///////////////////////////////////////////////////////////
+	
+	/**
+	 * Parse the OpenType file data (as an ArrayBuffer) and return a Font object.
+	 * Throws an error if the font could not be parsed.
+	 * @param  {ArrayBuffer}
+	 * @return {opentype.Font}
+	 */
+	function parseBuffer(buffer) {
+	    var indexToLocFormat;
+	    var ltagTable;
+	
+	    // Since the constructor can also be called to create new fonts from scratch, we indicate this
+	    // should be an empty font that we'll fill with our own data.
+	    var font = new Font({empty: true});
+	
+	    // OpenType fonts use big endian byte ordering.
+	    // We can't rely on typed array view types, because they operate with the endianness of the host computer.
+	    // Instead we use DataViews where we can specify endianness.
+	    var data = new DataView(buffer, 0);
+	    var numTables;
+	    var tableEntries = [];
+	    var signature = parse.getTag(data, 0);
+	    if (signature === String.fromCharCode(0, 1, 0, 0) || signature === 'true' || signature === 'typ1') {
+	        font.outlinesFormat = 'truetype';
+	        numTables = parse.getUShort(data, 4);
+	        tableEntries = parseOpenTypeTableEntries(data, numTables);
+	    } else if (signature === 'OTTO') {
+	        font.outlinesFormat = 'cff';
+	        numTables = parse.getUShort(data, 4);
+	        tableEntries = parseOpenTypeTableEntries(data, numTables);
+	    } else if (signature === 'wOFF') {
+	        var flavor = parse.getTag(data, 4);
+	        if (flavor === String.fromCharCode(0, 1, 0, 0)) {
+	            font.outlinesFormat = 'truetype';
+	        } else if (flavor === 'OTTO') {
+	            font.outlinesFormat = 'cff';
+	        } else {
+	            throw new Error('Unsupported OpenType flavor ' + signature);
+	        }
+	
+	        numTables = parse.getUShort(data, 12);
+	        tableEntries = parseWOFFTableEntries(data, numTables);
+	    } else {
+	        throw new Error('Unsupported OpenType signature ' + signature);
+	    }
+	
+	    var cffTableEntry;
+	    var fvarTableEntry;
+	    var glyfTableEntry;
+	    var gposTableEntry;
+	    var gsubTableEntry;
+	    var hmtxTableEntry;
+	    var kernTableEntry;
+	    var locaTableEntry;
+	    var nameTableEntry;
+	    var metaTableEntry;
+	    var p;
+	
+	    for (var i = 0; i < numTables; i += 1) {
+	        var tableEntry = tableEntries[i];
+	        var table = (void 0);
+	        switch (tableEntry.tag) {
+	            case 'cmap':
+	                table = uncompressTable(data, tableEntry);
+	                font.tables.cmap = cmap.parse(table.data, table.offset);
+	                font.encoding = new CmapEncoding(font.tables.cmap);
+	                break;
+	            case 'cvt ' :
+	                table = uncompressTable(data, tableEntry);
+	                p = new parse.Parser(table.data, table.offset);
+	                font.tables.cvt = p.parseShortList(tableEntry.length / 2);
+	                break;
+	            case 'fvar':
+	                fvarTableEntry = tableEntry;
+	                break;
+	            case 'fpgm' :
+	                table = uncompressTable(data, tableEntry);
+	                p = new parse.Parser(table.data, table.offset);
+	                font.tables.fpgm = p.parseByteList(tableEntry.length);
+	                break;
+	            case 'head':
+	                table = uncompressTable(data, tableEntry);
+	                font.tables.head = head.parse(table.data, table.offset);
+	                font.unitsPerEm = font.tables.head.unitsPerEm;
+	                indexToLocFormat = font.tables.head.indexToLocFormat;
+	                break;
+	            case 'hhea':
+	                table = uncompressTable(data, tableEntry);
+	                font.tables.hhea = hhea.parse(table.data, table.offset);
+	                font.ascender = font.tables.hhea.ascender;
+	                font.descender = font.tables.hhea.descender;
+	                font.numberOfHMetrics = font.tables.hhea.numberOfHMetrics;
+	                break;
+	            case 'hmtx':
+	                hmtxTableEntry = tableEntry;
+	                break;
+	            case 'ltag':
+	                table = uncompressTable(data, tableEntry);
+	                ltagTable = ltag.parse(table.data, table.offset);
+	                break;
+	            case 'maxp':
+	                table = uncompressTable(data, tableEntry);
+	                font.tables.maxp = maxp.parse(table.data, table.offset);
+	                font.numGlyphs = font.tables.maxp.numGlyphs;
+	                break;
+	            case 'name':
+	                nameTableEntry = tableEntry;
+	                break;
+	            case 'OS/2':
+	                table = uncompressTable(data, tableEntry);
+	                font.tables.os2 = os2.parse(table.data, table.offset);
+	                break;
+	            case 'post':
+	                table = uncompressTable(data, tableEntry);
+	                font.tables.post = post.parse(table.data, table.offset);
+	                font.glyphNames = new GlyphNames(font.tables.post);
+	                break;
+	            case 'prep' :
+	                table = uncompressTable(data, tableEntry);
+	                p = new parse.Parser(table.data, table.offset);
+	                font.tables.prep = p.parseByteList(tableEntry.length);
+	                break;
+	            case 'glyf':
+	                glyfTableEntry = tableEntry;
+	                break;
+	            case 'loca':
+	                locaTableEntry = tableEntry;
+	                break;
+	            case 'CFF ':
+	                cffTableEntry = tableEntry;
+	                break;
+	            case 'kern':
+	                kernTableEntry = tableEntry;
+	                break;
+	            case 'GPOS':
+	                gposTableEntry = tableEntry;
+	                break;
+	            case 'GSUB':
+	                gsubTableEntry = tableEntry;
+	                break;
+	            case 'meta':
+	                metaTableEntry = tableEntry;
+	                break;
+	        }
+	    }
+	
+	    var nameTable = uncompressTable(data, nameTableEntry);
+	    font.tables.name = _name.parse(nameTable.data, nameTable.offset, ltagTable);
+	    font.names = font.tables.name;
+	
+	    if (glyfTableEntry && locaTableEntry) {
+	        var shortVersion = indexToLocFormat === 0;
+	        var locaTable = uncompressTable(data, locaTableEntry);
+	        var locaOffsets = loca.parse(locaTable.data, locaTable.offset, font.numGlyphs, shortVersion);
+	        var glyfTable = uncompressTable(data, glyfTableEntry);
+	        font.glyphs = glyf.parse(glyfTable.data, glyfTable.offset, locaOffsets, font);
+	    } else if (cffTableEntry) {
+	        var cffTable = uncompressTable(data, cffTableEntry);
+	        cff.parse(cffTable.data, cffTable.offset, font);
+	    } else {
+	        throw new Error('Font doesn\'t contain TrueType or CFF outlines.');
+	    }
+	
+	    var hmtxTable = uncompressTable(data, hmtxTableEntry);
+	    hmtx.parse(hmtxTable.data, hmtxTable.offset, font.numberOfHMetrics, font.numGlyphs, font.glyphs);
+	    addGlyphNames(font);
+	
+	    if (kernTableEntry) {
+	        var kernTable = uncompressTable(data, kernTableEntry);
+	        font.kerningPairs = kern.parse(kernTable.data, kernTable.offset);
+	    } else {
+	        font.kerningPairs = {};
+	    }
+	
+	    if (gposTableEntry) {
+	        var gposTable = uncompressTable(data, gposTableEntry);
+	        gpos.parse(gposTable.data, gposTable.offset, font);
+	    }
+	
+	    if (gsubTableEntry) {
+	        var gsubTable = uncompressTable(data, gsubTableEntry);
+	        font.tables.gsub = gsub.parse(gsubTable.data, gsubTable.offset);
+	    }
+	
+	    if (fvarTableEntry) {
+	        var fvarTable = uncompressTable(data, fvarTableEntry);
+	        font.tables.fvar = fvar.parse(fvarTable.data, fvarTable.offset, font.names);
+	    }
+	
+	    if (metaTableEntry) {
+	        var metaTable = uncompressTable(data, metaTableEntry);
+	        font.tables.meta = meta.parse(metaTable.data, metaTable.offset);
+	        font.metas = font.tables.meta;
+	    }
+	
+	    return font;
+	}
+	
+	/**
+	 * Asynchronously load the font from a URL or a filesystem. When done, call the callback
+	 * with two arguments `(err, font)`. The `err` will be null on success,
+	 * the `font` is a Font object.
+	 * We use the node.js callback convention so that
+	 * opentype.js can integrate with frameworks like async.js.
+	 * @alias opentype.load
+	 * @param  {string} url - The URL of the font to load.
+	 * @param  {Function} callback - The callback.
+	 */
+	function load(url, callback) {
+	    var isNode$$1 = typeof window === 'undefined';
+	    var loadFn = isNode$$1 ? loadFromFile : loadFromUrl;
+	    loadFn(url, function(err, arrayBuffer) {
+	        if (err) {
+	            return callback(err);
+	        }
+	        var font;
+	        try {
+	            font = parseBuffer(arrayBuffer);
+	        } catch (e) {
+	            return callback(e, null);
+	        }
+	        return callback(null, font);
+	    });
+	}
+	
+	/**
+	 * Synchronously load the font from a URL or file.
+	 * When done, returns the font object or throws an error.
+	 * @alias opentype.loadSync
+	 * @param  {string} url - The URL of the font to load.
+	 * @return {opentype.Font}
+	 */
+	function loadSync(url) {
+	    var fs = __webpack_require__(3);
+	    var buffer = fs.readFileSync(url);
+	    return parseBuffer(nodeBufferToArrayBuffer(buffer));
+	}
+	
+	exports.Font = Font;
+	exports.Glyph = Glyph;
+	exports.Path = Path;
+	exports.BoundingBox = BoundingBox;
+	exports._parse = parse;
+	exports.parse = parseBuffer;
+	exports.load = load;
+	exports.loadSync = loadSync;
+	
+	Object.defineProperty(exports, '__esModule', { value: true });
+	
+	})));
+	//# sourceMappingURL=opentype.js.map
 
 
-/***/ },
-/* 36 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ }),
+/* 3 */
+/***/ (function(module, exports) {
+
+	/* (ignored) */
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
 
 	var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*!
-	 * Paper.js v0.10.2-develop - The Swiss Army Knife of Vector Graphics Scripting.
+	 * Paper.js v0.11.4 - The Swiss Army Knife of Vector Graphics Scripting.
 	 * http://paperjs.org/
 	 *
 	 * Copyright (c) 2011 - 2016, Juerg Lehni & Jonathan Puckey
@@ -8865,7 +12277,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	 *
 	 * All rights reserved.
 	 *
-	 * Date: Tue Aug 9 10:01:35 2016 +0200
+	 * Date: Wed Jun 7 16:56:44 2017 +0200
 	 *
 	 ***
 	 *
@@ -8888,8 +12300,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var paper = function(self, undefined) {
 	
-	self = self || __webpack_require__(37);
-	
+	self = self || __webpack_require__(5);
 	var window = self.window,
 		document = self.document;
 	
@@ -8955,12 +12366,13 @@ return /******/ (function(modules) { // webpackBootstrap
 							&& (bean = name.match(/^([gs]et|is)(([A-Z])(.*))$/)))
 						beansNames[bean[3].toLowerCase() + bean[4]] = bean[2];
 					if (!res || isFunc || !res.get || typeof res.get !== 'function'
-							|| !Base.isPlainObject(res))
+							|| !Base.isPlainObject(res)) {
 						res = { value: res, writable: true };
+					}
 					if ((describe(dest, name)
 							|| { configurable: true }).configurable) {
 						res.configurable = true;
-						res.enumerable = enumerable;
+						res.enumerable = enumerable != null ? enumerable : !bean;
 					}
 					define(dest, name, res);
 				}
@@ -8998,7 +12410,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						preserve = src.preserve;
 					if (statics !== src)
 						inject(this.prototype, src, src.enumerable, beans, preserve);
-					inject(this, statics, true, beans, preserve);
+					inject(this, statics, null, beans, preserve);
 				}
 				for (var i = 1, l = arguments.length; i < l; i++)
 					this.inject(arguments[i]);
@@ -9021,13 +12433,15 @@ return /******/ (function(modules) { // webpackBootstrap
 				proto = ctor.prototype = proto || create(this.prototype);
 				define(proto, 'constructor',
 						{ value: ctor, writable: true, configurable: true });
-				inject(ctor, this, true);
+				inject(ctor, this);
 				if (arguments.length)
 					this.inject.apply(ctor, arguments);
 				ctor.base = base;
 				return ctor;
 			}
-		}, true).inject({
+		}).inject({
+			enumerable: false,
+	
 			initialize: Base,
 	
 			set: Base,
@@ -9087,6 +12501,8 @@ return /******/ (function(modules) { // webpackBootstrap
 		module.exports = Base;
 	
 	Base.inject({
+		enumerable: false,
+	
 		toString: function() {
 			return this._id != null
 				?  (this._class || 'Object') + (this._name
@@ -9122,329 +12538,333 @@ return /******/ (function(modules) { // webpackBootstrap
 			if (props)
 				Base.filter(this, props, exclude, this._prioritize);
 			return this;
+		}
+	}, {
+	
+	beans: false,
+	statics: {
+		exports: {},
+	
+		extend: function extend() {
+			var res = extend.base.apply(this, arguments),
+				name = res.prototype._class;
+			if (name && !Base.exports[name])
+				Base.exports[name] = res;
+			return res;
 		},
 	
-		statics: {
-	
-			exports: {
-				enumerable: true
-			},
-	
-			extend: function extend() {
-				var res = extend.base.apply(this, arguments),
-					name = res.prototype._class;
-				if (name && !Base.exports[name])
-					Base.exports[name] = res;
-				return res;
-			},
-	
-			equals: function(obj1, obj2) {
-				if (obj1 === obj2)
-					return true;
-				if (obj1 && obj1.equals)
-					return obj1.equals(obj2);
-				if (obj2 && obj2.equals)
-					return obj2.equals(obj1);
-				if (obj1 && obj2
-						&& typeof obj1 === 'object' && typeof obj2 === 'object') {
-					if (Array.isArray(obj1) && Array.isArray(obj2)) {
-						var length = obj1.length;
-						if (length !== obj2.length)
+		equals: function(obj1, obj2) {
+			if (obj1 === obj2)
+				return true;
+			if (obj1 && obj1.equals)
+				return obj1.equals(obj2);
+			if (obj2 && obj2.equals)
+				return obj2.equals(obj1);
+			if (obj1 && obj2
+					&& typeof obj1 === 'object' && typeof obj2 === 'object') {
+				if (Array.isArray(obj1) && Array.isArray(obj2)) {
+					var length = obj1.length;
+					if (length !== obj2.length)
+						return false;
+					while (length--) {
+						if (!Base.equals(obj1[length], obj2[length]))
 							return false;
-						while (length--) {
-							if (!Base.equals(obj1[length], obj2[length]))
-								return false;
-						}
-					} else {
-						var keys = Object.keys(obj1),
-							length = keys.length;
-						if (length !== Object.keys(obj2).length)
+					}
+				} else {
+					var keys = Object.keys(obj1),
+						length = keys.length;
+					if (length !== Object.keys(obj2).length)
+						return false;
+					while (length--) {
+						var key = keys[length];
+						if (!(obj2.hasOwnProperty(key)
+								&& Base.equals(obj1[key], obj2[key])))
 							return false;
-						while (length--) {
-							var key = keys[length];
-							if (!(obj2.hasOwnProperty(key)
-									&& Base.equals(obj1[key], obj2[key])))
-								return false;
-						}
-					}
-					return true;
-				}
-				return false;
-			},
-	
-			read: function(list, start, options, amount) {
-				if (this === Base) {
-					var value = this.peek(list, start);
-					list.__index++;
-					return value;
-				}
-				var proto = this.prototype,
-					readIndex = proto._readIndex,
-					begin = start || readIndex && list.__index || 0,
-					length = list.length,
-					obj = list[begin];
-				amount = amount || length - begin;
-				if (obj instanceof this
-					|| options && options.readNull && obj == null && amount <= 1) {
-					if (readIndex)
-						list.__index = begin + 1;
-					return obj && options && options.clone ? obj.clone() : obj;
-				}
-				obj = Base.create(proto);
-				if (readIndex)
-					obj.__read = true;
-				obj = obj.initialize.apply(obj, begin > 0 || begin + amount < length
-						? Base.slice(list, begin, begin + amount)
-						: list) || obj;
-				if (readIndex) {
-					list.__index = begin + obj.__read;
-					obj.__read = undefined;
-				}
-				return obj;
-			},
-	
-			peek: function(list, start) {
-				return list[list.__index = start || list.__index || 0];
-			},
-	
-			remain: function(list) {
-				return list.length - (list.__index || 0);
-			},
-	
-			readList: function(list, start, options, amount) {
-				var res = [],
-					entry,
-					begin = start || 0,
-					end = amount ? begin + amount : list.length;
-				for (var i = begin; i < end; i++) {
-					res.push(Array.isArray(entry = list[i])
-							? this.read(entry, 0, options)
-							: this.read(list, i, options, 1));
-				}
-				return res;
-			},
-	
-			readNamed: function(list, name, start, options, amount) {
-				var value = this.getNamed(list, name),
-					hasObject = value !== undefined;
-				if (hasObject) {
-					var filtered = list._filtered;
-					if (!filtered) {
-						filtered = list._filtered = Base.create(list[0]);
-						filtered._unfiltered = list[0];
-					}
-					filtered[name] = undefined;
-				}
-				return this.read(hasObject ? [value] : list, start, options, amount);
-			},
-	
-			getNamed: function(list, name) {
-				var arg = list[0];
-				if (list._hasObject === undefined)
-					list._hasObject = list.length === 1 && Base.isPlainObject(arg);
-				if (list._hasObject)
-					return name ? arg[name] : list._filtered || arg;
-			},
-	
-			hasNamed: function(list, name) {
-				return !!this.getNamed(list, name);
-			},
-	
-			filter: function(dest, source, exclude, prioritize) {
-				var processed;
-	
-				function handleKey(key) {
-					if (!(exclude && key in exclude) &&
-						!(processed && key in processed)) {
-						var value = source[key];
-						if (value !== undefined)
-							dest[key] = value;
 					}
 				}
-	
-				if (prioritize) {
-					var keys = {};
-					for (var i = 0, key, l = prioritize.length; i < l; i++) {
-						if ((key = prioritize[i]) in source) {
-							handleKey(key);
-							keys[key] = true;
-						}
-					}
-					processed = keys;
-				}
-	
-				Object.keys(source._unfiltered || source).forEach(handleKey);
-				return dest;
-			},
-	
-			isPlainValue: function(obj, asString) {
-				return Base.isPlainObject(obj) || Array.isArray(obj)
-						|| asString && typeof obj === 'string';
-			},
-	
-			serialize: function(obj, options, compact, dictionary) {
-				options = options || {};
-	
-				var isRoot = !dictionary,
-					res;
-				if (isRoot) {
-					options.formatter = new Formatter(options.precision);
-					dictionary = {
-						length: 0,
-						definitions: {},
-						references: {},
-						add: function(item, create) {
-							var id = '#' + item._id,
-								ref = this.references[id];
-							if (!ref) {
-								this.length++;
-								var res = create.call(item),
-									name = item._class;
-								if (name && res[0] !== name)
-									res.unshift(name);
-								this.definitions[id] = res;
-								ref = this.references[id] = [id];
-							}
-							return ref;
-						}
-					};
-				}
-				if (obj && obj._serialize) {
-					res = obj._serialize(options, dictionary);
-					var name = obj._class;
-					if (name && !obj._compactSerialize && (isRoot || !compact)
-							&& res[0] !== name) {
-						res.unshift(name);
-					}
-				} else if (Array.isArray(obj)) {
-					res = [];
-					for (var i = 0, l = obj.length; i < l; i++)
-						res[i] = Base.serialize(obj[i], options, compact,
-								dictionary);
-				} else if (Base.isPlainObject(obj)) {
-					res = {};
-					var keys = Object.keys(obj);
-					for (var i = 0, l = keys.length; i < l; i++) {
-						var key = keys[i];
-						res[key] = Base.serialize(obj[key], options, compact,
-								dictionary);
-					}
-				} else if (typeof obj === 'number') {
-					res = options.formatter.number(obj, options.precision);
-				} else {
-					res = obj;
-				}
-				return isRoot && dictionary.length > 0
-						? [['dictionary', dictionary.definitions], res]
-						: res;
-			},
-	
-			deserialize: function(json, create, _data, _setDictionary, _isRoot) {
-				var res = json,
-					isFirst = !_data,
-					hasDictionary = isFirst && json && json.length
-						&& json[0][0] === 'dictionary';
-				_data = _data || {};
-				if (Array.isArray(json)) {
-					var type = json[0],
-						isDictionary = type === 'dictionary';
-					if (json.length == 1 && /^#/.test(type)) {
-						return _data.dictionary[type];
-					}
-					type = Base.exports[type];
-					res = [];
-					for (var i = type ? 1 : 0, l = json.length; i < l; i++) {
-						res.push(Base.deserialize(json[i], create, _data,
-								isDictionary, hasDictionary));
-					}
-					if (type) {
-						var args = res;
-						if (create) {
-							res = create(type, args, isFirst || _isRoot);
-						} else {
-							res = Base.create(type.prototype);
-							type.apply(res, args);
-						}
-					}
-				} else if (Base.isPlainObject(json)) {
-					res = {};
-					if (_setDictionary)
-						_data.dictionary = res;
-					for (var key in json)
-						res[key] = Base.deserialize(json[key], create, _data);
-				}
-				return hasDictionary ? res[1] : res;
-			},
-	
-			exportJSON: function(obj, options) {
-				var json = Base.serialize(obj, options);
-				return options && options.asString === false
-						? json
-						: JSON.stringify(json);
-			},
-	
-			importJSON: function(json, target) {
-				return Base.deserialize(
-						typeof json === 'string' ? JSON.parse(json) : json,
-						function(ctor, args, isRoot) {
-							var useTarget = isRoot && target
-									&& target.constructor === ctor,
-								obj = useTarget ? target
-									: Base.create(ctor.prototype);
-							if (args.length === 1 && obj instanceof Item
-									&& (useTarget || !(obj instanceof Layer))) {
-								var arg = args[0];
-								if (Base.isPlainObject(arg))
-									arg.insert = false;
-							}
-							(useTarget ? obj.set : ctor).apply(obj, args);
-							if (useTarget)
-								target = null;
-							return obj;
-						});
-			},
-	
-			splice: function(list, items, index, remove) {
-				var amount = items && items.length,
-					append = index === undefined;
-				index = append ? list.length : index;
-				if (index > list.length)
-					index = list.length;
-				for (var i = 0; i < amount; i++)
-					items[i]._index = index + i;
-				if (append) {
-					list.push.apply(list, items);
-					return [];
-				} else {
-					var args = [index, remove];
-					if (items)
-						args.push.apply(args, items);
-					var removed = list.splice.apply(list, args);
-					for (var i = 0, l = removed.length; i < l; i++)
-						removed[i]._index = undefined;
-					for (var i = index + amount, l = list.length; i < l; i++)
-						list[i]._index = i;
-					return removed;
-				}
-			},
-	
-			capitalize: function(str) {
-				return str.replace(/\b[a-z]/g, function(match) {
-					return match.toUpperCase();
-				});
-			},
-	
-			camelize: function(str) {
-				return str.replace(/-(.)/g, function(match, chr) {
-					return chr.toUpperCase();
-				});
-			},
-	
-			hyphenate: function(str) {
-				return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+				return true;
 			}
+			return false;
+		},
+	
+		read: function(list, start, options, amount) {
+			if (this === Base) {
+				var value = this.peek(list, start);
+				list.__index++;
+				return value;
+			}
+			var proto = this.prototype,
+				readIndex = proto._readIndex,
+				begin = start || readIndex && list.__index || 0,
+				length = list.length,
+				obj = list[begin];
+			amount = amount || length - begin;
+			if (obj instanceof this
+				|| options && options.readNull && obj == null && amount <= 1) {
+				if (readIndex)
+					list.__index = begin + 1;
+				return obj && options && options.clone ? obj.clone() : obj;
+			}
+			obj = Base.create(proto);
+			if (readIndex)
+				obj.__read = true;
+			obj = obj.initialize.apply(obj, begin > 0 || begin + amount < length
+					? Base.slice(list, begin, begin + amount)
+					: list) || obj;
+			if (readIndex) {
+				list.__index = begin + obj.__read;
+				var filtered = obj.__filtered;
+				if (filtered) {
+					list.__filtered = filtered;
+					obj.__filtered = undefined;
+				}
+				obj.__read = undefined;
+			}
+			return obj;
+		},
+	
+		peek: function(list, start) {
+			return list[list.__index = start || list.__index || 0];
+		},
+	
+		remain: function(list) {
+			return list.length - (list.__index || 0);
+		},
+	
+		readList: function(list, start, options, amount) {
+			var res = [],
+				entry,
+				begin = start || 0,
+				end = amount ? begin + amount : list.length;
+			for (var i = begin; i < end; i++) {
+				res.push(Array.isArray(entry = list[i])
+						? this.read(entry, 0, options)
+						: this.read(list, i, options, 1));
+			}
+			return res;
+		},
+	
+		readNamed: function(list, name, start, options, amount) {
+			var value = this.getNamed(list, name),
+				hasObject = value !== undefined;
+			if (hasObject) {
+				var filtered = list.__filtered;
+				if (!filtered) {
+					filtered = list.__filtered = Base.create(list[0]);
+					filtered.__unfiltered = list[0];
+				}
+				filtered[name] = undefined;
+			}
+			var l = hasObject ? [value] : list,
+				res = this.read(l, start, options, amount);
+			return res;
+		},
+	
+		getNamed: function(list, name) {
+			var arg = list[0];
+			if (list._hasObject === undefined)
+				list._hasObject = list.length === 1 && Base.isPlainObject(arg);
+			if (list._hasObject)
+				return name ? arg[name] : list.__filtered || arg;
+		},
+	
+		hasNamed: function(list, name) {
+			return !!this.getNamed(list, name);
+		},
+	
+		filter: function(dest, source, exclude, prioritize) {
+			var processed;
+	
+			function handleKey(key) {
+				if (!(exclude && key in exclude) &&
+					!(processed && key in processed)) {
+					var value = source[key];
+					if (value !== undefined)
+						dest[key] = value;
+				}
+			}
+	
+			if (prioritize) {
+				var keys = {};
+				for (var i = 0, key, l = prioritize.length; i < l; i++) {
+					if ((key = prioritize[i]) in source) {
+						handleKey(key);
+						keys[key] = true;
+					}
+				}
+				processed = keys;
+			}
+	
+			Object.keys(source.__unfiltered || source).forEach(handleKey);
+			return dest;
+		},
+	
+		isPlainValue: function(obj, asString) {
+			return Base.isPlainObject(obj) || Array.isArray(obj)
+					|| asString && typeof obj === 'string';
+		},
+	
+		serialize: function(obj, options, compact, dictionary) {
+			options = options || {};
+	
+			var isRoot = !dictionary,
+				res;
+			if (isRoot) {
+				options.formatter = new Formatter(options.precision);
+				dictionary = {
+					length: 0,
+					definitions: {},
+					references: {},
+					add: function(item, create) {
+						var id = '#' + item._id,
+							ref = this.references[id];
+						if (!ref) {
+							this.length++;
+							var res = create.call(item),
+								name = item._class;
+							if (name && res[0] !== name)
+								res.unshift(name);
+							this.definitions[id] = res;
+							ref = this.references[id] = [id];
+						}
+						return ref;
+					}
+				};
+			}
+			if (obj && obj._serialize) {
+				res = obj._serialize(options, dictionary);
+				var name = obj._class;
+				if (name && !obj._compactSerialize && (isRoot || !compact)
+						&& res[0] !== name) {
+					res.unshift(name);
+				}
+			} else if (Array.isArray(obj)) {
+				res = [];
+				for (var i = 0, l = obj.length; i < l; i++)
+					res[i] = Base.serialize(obj[i], options, compact, dictionary);
+			} else if (Base.isPlainObject(obj)) {
+				res = {};
+				var keys = Object.keys(obj);
+				for (var i = 0, l = keys.length; i < l; i++) {
+					var key = keys[i];
+					res[key] = Base.serialize(obj[key], options, compact,
+							dictionary);
+				}
+			} else if (typeof obj === 'number') {
+				res = options.formatter.number(obj, options.precision);
+			} else {
+				res = obj;
+			}
+			return isRoot && dictionary.length > 0
+					? [['dictionary', dictionary.definitions], res]
+					: res;
+		},
+	
+		deserialize: function(json, create, _data, _setDictionary, _isRoot) {
+			var res = json,
+				isFirst = !_data,
+				hasDictionary = isFirst && json && json.length
+					&& json[0][0] === 'dictionary';
+			_data = _data || {};
+			if (Array.isArray(json)) {
+				var type = json[0],
+					isDictionary = type === 'dictionary';
+				if (json.length == 1 && /^#/.test(type)) {
+					return _data.dictionary[type];
+				}
+				type = Base.exports[type];
+				res = [];
+				for (var i = type ? 1 : 0, l = json.length; i < l; i++) {
+					res.push(Base.deserialize(json[i], create, _data,
+							isDictionary, hasDictionary));
+				}
+				if (type) {
+					var args = res;
+					if (create) {
+						res = create(type, args, isFirst || _isRoot);
+					} else {
+						res = Base.create(type.prototype);
+						type.apply(res, args);
+					}
+				}
+			} else if (Base.isPlainObject(json)) {
+				res = {};
+				if (_setDictionary)
+					_data.dictionary = res;
+				for (var key in json)
+					res[key] = Base.deserialize(json[key], create, _data);
+			}
+			return hasDictionary ? res[1] : res;
+		},
+	
+		exportJSON: function(obj, options) {
+			var json = Base.serialize(obj, options);
+			return options && options.asString == false
+					? json
+					: JSON.stringify(json);
+		},
+	
+		importJSON: function(json, target) {
+			return Base.deserialize(
+					typeof json === 'string' ? JSON.parse(json) : json,
+					function(ctor, args, isRoot) {
+						var useTarget = isRoot && target
+								&& target.constructor === ctor,
+							obj = useTarget ? target
+								: Base.create(ctor.prototype);
+						if (args.length === 1 && obj instanceof Item
+								&& (useTarget || !(obj instanceof Layer))) {
+							var arg = args[0];
+							if (Base.isPlainObject(arg))
+								arg.insert = false;
+						}
+						(useTarget ? obj.set : ctor).apply(obj, args);
+						if (useTarget)
+							target = null;
+						return obj;
+					});
+		},
+	
+		splice: function(list, items, index, remove) {
+			var amount = items && items.length,
+				append = index === undefined;
+			index = append ? list.length : index;
+			if (index > list.length)
+				index = list.length;
+			for (var i = 0; i < amount; i++)
+				items[i]._index = index + i;
+			if (append) {
+				list.push.apply(list, items);
+				return [];
+			} else {
+				var args = [index, remove];
+				if (items)
+					args.push.apply(args, items);
+				var removed = list.splice.apply(list, args);
+				for (var i = 0, l = removed.length; i < l; i++)
+					removed[i]._index = undefined;
+				for (var i = index + amount, l = list.length; i < l; i++)
+					list[i]._index = i;
+				return removed;
+			}
+		},
+	
+		capitalize: function(str) {
+			return str.replace(/\b[a-z]/g, function(match) {
+				return match.toUpperCase();
+			});
+		},
+	
+		camelize: function(str) {
+			return str.replace(/-(.)/g, function(match, chr) {
+				return chr.toUpperCase();
+			});
+		},
+	
+		hyphenate: function(str) {
+			return str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 		}
-	});
+	}});
 	
 	var Emitter = {
 		on: function(type, func) {
@@ -9507,7 +12927,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			if (setTarget)
 				event.currentTarget = this;
 			for (var i = 0, l = handlers.length; i < l; i++) {
-				if (handlers[i].apply(this, args) === false) {
+				if (handlers[i].apply(this, args) == false) {
 					if (event && event.stop)
 						event.stop();
 					break;
@@ -9587,7 +13007,6 @@ return /******/ (function(modules) { // webpackBootstrap
 			this.project = null;
 			this.projects = [];
 			this.tools = [];
-			this.palettes = [];
 			this._id = PaperScope._id++;
 			PaperScope._scopes[this._id] = this;
 			var proto = PaperScope.prototype;
@@ -9627,7 +13046,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			}
 		},
 	
-		version: "0.10.2-develop",
+		version: "0.11.4",
 	
 		getView: function() {
 			var project = this.project;
@@ -9674,14 +13093,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		clear: function() {
 			var projects = this.projects,
-				tools = this.tools,
-				palettes = this.palettes;
+				tools = this.tools;
 			for (var i = projects.length - 1; i >= 0; i--)
 				projects[i].remove();
 			for (var i = tools.length - 1; i >= 0; i--)
 				tools[i].remove();
-			for (var i = palettes.length - 1; i >= 0; i--)
-				palettes[i].remove();
 		},
 	
 		remove: function() {
@@ -9866,14 +13282,11 @@ return /******/ (function(modules) { // webpackBootstrap
 		}
 	
 		return {
-			TOLERANCE: 1e-6,
 			EPSILON: EPSILON,
 			MACHINE_EPSILON: MACHINE_EPSILON,
-			CURVETIME_EPSILON: 4e-7,
+			CURVETIME_EPSILON: 1e-8,
 			GEOMETRIC_EPSILON: 1e-7,
-			WINDING_EPSILON: 1e-8,
 			TRIGONOMETRIC_EPSILON: 1e-8,
-			CLIPPING_EPSILON: 1e-10,
 			KAPPA: 4 * (sqrt(2) - 1) / 3,
 	
 			isZero: function(val) {
@@ -9902,8 +13315,10 @@ return /******/ (function(modules) { // webpackBootstrap
 					var fx = f(x),
 						dx = fx / df(x),
 						nx = x - dx;
-					if (abs(dx) < tolerance)
-						return nx;
+					if (abs(dx) < tolerance) {
+						x = nx;
+						break;
+					}
 					if (fx > 0) {
 						b = x;
 						x = nx <= a ? (a + b) * 0.5 : nx;
@@ -9912,7 +13327,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						x = nx >= b ? (a + b) * 0.5 : nx;
 					}
 				}
-				return x;
+				return clamp(x, a, b);
 			},
 	
 			solveQuadratic: function(a, b, c, roots, min, max) {
@@ -10261,11 +13676,17 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		isZero: function() {
-			return Numerical.isZero(this.x) && Numerical.isZero(this.y);
+			var isZero = Numerical.isZero;
+			return isZero(this.x) && isZero(this.y);
 		},
 	
 		isNaN: function() {
 			return isNaN(this.x) || isNaN(this.y);
+		},
+	
+		isInQuadrant: function(q) {
+			return this.x * (q > 1 && q < 4 ? -1 : 1) >= 0
+				&& this.y * (q > 2 ? -1 : 1) >= 0;
 		},
 	
 		dot: function() {
@@ -10368,7 +13789,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		setSelected: function(selected) {
-			this._owner.changeSelection(this._getSelection(), selected);
+			this._owner._changeSelection(this._getSelection(), selected);
 		},
 	
 		_getSelection: function() {
@@ -10473,7 +13894,8 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		isZero: function() {
-			return Numerical.isZero(this.width) && Numerical.isZero(this.height);
+			var isZero = Numerical.isZero;
+			return isZero(this.width) && isZero(this.height);
 		},
 	
 		isNaN: function() {
@@ -10594,6 +14016,9 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 				this._set(x, y, width, height);
 				read = arguments.__index;
+				var filtered = arguments.__filtered;
+				if (filtered)
+					this.__filtered = filtered;
 			}
 			if (this.__read)
 				this.__read = read;
@@ -10657,16 +14082,24 @@ return /******/ (function(modules) { // webpackBootstrap
 			return new ctor(this.width, this.height, this, 'setSize');
 		},
 	
+		_fw: 1,
+		_fh: 1,
+	
 		setSize: function() {
-			var size = Size.read(arguments);
-			if (this._fixX)
-				this.x += (this.width - size.width) * this._fixX;
-			if (this._fixY)
-				this.y += (this.height - size.height) * this._fixY;
-			this.width = size.width;
-			this.height = size.height;
-			this._fixW = 1;
-			this._fixH = 1;
+			var size = Size.read(arguments),
+				sx = this._sx,
+				sy = this._sy,
+				w = size.width,
+				h = size.height;
+			if (sx) {
+				this.x += (this.width - w) * sx;
+			}
+			if (sy) {
+				this.y += (this.height - h) * sy;
+			}
+			this.width = w;
+			this.height = h;
+			this._fw = this._fh = 1;
 		},
 	
 		getLeft: function() {
@@ -10674,10 +14107,12 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		setLeft: function(left) {
-			if (!this._fixW)
-				this.width -= left - this.x;
+			if (!this._fw) {
+				var amount = left - this.x;
+				this.width -= this._sx === 0.5 ? amount * 2 : amount;
+			}
 			this.x = left;
-			this._fixX = 0;
+			this._sx = this._fw = 0;
 		},
 	
 		getTop: function() {
@@ -10685,10 +14120,12 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		setTop: function(top) {
-			if (!this._fixH)
-				this.height -= top - this.y;
+			if (!this._fh) {
+				var amount = top - this.y;
+				this.height -= this._sy === 0.5 ? amount * 2 : amount;
+			}
 			this.y = top;
-			this._fixY = 0;
+			this._sy = this._fh = 0;
 		},
 	
 		getRight: function() {
@@ -10696,13 +14133,13 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		setRight: function(right) {
-			if (this._fixX !== undefined && this._fixX !== 1)
-				this._fixW = 0;
-			if (this._fixW)
-				this.x = right - this.width;
-			else
-				this.width = right - this.x;
-			this._fixX = 1;
+			if (!this._fw) {
+				var amount = right - this.x;
+				this.width = this._sx === 0.5 ? amount * 2 : amount;
+			}
+			this.x = right - this.width;
+			this._sx = 1;
+			this._fw = 0;
 		},
 	
 		getBottom: function() {
@@ -10710,31 +14147,47 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		setBottom: function(bottom) {
-			if (this._fixY !== undefined && this._fixY !== 1)
-				this._fixH = 0;
-			if (this._fixH)
-				this.y = bottom - this.height;
-			else
-				this.height = bottom - this.y;
-			this._fixY = 1;
+			if (!this._fh) {
+				var amount = bottom - this.y;
+				this.height = this._sy === 0.5 ? amount * 2 : amount;
+			}
+			this.y = bottom - this.height;
+			this._sy = 1;
+			this._fh = 0;
 		},
 	
 		getCenterX: function() {
-			return this.x + this.width * 0.5;
+			return this.x + this.width / 2;
 		},
 	
 		setCenterX: function(x) {
-			this.x = x - this.width * 0.5;
-			this._fixX = 0.5;
+			if (this._fw || this._sx === 0.5) {
+				this.x = x - this.width / 2;
+			} else {
+				if (this._sx) {
+					this.x += (x - this.x) * 2 * this._sx;
+				}
+				this.width = (x - this.x) * 2;
+			}
+			this._sx = 0.5;
+			this._fw = 0;
 		},
 	
 		getCenterY: function() {
-			return this.y + this.height * 0.5;
+			return this.y + this.height / 2;
 		},
 	
 		setCenterY: function(y) {
-			this.y = y - this.height * 0.5;
-			this._fixY = 0.5;
+			if (this._fh || this._sy === 0.5) {
+				this.y = y - this.height / 2;
+			} else {
+				if (this._sy) {
+					this.y += (y - this.y) * 2 * this._sy;
+				}
+				this.height = (y - this.y) * 2;
+			}
+			this._sy = 0.5;
+			this._fh = 0;
 		},
 	
 		getCenter: function(_dontLink) {
@@ -10781,19 +14234,12 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		intersects: function() {
-			var rect = Rectangle.read(arguments);
-			return rect.x + rect.width > this.x
-					&& rect.y + rect.height > this.y
-					&& rect.x < this.x + this.width
-					&& rect.y < this.y + this.height;
-		},
-	
-		touches: function() {
-			var rect = Rectangle.read(arguments);
-			return rect.x + rect.width >= this.x
-					&& rect.y + rect.height >= this.y
-					&& rect.x <= this.x + this.width
-					&& rect.y <= this.y + this.height;
+			var rect = Rectangle.read(arguments),
+				epsilon = Base.read(arguments) || 0;
+			return rect.x + rect.width > this.x - epsilon
+					&& rect.y + rect.height > this.y - epsilon
+					&& rect.x < this.x + this.width + epsilon
+					&& rect.y < this.y + this.height + epsilon;
 		},
 	
 		intersect: function() {
@@ -10919,8 +14365,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 				setSelected: function(selected) {
 					var owner = this._owner;
-					if (owner.changeSelection) {
-						owner.changeSelection(2, selected);
+					if (owner._changeSelection) {
+						owner._changeSelection(2, selected);
 					}
 				}
 			})
@@ -10930,16 +14376,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	var Matrix = Base.extend({
 		_class: 'Matrix',
 	
-		initialize: function Matrix(arg) {
+		initialize: function Matrix(arg, _dontNotify) {
 			var count = arguments.length,
 				ok = true;
-			if (count === 6) {
+			if (count >= 6) {
 				this._set.apply(this, arguments);
-			} else if (count === 1) {
+			} else if (count === 1 || count === 2) {
 				if (arg instanceof Matrix) {
-					this._set(arg._a, arg._b, arg._c, arg._d, arg._tx, arg._ty);
+					this._set(arg._a, arg._b, arg._c, arg._d, arg._tx, arg._ty,
+							_dontNotify);
 				} else if (Array.isArray(arg)) {
-					this._set.apply(this, arg);
+					this._set.apply(this,
+							_dontNotify ? arg.concat([_dontNotify]) : arg);
 				} else {
 					ok = false;
 				}
@@ -11094,7 +14542,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			return this.shear(shear, center);
 		},
 	
-		append: function(mx) {
+		append: function(mx, _dontNotify) {
 			if (mx) {
 				var a1 = this._a,
 					b1 = this._b,
@@ -11112,12 +14560,13 @@ return /******/ (function(modules) { // webpackBootstrap
 				this._d = b2 * b1 + d2 * d1;
 				this._tx += tx2 * a1 + ty2 * c1;
 				this._ty += tx2 * b1 + ty2 * d1;
-				this._changed();
+				if (!_dontNotify)
+					this._changed();
 			}
 			return this;
 		},
 	
-		prepend: function(mx) {
+		prepend: function(mx, _dontNotify) {
 			if (mx) {
 				var a1 = this._a,
 					b1 = this._b,
@@ -11137,7 +14586,8 @@ return /******/ (function(modules) { // webpackBootstrap
 				this._d = c2 * c1 + d2 * d1;
 				this._tx = a2 * tx1 + b2 * ty1 + tx2;
 				this._ty = c2 * tx1 + d2 * ty1 + ty2;
-				this._changed();
+				if (!_dontNotify)
+					this._changed();
 			}
 			return this;
 		},
@@ -11400,9 +14850,12 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		getDistance: function(point) {
-			return Math.abs(Line.getSignedDistance(
-					this._px, this._py, this._vx, this._vy,
-					point.x, point.y, true));
+			return Math.abs(this.getSignedDistance(point));
+		},
+	
+		getSignedDistance: function(point) {
+			return Line.getSignedDistance(this._px, this._py, this._vx, this._vy,
+					point.x, point.y, true);
 		},
 	
 		isCollinear: function(line) {
@@ -11451,7 +14904,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				var v2x = x - px,
 					v2y = y - py,
 					ccw = v2x * vy - v2y * vx;
-				if (ccw === 0 && !isInfinite) {
+				if (!isInfinite && Numerical.isZero(ccw)) {
 					ccw = (v2x * vx + v2x * vx) / (vx * vx + vy * vy);
 					if (ccw >= 0 && ccw <= 1)
 						ccw = 0;
@@ -11467,6 +14920,11 @@ return /******/ (function(modules) { // webpackBootstrap
 				return vx === 0 ? vy > 0 ? x - px : px - x
 					 : vy === 0 ? vx < 0 ? y - py : py - y
 					 : ((x-px) * vy - (y-py) * vx) / Math.sqrt(vx * vx + vy * vy);
+			},
+	
+			getDistance: function(px, py, vx, vy, x, y, asVector) {
+				return Math.abs(
+						Line.getSignedDistance(px, py, vx, vy, x, y, asVector));
 			}
 		}
 	});
@@ -11588,7 +15046,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			for (var id in selectionItems) {
 				var item = selectionItems[id],
 					selection = item._selection;
-				if (selection & 1 && item.isInserted()) {
+				if ((selection & 1) && item.isInserted()) {
 					items.push(item);
 				} else if (!selection) {
 					this._updateSelection(item);
@@ -11815,7 +15273,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				matrix.translate(point);
 			matrix._owner = this;
 			this._style = new Style(project._currentStyle, this, project);
-			if (internal || hasProps && props.insert === false
+			if (internal || hasProps && props.insert == false
 				|| !settings.insertItems && !(hasProps && props.insert === true)) {
 				this._setProject(project);
 			} else {
@@ -11909,15 +15367,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	}, Base.each(['locked', 'visible', 'blendMode', 'opacity', 'guide'],
 		function(name) {
 			var part = Base.capitalize(name),
-				name = '_' + name;
+				key = '_' + name,
+				flags = {
+					locked: 128,
+					visible: 137
+				};
 			this['get' + part] = function() {
-				return this[name];
+				return this[key];
 			};
 			this['set' + part] = function(value) {
-				if (value != this[name]) {
-					this[name] = value;
-					this._changed(name === '_locked'
-							? 128 : 129);
+				if (value != this[key]) {
+					this[key] = value;
+					this._changed(flags[name] || 129);
 				}
 			};
 		},
@@ -11939,7 +15400,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			}
 		},
 	
-		changeSelection: function(flag, selected) {
+		_changeSelection: function(flag, selected) {
 			var selection = this._selection;
 			this.setSelection(selected ? selection | flag : selection & ~flag);
 		},
@@ -11960,7 +15421,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				for (var i = 0, l = children.length; i < l; i++)
 					children[i].setSelected(selected);
 			}
-			this.changeSelection(1, selected);
+			this._changeSelection(1, selected);
 		},
 	
 		isFullySelected: function() {
@@ -11981,7 +15442,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				for (var i = 0, l = children.length; i < l; i++)
 					children[i].setFullySelected(selected);
 			}
-			this.changeSelection(1, selected);
+			this._changeSelection(1, selected);
 		},
 	
 		isClipMask: function() {
@@ -12057,11 +15518,11 @@ return /******/ (function(modules) { // webpackBootstrap
 						this._boundsOptions);
 			if (!opts.stroke || this.getStrokeScaling())
 				opts.cacheItem = this;
-			var bounds = this._getCachedBounds(hasMatrix && matrix, opts);
+			var rect = this._getCachedBounds(hasMatrix && matrix, opts).rect;
 			return !arguments.length
-					? new LinkedRectangle(bounds.x, bounds.y, bounds.width,
-							bounds.height, this, 'setBounds')
-					: bounds;
+					? new LinkedRectangle(rect.x, rect.y, rect.width, rect.height,
+						this, 'setBounds')
+					: rect;
 		},
 	
 		setBounds: function() {
@@ -12094,29 +15555,49 @@ return /******/ (function(modules) { // webpackBootstrap
 			return Item._getBounds(children, matrix, options);
 		},
 	
-		_getCachedBounds: function(matrix, options) {
+		_getBoundsCacheKey: function(options, internal) {
+			return [
+				options.stroke ? 1 : 0,
+				options.handle ? 1 : 0,
+				internal ? 1 : 0
+			].join('');
+		},
+	
+		_getCachedBounds: function(matrix, options, noInternal) {
 			matrix = matrix && matrix._orNullIfIdentity();
-			var internal = options.internal,
+			var internal = options.internal && !noInternal,
 				cacheItem = options.cacheItem,
 				_matrix = internal ? null : this._matrix._orNullIfIdentity(),
-				cacheKey = cacheItem && (!matrix || matrix.equals(_matrix)) && [
-					options.stroke ? 1 : 0,
-					options.handle ? 1 : 0,
-					internal ? 1 : 0
-				].join('');
+				cacheKey = cacheItem && (!matrix || matrix.equals(_matrix))
+					&& this._getBoundsCacheKey(options, internal),
+				bounds = this._bounds;
 			Item._updateBoundsCache(this._parent || this._symbol, cacheItem);
-			if (cacheKey && this._bounds && cacheKey in this._bounds)
-				return this._bounds[cacheKey].rect.clone();
-			var bounds = this._getBounds(matrix || _matrix, options);
-			if (cacheKey) {
-				if (!this._bounds)
-					this._bounds = {};
-				var cached = this._bounds[cacheKey] = {
-					rect: bounds.clone(),
-					internal: options.internal
+			if (cacheKey && bounds && cacheKey in bounds) {
+				var cached = bounds[cacheKey];
+				return {
+					rect: cached.rect.clone(),
+					nonscaling: cached.nonscaling
 				};
 			}
-			return bounds;
+			var res = this._getBounds(matrix || _matrix, options),
+				rect = res.rect || res,
+				style = this._style,
+				nonscaling = res.nonscaling || style.hasStroke()
+					&& !style.getStrokeScaling();
+			if (cacheKey) {
+				if (!bounds) {
+					this._bounds = bounds = {};
+				}
+				var cached = bounds[cacheKey] = {
+					rect: rect.clone(),
+					nonscaling: nonscaling,
+					internal: internal
+				};
+			}
+			return {
+				rect: rect,
+				nonscaling: nonscaling
+			};
 		},
 	
 		_getStrokeMatrix: function(matrix, options) {
@@ -12161,22 +15642,29 @@ return /******/ (function(modules) { // webpackBootstrap
 				var x1 = Infinity,
 					x2 = -x1,
 					y1 = x1,
-					y2 = x2;
+					y2 = x2,
+					nonscaling = false;
 				options = options || {};
 				for (var i = 0, l = items.length; i < l; i++) {
 					var item = items[i];
 					if (item._visible && !item.isEmpty()) {
-						var rect = item._getCachedBounds(
-							matrix && matrix.appended(item._matrix), options);
+						var bounds = item._getCachedBounds(
+							matrix && matrix.appended(item._matrix), options, true),
+							rect = bounds.rect;
 						x1 = Math.min(rect.x, x1);
 						y1 = Math.min(rect.y, y1);
 						x2 = Math.max(rect.x + rect.width, x2);
 						y2 = Math.max(rect.y + rect.height, y2);
+						if (bounds.nonscaling)
+							nonscaling = true;
 					}
 				}
-				return isFinite(x1)
+				return {
+					rect: isFinite(x1)
 						? new Rectangle(x1, y1, x2 - x1, y2 - y1)
-						: new Rectangle();
+						: new Rectangle(),
+					nonscaling: nonscaling
+				};
 			}
 		}
 	
@@ -12184,34 +15672,54 @@ return /******/ (function(modules) { // webpackBootstrap
 		beans: true,
 	
 		_decompose: function() {
-			return this._decomposed || (this._decomposed = this._matrix.decompose());
+			return this._applyMatrix
+				? null
+				: this._decomposed || (this._decomposed = this._matrix.decompose());
 		},
 	
 		getRotation: function() {
 			var decomposed = this._decompose();
-			return decomposed && decomposed.rotation;
+			return decomposed ? decomposed.rotation : 0;
 		},
 	
 		setRotation: function(rotation) {
 			var current = this.getRotation();
 			if (current != null && rotation != null) {
+				var decomposed = this._decomposed;
 				this.rotate(rotation - current);
+				if (decomposed) {
+					decomposed.rotation = rotation;
+					this._decomposed = decomposed;
+				}
 			}
 		},
 	
 		getScaling: function() {
 			var decomposed = this._decompose(),
-				scaling = decomposed && decomposed.scaling;
-			return scaling
-					? new LinkedPoint(scaling.x, scaling.y, this, 'setScaling')
-					: undefined;
+				s = decomposed && decomposed.scaling;
+			return new LinkedPoint(s ? s.x : 1, s ? s.y : 1, this, 'setScaling');
 		},
 	
 		setScaling: function() {
 			var current = this.getScaling(),
 				scaling = Point.read(arguments, 0, { clone: true, readNull: true });
-			if (current && scaling) {
-				this.scale(scaling.x / current.x, scaling.y / current.y);
+			if (current && scaling && !current.equals(scaling)) {
+				var rotation = this.getRotation(),
+					decomposed = this._decomposed,
+					matrix = new Matrix(),
+					center = this.getPosition(true);
+				matrix.translate(center);
+				if (rotation)
+					matrix.rotate(rotation);
+				matrix.scale(scaling.x / current.x, scaling.y / current.y);
+				if (rotation)
+					matrix.rotate(-rotation);
+				matrix.translate(center.negate());
+				this.transform(matrix);
+				if (decomposed) {
+					decomposed.scaling = scaling;
+					this._decomposed = decomposed;
+				}
 			}
 		},
 	
@@ -12398,7 +15906,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					this[key] = source[key];
 			}
 			if (!excludeMatrix)
-				this._matrix.set(source._matrix);
+				this._matrix.set(source._matrix, true);
 			this.setApplyMatrix(source._applyMatrix);
 			this.setPivot(source._pivot);
 			this.setSelection(source._selection);
@@ -12479,16 +15987,9 @@ return /******/ (function(modules) { // webpackBootstrap
 		function hitTestAll() {
 			var point = Point.read(arguments),
 				options = HitResult.getOptions(arguments),
-				callback = options.match,
-				results = [];
-			options = Base.set({}, options, {
-				match: function(hit) {
-					if (!callback || callback(hit))
-						results.push(hit);
-				}
-			});
-			this._hitTest(point, options);
-			return results;
+				all = [];
+			this._hitTest(point, Base.set({ all: all }, options));
+			return all;
 		}
 	
 		function hitTestChildren(point, options, viewMatrix, _exclude) {
@@ -12498,7 +15999,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					var child = children[i];
 					var res = child !== _exclude && child._hitTest(point, options,
 							viewMatrix);
-					if (res)
+					if (res && !options.all)
 						return res;
 				}
 			}
@@ -12528,12 +16029,10 @@ return /******/ (function(modules) { // webpackBootstrap
 				viewMatrix = parentViewMatrix
 						? parentViewMatrix.appended(matrix)
 						: this.getGlobalMatrix().prepend(this.getView()._matrix),
-				strokeMatrix = this.getStrokeScaling()
-						? null
-						: viewMatrix.inverted()._shiftless(),
-				tolerance = Math.max(options.tolerance, 1e-6),
+				tolerance = Math.max(options.tolerance, 1e-12),
 				tolerancePadding = options._tolerancePadding = new Size(
-						Path._getStrokePadding(tolerance, strokeMatrix));
+						Path._getStrokePadding(tolerance,
+							matrix._shiftless().invert()));
 			point = matrix._inverseTransform(point);
 			if (!point || !this._children &&
 				!this.getBounds({ internal: true, stroke: true, handle: true })
@@ -12545,45 +16044,57 @@ return /******/ (function(modules) { // webpackBootstrap
 					|| options.selected && !this.isSelected()
 					|| options.type && options.type !== Base.hyphenate(this._class)
 					|| options.class && !(this instanceof options.class)),
-				callback = options.match,
+				match = options.match,
 				that = this,
 				bounds,
 				res;
 	
-			function match(hit) {
-				return !callback || hit && callback(hit) ? hit : null;
+			function filter(hit) {
+				if (hit && match && !match(hit))
+					hit = null;
+				if (hit && options.all)
+					options.all.push(hit);
+				return hit;
 			}
 	
-			function checkBounds(type, part) {
-				var pt = bounds['get' + part]();
+			function checkPoint(type, part) {
+				var pt = part ? bounds['get' + part]() : that.getPosition();
 				if (point.subtract(pt).divide(tolerancePadding).length <= 1) {
-					return new HitResult(type, that,
-							{ name: Base.hyphenate(part), point: pt });
+					return new HitResult(type, that, {
+						name: part ? Base.hyphenate(part) : type,
+						point: pt
+					});
 				}
 			}
 	
-			if (checkSelf && (options.center || options.bounds) && this._parent) {
-				bounds = this.getInternalBounds();
-				if (options.center) {
-					res = checkBounds('center', 'Center');
+			var checkPosition = options.position,
+				checkCenter = options.center,
+				checkBounds = options.bounds;
+			if (checkSelf && this._parent
+					&& (checkPosition || checkCenter || checkBounds)) {
+				if (checkCenter || checkBounds) {
+					bounds = this.getInternalBounds();
 				}
-				if (!res && options.bounds) {
+				res = checkPosition && checkPoint('position') ||
+						checkCenter && checkPoint('center', 'Center');
+				if (!res && checkBounds) {
 					var points = [
 						'TopLeft', 'TopRight', 'BottomLeft', 'BottomRight',
 						'LeftCenter', 'TopCenter', 'RightCenter', 'BottomCenter'
 					];
 					for (var i = 0; i < 8 && !res; i++) {
-						res = checkBounds('bounds', points[i]);
+						res = checkPoint('bounds', points[i]);
 					}
 				}
-				res = match(res);
+				res = filter(res);
 			}
 	
 			if (!res) {
 				res = this._hitTestChildren(point, options, viewMatrix)
 					|| checkSelf
-						&& match(this._hitTestSelf(point, options, viewMatrix,
-							strokeMatrix))
+						&& filter(this._hitTestSelf(point, options, viewMatrix,
+							this.getStrokeScaling() ? null
+								: viewMatrix._shiftless().invert()))
 					|| null;
 			}
 			if (res && res.point) {
@@ -12737,12 +16248,15 @@ return /******/ (function(modules) { // webpackBootstrap
 			var children = this._children;
 			if (children && items && items.length > 0) {
 				items = Base.slice(items);
+				var inserted = {};
 				for (var i = items.length - 1; i >= 0; i--) {
-					var item = items[i];
-					if (!item) {
+					var item = items[i],
+						id = item && item._id;
+					if (!item || inserted[id]) {
 						items.splice(i, 1);
 					} else {
 						item._remove(false, true);
+						inserted[id] = true;
 					}
 				}
 				Base.splice(children, items, index, 0);
@@ -12756,7 +16270,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					if (name)
 						item.setName(name);
 					if (notifySelf)
-						this._changed(5);
+						item._changed(5);
 				}
 				this._changed(11);
 			} else {
@@ -12805,8 +16319,12 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		moveBelow: '#insertBelow',
 	
+		addTo: function(owner) {
+			return owner._insertItem(undefined, this);
+		},
+	
 		copyTo: function(owner) {
-			return owner._insertItem(undefined, this.clone(false));
+			return this.clone(false).addTo(owner);
 		},
 	
 		reduce: function(options) {
@@ -13019,53 +16537,57 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		transform: function(matrix, _applyMatrix, _applyRecursively,
 				_setApplyMatrix) {
-			if (matrix && matrix.isIdentity())
-				matrix = null;
 			var _matrix = this._matrix,
+				transform = matrix && !matrix.isIdentity(),
 				applyMatrix = (_applyMatrix || this._applyMatrix)
-						&& ((!_matrix.isIdentity() || matrix)
+						&& ((!_matrix.isIdentity() || transform)
 							|| _applyMatrix && _applyRecursively && this._children);
-			if (!matrix && !applyMatrix)
+			if (!transform && !applyMatrix)
 				return this;
-			if (matrix) {
+			if (transform) {
 				if (!matrix.isInvertible() && _matrix.isInvertible())
 					_matrix._backup = _matrix.getValues();
-				_matrix.prepend(matrix);
-			}
-			if (applyMatrix = applyMatrix && this._transformContent(_matrix,
-						_applyRecursively, _setApplyMatrix)) {
-				var pivot = this._pivot,
-					style = this._style,
+				_matrix.prepend(matrix, true);
+				var style = this._style,
 					fillColor = style.getFillColor(true),
 					strokeColor = style.getStrokeColor(true);
+				if (fillColor)
+					fillColor.transform(matrix);
+				if (strokeColor)
+					strokeColor.transform(matrix);
+			}
+			if (applyMatrix && (applyMatrix = this._transformContent(_matrix,
+					_applyRecursively, _setApplyMatrix))) {
+				var pivot = this._pivot;
 				if (pivot)
 					_matrix._transformPoint(pivot, pivot, true);
-				if (fillColor)
-					fillColor.transform(_matrix);
-				if (strokeColor)
-					strokeColor.transform(_matrix);
 				_matrix.reset(true);
 				if (_setApplyMatrix && this._canApplyMatrix)
 					this._applyMatrix = true;
 			}
 			var bounds = this._bounds,
 				position = this._position;
-			this._changed(9);
-			var decomp = bounds && matrix && matrix.decompose();
-			if (decomp && !decomp.shearing && decomp.rotation % 90 === 0) {
+			if (transform || applyMatrix) {
+				this._changed(9);
+			}
+			var decomp = transform && bounds && matrix.decompose();
+			if (decomp && decomp.skewing.isZero() && decomp.rotation % 90 === 0) {
 				for (var key in bounds) {
 					var cache = bounds[key];
-					if (applyMatrix || !cache.internal) {
+					if (cache.nonscaling) {
+						delete bounds[key];
+					} else if (applyMatrix || !cache.internal) {
 						var rect = cache.rect;
 						matrix._transformBounds(rect, rect);
 					}
 				}
-				var getter = this._boundsGetter,
-					rect = bounds[getter && getter.getBounds || getter || 'getBounds'];
-				if (rect)
-					this._position = rect.getCenter(true);
 				this._bounds = bounds;
-			} else if (matrix && position) {
+				var cached = bounds[this._getBoundsCacheKey(
+						this._boundsOptions || {})];
+				if (cached) {
+					this._position = cached.rect.getCenter(true);
+				}
+			} else if (transform && position && this._pivot) {
 				this._position = matrix._transformPoint(position, position);
 			}
 			return this;
@@ -13115,12 +16637,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	}), {
 	
 		_setStyles: function(ctx, param, viewMatrix) {
-			var style = this._style;
+			var style = this._style,
+				matrix = this._matrix;
 			if (style.hasFill()) {
-				ctx.fillStyle = style.getFillColor().toCanvasStyle(ctx);
+				ctx.fillStyle = style.getFillColor().toCanvasStyle(ctx, matrix);
 			}
 			if (style.hasStroke()) {
-				ctx.strokeStyle = style.getStrokeColor().toCanvasStyle(ctx);
+				ctx.strokeStyle = style.getStrokeColor().toCanvasStyle(ctx, matrix);
 				ctx.lineWidth = style.getStrokeWidth();
 				var strokeJoin = style.getStrokeJoin(),
 					strokeCap = style.getStrokeCap(),
@@ -13449,8 +16972,8 @@ return /******/ (function(modules) { // webpackBootstrap
 			radius: null
 		},
 	
-		initialize: function Shape(props) {
-			this._initialize(props);
+		initialize: function Shape(props, point) {
+			this._initialize(props, point);
 		},
 	
 		_equals: function(item) {
@@ -13557,6 +17080,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		toShape: '#clone',
 	
+		_asPathItem: function() {
+			return this.toPath(false);
+		},
+	
 		_draw: function(ctx, param, viewMatrix, strokeMatrix) {
 			var style = this._style,
 				hasFill = style.hasFill(),
@@ -13653,20 +17180,22 @@ return /******/ (function(modules) { // webpackBootstrap
 			var radius = that._radius;
 			if (!radius.isZero()) {
 				var halfSize = that._size.divide(2);
-				for (var i = 0; i < 4; i++) {
-					var dir = new Point(i & 1 ? 1 : -1, i > 1 ? 1 : -1),
+				for (var q = 1; q <= 4; q++) {
+					var dir = new Point(q > 1 && q < 4 ? -1 : 1, q > 2 ? -1 : 1),
 						corner = dir.multiply(halfSize),
 						center = corner.subtract(dir.multiply(radius)),
-						rect = new Rectangle(corner, center);
-					if ((expand ? rect.expand(expand) : rect).contains(point))
-						return center;
+						rect = new Rectangle(
+								expand ? corner.add(dir.multiply(expand)) : corner,
+								center);
+					if (rect.contains(point))
+						return { point: center, quadrant: q };
 				}
 			}
 		}
 	
 		function isOnEllipseStroke(point, radius, padding, quadrant) {
 			var vector = point.divide(radius);
-			return (!quadrant || vector.quadrant === quadrant) &&
+			return (!quadrant || vector.isInQuadrant(quadrant)) &&
 					vector.subtract(vector.normalize()).multiply(radius)
 						.divide(padding).length <= 1;
 		}
@@ -13676,7 +17205,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				if (this._type === 'rectangle') {
 					var center = getCornerCenter(this, point);
 					return center
-							? point.subtract(center).divide(this._radius)
+							? point.subtract(center.point).divide(this._radius)
 								.getLength() <= 1
 							: _contains.base.call(this, point);
 				} else {
@@ -13701,8 +17230,8 @@ return /******/ (function(modules) { // webpackBootstrap
 						var padding = strokePadding.multiply(2),
 							center = getCornerCenter(this, point, padding);
 						if (center) {
-							hit = isOnEllipseStroke(point.subtract(center), radius,
-									strokePadding, center.getQuadrant());
+							hit = isOnEllipseStroke(point.subtract(center.point),
+									radius, strokePadding, center.quadrant);
 						} else {
 							var rect = new Rectangle(this._size).setCenter(0, 0),
 								outer = rect.expand(padding),
@@ -13722,11 +17251,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	statics: new function() {
 		function createShape(type, point, size, radius, args) {
-			var item = new Shape(Base.getNamed(args));
+			var item = new Shape(Base.getNamed(args), point);
 			item._type = type;
 			item._size = size;
 			item._radius = radius;
-			return item.translate(point);
+			return item;
 		}
 	
 		return {
@@ -14191,7 +17720,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			return item._getCachedBounds(item._matrix.prepended(matrix), options);
 		},
 	
-		_hitTestSelf: function(point, options, viewMatrix, strokeMatrix) {
+		_hitTestSelf: function(point, options, viewMatrix) {
 			var res = this._definition._item._hitTest(point, options, viewMatrix);
 			if (res)
 				res.item = this;
@@ -14270,10 +17799,8 @@ return /******/ (function(modules) { // webpackBootstrap
 		initialize: function HitResult(type, item, values) {
 			this.type = type;
 			this.item = item;
-			if (values) {
-				values.enumerable = true;
+			if (values)
 				this.inject(values);
-			}
 		},
 	
 		statics: {
@@ -14287,6 +17814,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					segments: !options,
 					handles: false,
 					ends: false,
+					position: false,
 					center: false,
 					bounds: false,
 					guides: false,
@@ -14388,6 +17916,13 @@ return /******/ (function(modules) { // webpackBootstrap
 			return !this._handleIn.isZero() || !this._handleOut.isZero();
 		},
 	
+		isSmooth: function() {
+			var handleIn = this._handleIn,
+				handleOut = this._handleOut;
+			return !handleIn.isZero() && !handleOut.isZero()
+					&& handleIn.isCollinear(handleOut);
+		},
+	
 		clearHandles: function() {
 			this._handleIn._set(0, 0);
 			this._handleOut._set(0, 0);
@@ -14407,7 +17942,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			}
 		},
 	
-		changeSelection: function(flag, selected) {
+		_changeSelection: function(flag, selected) {
 			var selection = this._selection;
 			this.setSelection(selected ? selection | flag : selection & ~flag);
 		},
@@ -14417,7 +17952,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		setSelected: function(selected) {
-			this.changeSelection(7, selected);
+			this._changeSelection(7, selected);
 		},
 	
 		getIndex: function() {
@@ -14682,7 +18217,8 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		isZero: function() {
-			return Numerical.isZero(this._x) && Numerical.isZero(this._y);
+			var isZero = Numerical.isZero;
+			return isZero(this._x) && isZero(this._y);
 		},
 	
 		isSelected: function() {
@@ -14690,7 +18226,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		setSelected: function(selected) {
-			this._owner.changeSelection(this._getSelection(), selected);
+			this._owner._changeSelection(this._getSelection(), selected);
 		},
 	
 		_getSelection: function() {
@@ -14704,6 +18240,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 	var Curve = Base.extend({
 		_class: 'Curve',
+		beans: true,
 	
 		initialize: function Curve(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
 			var count = arguments.length,
@@ -14774,6 +18311,10 @@ return /******/ (function(modules) { // webpackBootstrap
 				parts.push('handle2: ' + this._segment2._handleIn);
 			parts.push('point2: ' + this._segment2._point);
 			return '{ ' + parts.join(', ') + ' }';
+		},
+	
+		classify: function() {
+			return Curve.classify(this.getValues());
 		},
 	
 		remove: function() {
@@ -14882,8 +18423,8 @@ return /******/ (function(modules) { // webpackBootstrap
 			for (var i = 0; i < 8; i += 2)
 				points.push(new Point(coords[i], coords[i + 1]));
 			return points;
-		},
-	
+		}
+	}, {
 		getLength: function() {
 			if (this._length == null)
 				this._length = Curve.getLength(this.getValues(), 0, 1);
@@ -14906,19 +18447,13 @@ return /******/ (function(modules) { // webpackBootstrap
 			return Curve.getLength(this.getValues(), from, to);
 		},
 	
-		getIntersections: function(curve) {
-			return Curve._getIntersections(this.getValues(),
-					curve && curve !== this ? curve.getValues() : null,
-					this, curve, [], {});
-		},
-	
 		divideAt: function(location) {
 			return this.divideAtTime(location && location.curve === this
-					? location.time : location);
+					? location.time : this.getTimeAt(location));
 		},
 	
 		divideAtTime: function(time, _setHandles) {
-			var tMin = 4e-7,
+			var tMin = 1e-8,
 				tMax = 1 - tMin,
 				res = null;
 			if (time >= tMin && time <= tMax) {
@@ -14926,35 +18461,36 @@ return /******/ (function(modules) { // webpackBootstrap
 					left = parts[0],
 					right = parts[1],
 					setHandles = _setHandles || this.hasHandles(),
-					segment1 = this._segment1,
-					segment2 = this._segment2,
+					seg1 = this._segment1,
+					seg2 = this._segment2,
 					path = this._path;
 				if (setHandles) {
-					segment1._handleOut._set(left[2] - left[0], left[3] - left[1]);
-					segment2._handleIn._set(right[4] - right[6],right[5] - right[7]);
+					seg1._handleOut._set(left[2] - left[0], left[3] - left[1]);
+					seg2._handleIn._set(right[4] - right[6],right[5] - right[7]);
 				}
 				var x = left[6], y = left[7],
 					segment = new Segment(new Point(x, y),
 							setHandles && new Point(left[4] - x, left[5] - y),
 							setHandles && new Point(right[2] - x, right[3] - y));
 				if (path) {
-					path.insert(segment1._index + 1, segment);
+					path.insert(seg1._index + 1, segment);
 					res = this.getNext();
 				} else {
 					this._segment2 = segment;
 					this._changed();
-					res = new Curve(segment, segment2);
+					res = new Curve(segment, seg2);
 				}
 			}
 			return res;
 		},
 	
 		splitAt: function(location) {
-			return this._path ? this._path.splitAt(location) : null;
+			var path = this._path;
+			return path ? path.splitAt(location) : null;
 		},
 	
-		splitAtTime: function(t) {
-			return this.splitAt(this.getLocationAtTime(t));
+		splitAtTime: function(time) {
+			return this.splitAt(this.getLocationAtTime(time));
 		},
 	
 		divide: function(offset, isTime) {
@@ -14998,29 +18534,29 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		subdivide: function(v, t) {
-			var p1x = v[0], p1y = v[1],
-				c1x = v[2], c1y = v[3],
-				c2x = v[4], c2y = v[5],
-				p2x = v[6], p2y = v[7];
+			var x0 = v[0], y0 = v[1],
+				x1 = v[2], y1 = v[3],
+				x2 = v[4], y2 = v[5],
+				x3 = v[6], y3 = v[7];
 			if (t === undefined)
 				t = 0.5;
 			var u = 1 - t,
-				p3x = u * p1x + t * c1x, p3y = u * p1y + t * c1y,
-				p4x = u * c1x + t * c2x, p4y = u * c1y + t * c2y,
-				p5x = u * c2x + t * p2x, p5y = u * c2y + t * p2y,
-				p6x = u * p3x + t * p4x, p6y = u * p3y + t * p4y,
-				p7x = u * p4x + t * p5x, p7y = u * p4y + t * p5y,
-				p8x = u * p6x + t * p7x, p8y = u * p6y + t * p7y;
+				x4 = u * x0 + t * x1, y4 = u * y0 + t * y1,
+				x5 = u * x1 + t * x2, y5 = u * y1 + t * y2,
+				x6 = u * x2 + t * x3, y6 = u * y2 + t * y3,
+				x7 = u * x4 + t * x5, y7 = u * y4 + t * y5,
+				x8 = u * x5 + t * x6, y8 = u * y5 + t * y6,
+				x9 = u * x7 + t * x8, y9 = u * y7 + t * y8;
 			return [
-				[p1x, p1y, p3x, p3y, p6x, p6y, p8x, p8y],
-				[p8x, p8y, p7x, p7y, p5x, p5y, p2x, p2y]
+				[x0, y0, x4, y4, x7, y7, x9, y9],
+				[x9, y9, x8, y8, x6, y6, x3, y3]
 			];
 		},
 	
 		getMonoCurves: function(v, dir) {
 			var curves = [],
 				io = dir ? 0 : 1,
-				o0 = v[io],
+				o0 = v[io + 0],
 				o1 = v[io + 2],
 				o2 = v[io + 4],
 				o3 = v[io + 6];
@@ -15031,7 +18567,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				var a = 3 * (o1 - o2) - o0 + o3,
 					b = 2 * (o0 + o2) - 4 * o1,
 					c = o1 - o0,
-					tMin = 4e-7,
+					tMin = 1e-8,
 					tMax = 1 - tMin,
 					roots = [],
 					n = Numerical.solveQuadratic(a, b, c, roots, tMin, tMax);
@@ -15054,59 +18590,59 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		solveCubic: function (v, coord, val, roots, min, max) {
-			var p1 = v[coord],
-				c1 = v[coord + 2],
-				c2 = v[coord + 4],
-				p2 = v[coord + 6],
+			var v0 = v[coord],
+				v1 = v[coord + 2],
+				v2 = v[coord + 4],
+				v3 = v[coord + 6],
 				res = 0;
-			if (  !(p1 < val && p2 < val && c1 < val && c2 < val ||
-					p1 > val && p2 > val && c1 > val && c2 > val)) {
-				var c = 3 * (c1 - p1),
-					b = 3 * (c2 - c1) - c,
-					a = p2 - p1 - c - b;
-				res = Numerical.solveCubic(a, b, c, p1 - val, roots, min, max);
+			if (  !(v0 < val && v3 < val && v1 < val && v2 < val ||
+					v0 > val && v3 > val && v1 > val && v2 > val)) {
+				var c = 3 * (v1 - v0),
+					b = 3 * (v2 - v1) - c,
+					a = v3 - v0 - c - b;
+				res = Numerical.solveCubic(a, b, c, v0 - val, roots, min, max);
 			}
 			return res;
 		},
 	
 		getTimeOf: function(v, point) {
-			var p1 = new Point(v[0], v[1]),
-				p2 = new Point(v[6], v[7]),
+			var p0 = new Point(v[0], v[1]),
+				p3 = new Point(v[6], v[7]),
 				epsilon = 1e-12,
-				t = point.isClose(p1, epsilon) ? 0
-				  : point.isClose(p2, epsilon) ? 1
+				geomEpsilon = 1e-7,
+				t = point.isClose(p0, epsilon) ? 0
+				  : point.isClose(p3, epsilon) ? 1
 				  : null;
-			if (t !== null)
-				return t;
-			var coords = [point.x, point.y],
-				roots = [],
-				geomEpsilon = 1e-7;
-			for (var c = 0; c < 2; c++) {
-				var count = Curve.solveCubic(v, c, coords[c], roots, 0, 1);
-				for (var i = 0; i < count; i++) {
-					t = roots[i];
-					if (point.isClose(Curve.getPoint(v, t), geomEpsilon))
-						return t;
+			if (t === null) {
+				var coords = [point.x, point.y],
+					roots = [];
+				for (var c = 0; c < 2; c++) {
+					var count = Curve.solveCubic(v, c, coords[c], roots, 0, 1);
+					for (var i = 0; i < count; i++) {
+						var u = roots[i];
+						if (point.isClose(Curve.getPoint(v, u), geomEpsilon))
+							return u;
+					}
 				}
 			}
-			return point.isClose(p1, geomEpsilon) ? 0
-				 : point.isClose(p2, geomEpsilon) ? 1
+			return point.isClose(p0, geomEpsilon) ? 0
+				 : point.isClose(p3, geomEpsilon) ? 1
 				 : null;
 		},
 	
 		getNearestTime: function(v, point) {
 			if (Curve.isStraight(v)) {
-				var p1x = v[0], p1y = v[1],
-					p2x = v[6], p2y = v[7],
-					vx = p2x - p1x, vy = p2y - p1y,
+				var x0 = v[0], y0 = v[1],
+					x3 = v[6], y3 = v[7],
+					vx = x3 - x0, vy = y3 - y0,
 					det = vx * vx + vy * vy;
 				if (det === 0)
 					return 0;
-				var u = ((point.x - p1x) * vx + (point.y - p1y) * vy) / det;
+				var u = ((point.x - x0) * vx + (point.y - y0) * vy) / det;
 				return u < 1e-12 ? 0
 					 : u > 0.999999999999 ? 1
 					 : Curve.getTimeOf(v,
-						new Point(p1x + u * vx, p1y + u * vy));
+						new Point(x0 + u * vx, y0 + u * vy));
 			}
 	
 			var count = 100,
@@ -15128,7 +18664,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				refine(i / count);
 	
 			var step = 1 / (count * 2);
-			while (step > 4e-7) {
+			while (step > 1e-8) {
 				if (!refine(minT - step) && !refine(minT + step))
 					step /= 2;
 			}
@@ -15152,26 +18688,26 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		isFlatEnough: function(v, flatness) {
-			var p1x = v[0], p1y = v[1],
-				c1x = v[2], c1y = v[3],
-				c2x = v[4], c2y = v[5],
-				p2x = v[6], p2y = v[7],
-				ux = 3 * c1x - 2 * p1x - p2x,
-				uy = 3 * c1y - 2 * p1y - p2y,
-				vx = 3 * c2x - 2 * p2x - p1x,
-				vy = 3 * c2y - 2 * p2y - p1y;
+			var x0 = v[0], y0 = v[1],
+				x1 = v[2], y1 = v[3],
+				x2 = v[4], y2 = v[5],
+				x3 = v[6], y3 = v[7],
+				ux = 3 * x1 - 2 * x0 - x3,
+				uy = 3 * y1 - 2 * y0 - y3,
+				vx = 3 * x2 - 2 * x3 - x0,
+				vy = 3 * y2 - 2 * y3 - y0;
 			return Math.max(ux * ux, vx * vx) + Math.max(uy * uy, vy * vy)
 					<= 16 * flatness * flatness;
 		},
 	
 		getArea: function(v) {
-			var p1x = v[0], p1y = v[1],
-				c1x = v[2], c1y = v[3],
-				c2x = v[4], c2y = v[5],
-				p2x = v[6], p2y = v[7];
-			return 3 * ((p2y - p1y) * (c1x + c2x) - (p2x - p1x) * (c1y + c2y)
-					+ c1y * (p1x - c2x) - c1x * (p1y - c2y)
-					+ p2y * (c2x + p1x / 3) - p2x * (c2y + p1y / 3)) / 20;
+			var x0 = v[0], y0 = v[1],
+				x1 = v[2], y1 = v[3],
+				x2 = v[4], y2 = v[5],
+				x3 = v[6], y3 = v[7];
+			return 3 * ((y3 - y0) * (x1 + x2) - (x3 - x0) * (y1 + y2)
+					+ y1 * (x0 - x2) - x1 * (y0 - y2)
+					+ y3 * (x2 + x0 / 3) - x3 * (y2 + y0 / 3)) / 20;
 		},
 	
 		getBounds: function(v) {
@@ -15207,13 +18743,13 @@ return /******/ (function(modules) { // webpackBootstrap
 						b = 2 * (v0 + v2) - 4 * v1,
 						c = v1 - v0,
 						count = Numerical.solveQuadratic(a, b, c, roots),
-						tMin = 4e-7,
+						tMin = 1e-8,
 						tMax = 1 - tMin;
 					add(v3, 0);
 					for (var i = 0; i < count; i++) {
 						var t = roots[i],
 							u = 1 - t;
-						if (tMin < t && t < tMax)
+						if (tMin <= t && t <= tMax)
 							add(u * u * u * v0
 								+ 3 * u * u * t * v1
 								+ 3 * u * t * t * v2
@@ -15240,43 +18776,48 @@ return /******/ (function(modules) { // webpackBootstrap
 	{
 	
 	}), Base.each({
-		isStraight: function(l, h1, h2) {
+		isStraight: function(p1, h1, h2, p2) {
 			if (h1.isZero() && h2.isZero()) {
 				return true;
 			} else {
-				var v = l.getVector(),
-					epsilon = 1e-7;
+				var v = p2.subtract(p1);
 				if (v.isZero()) {
 					return false;
-				} else if (l.getDistance(h1) < epsilon
-						&& l.getDistance(h2) < epsilon) {
-					var div = v.dot(v),
-						p1 = v.dot(h1) / div,
-						p2 = v.dot(h2) / div;
-					return p1 >= 0 && p1 <= 1 && p2 <= 0 && p2 >= -1;
+				} else if (v.isCollinear(h1) && v.isCollinear(h2)) {
+					var l = new Line(p1, p2),
+						epsilon = 1e-7;
+					if (l.getDistance(p1.add(h1)) < epsilon &&
+						l.getDistance(p2.add(h2)) < epsilon) {
+						var div = v.dot(v),
+							s1 = v.dot(h1) / div,
+							s2 = v.dot(h2) / div;
+						return s1 >= 0 && s1 <= 1 && s2 <= 0 && s2 >= -1;
+					}
 				}
 			}
 			return false;
 		},
 	
-		isLinear: function(l, h1, h2) {
-			var third = l.getVector().divide(3);
+		isLinear: function(p1, h1, h2, p2) {
+			var third = p2.subtract(p1).divide(3);
 			return h1.equals(third) && h2.negate().equals(third);
 		}
 	}, function(test, name) {
-		this[name] = function() {
+		this[name] = function(epsilon) {
 			var seg1 = this._segment1,
 				seg2 = this._segment2;
-			return test(new Line(seg1._point, seg2._point),
-					seg1._handleOut, seg2._handleIn);
+			return test(seg1._point, seg1._handleOut, seg2._handleIn, seg2._point,
+					epsilon);
 		};
 	
-		this.statics[name] = function(v) {
-			var p1x = v[0], p1y = v[1],
-				p2x = v[6], p2y = v[7];
-			return test(new Line(p1x, p1y, p2x, p2y),
-					new Point(v[2] - p1x, v[3] - p1y),
-					new Point(v[4] - p2x, v[5] - p2y));
+		this.statics[name] = function(v, epsilon) {
+			var x0 = v[0], y0 = v[1],
+				x3 = v[6], y3 = v[7];
+			return test(
+					new Point(x0, y0),
+					new Point(v[2] - x0, v[3] - y0),
+					new Point(v[4] - x3, v[5] - y3),
+					new Point(x3, y3), epsilon);
 		};
 	}, {
 		statics: {},
@@ -15284,6 +18825,11 @@ return /******/ (function(modules) { // webpackBootstrap
 		hasHandles: function() {
 			return !this._segment1._handleOut.isZero()
 					|| !this._segment2._handleIn.isZero();
+		},
+	
+		hasLength: function(epsilon) {
+			return (!this.getPoint1().equals(this.getPoint2()) || this.hasHandles())
+					&& this.getLength() > (epsilon || 0);
 		},
 	
 		isCollinear: function(curve) {
@@ -15377,18 +18923,18 @@ return /******/ (function(modules) { // webpackBootstrap
 	new function() {
 	
 		function getLengthIntegrand(v) {
-			var p1x = v[0], p1y = v[1],
-				c1x = v[2], c1y = v[3],
-				c2x = v[4], c2y = v[5],
-				p2x = v[6], p2y = v[7],
+			var x0 = v[0], y0 = v[1],
+				x1 = v[2], y1 = v[3],
+				x2 = v[4], y2 = v[5],
+				x3 = v[6], y3 = v[7],
 	
-				ax = 9 * (c1x - c2x) + 3 * (p2x - p1x),
-				bx = 6 * (p1x + c2x) - 12 * c1x,
-				cx = 3 * (c1x - p1x),
+				ax = 9 * (x1 - x2) + 3 * (x3 - x0),
+				bx = 6 * (x0 + x2) - 12 * x1,
+				cx = 3 * (x1 - x0),
 	
-				ay = 9 * (c1y - c2y) + 3 * (p2y - p1y),
-				by = 6 * (p1y + c2y) - 12 * c1y,
-				cy = 3 * (c1y - p1y);
+				ay = 9 * (y1 - y2) + 3 * (y3 - y0),
+				by = 6 * (y0 + y2) - 12 * y1,
+				cy = 3 * (y1 - y0);
 	
 			return function(t) {
 				var dx = (ax * t + bx) * t + cx,
@@ -15404,48 +18950,48 @@ return /******/ (function(modules) { // webpackBootstrap
 		function evaluate(v, t, type, normalized) {
 			if (t == null || t < 0 || t > 1)
 				return null;
-			var p1x = v[0], p1y = v[1],
-				c1x = v[2], c1y = v[3],
-				c2x = v[4], c2y = v[5],
-				p2x = v[6], p2y = v[7],
+			var x0 = v[0], y0 = v[1],
+				x1 = v[2], y1 = v[3],
+				x2 = v[4], y2 = v[5],
+				x3 = v[6], y3 = v[7],
 				isZero = Numerical.isZero;
-			if (isZero(c1x - p1x) && isZero(c1y - p1y)) {
-				c1x = p1x;
-				c1y = p1y;
+			if (isZero(x1 - x0) && isZero(y1 - y0)) {
+				x1 = x0;
+				y1 = y0;
 			}
-			if (isZero(c2x - p2x) && isZero(c2y - p2y)) {
-				c2x = p2x;
-				c2y = p2y;
+			if (isZero(x2 - x3) && isZero(y2 - y3)) {
+				x2 = x3;
+				y2 = y3;
 			}
-			var cx = 3 * (c1x - p1x),
-				bx = 3 * (c2x - c1x) - cx,
-				ax = p2x - p1x - cx - bx,
-				cy = 3 * (c1y - p1y),
-				by = 3 * (c2y - c1y) - cy,
-				ay = p2y - p1y - cy - by,
+			var cx = 3 * (x1 - x0),
+				bx = 3 * (x2 - x1) - cx,
+				ax = x3 - x0 - cx - bx,
+				cy = 3 * (y1 - y0),
+				by = 3 * (y2 - y1) - cy,
+				ay = y3 - y0 - cy - by,
 				x, y;
 			if (type === 0) {
-				x = t === 0 ? p1x : t === 1 ? p2x
-						: ((ax * t + bx) * t + cx) * t + p1x;
-				y = t === 0 ? p1y : t === 1 ? p2y
-						: ((ay * t + by) * t + cy) * t + p1y;
+				x = t === 0 ? x0 : t === 1 ? x3
+						: ((ax * t + bx) * t + cx) * t + x0;
+				y = t === 0 ? y0 : t === 1 ? y3
+						: ((ay * t + by) * t + cy) * t + y0;
 			} else {
-				var tMin = 4e-7,
+				var tMin = 1e-8,
 					tMax = 1 - tMin;
 				if (t < tMin) {
 					x = cx;
 					y = cy;
 				} else if (t > tMax) {
-					x = 3 * (p2x - c2x);
-					y = 3 * (p2y - c2y);
+					x = 3 * (x3 - x2);
+					y = 3 * (y3 - y2);
 				} else {
 					x = (3 * ax * t + 2 * bx) * t + cx;
 					y = (3 * ay * t + 2 * by) * t + cy;
 				}
 				if (normalized) {
 					if (x === 0 && y === 0 && (t < tMin || t > tMax)) {
-						x = c2x - c1x;
-						y = c2y - c1y;
+						x = x2 - x1;
+						y = y2 - y1;
 					}
 					var len = Math.sqrt(x * x + y * y);
 					if (len) {
@@ -15465,6 +19011,61 @@ return /******/ (function(modules) { // webpackBootstrap
 		}
 	
 		return { statics: {
+	
+			classify: function(v) {
+	
+				var x0 = v[0], y0 = v[1],
+					x1 = v[2], y1 = v[3],
+					x2 = v[4], y2 = v[5],
+					x3 = v[6], y3 = v[7],
+					a1 = x0 * (y3 - y2) + y0 * (x2 - x3) + x3 * y2 - y3 * x2,
+					a2 = x1 * (y0 - y3) + y1 * (x3 - x0) + x0 * y3 - y0 * x3,
+					a3 = x2 * (y1 - y0) + y2 * (x0 - x1) + x1 * y0 - y1 * x0,
+					d3 = 3 * a3,
+					d2 = d3 - a2,
+					d1 = d2 - a2 + a1,
+					l = Math.sqrt(d1 * d1 + d2 * d2 + d3 * d3),
+					s = l !== 0 ? 1 / l : 0,
+					isZero = Numerical.isZero,
+					serpentine = 'serpentine';
+				d1 *= s;
+				d2 *= s;
+				d3 *= s;
+	
+				function type(type, t1, t2) {
+					var hasRoots = t1 !== undefined,
+						t1Ok = hasRoots && t1 > 0 && t1 < 1,
+						t2Ok = hasRoots && t2 > 0 && t2 < 1;
+					if (hasRoots && (!(t1Ok || t2Ok)
+							|| type === 'loop' && !(t1Ok && t2Ok))) {
+						type = 'arch';
+						t1Ok = t2Ok = false;
+					}
+					return {
+						type: type,
+						roots: t1Ok || t2Ok
+								? t1Ok && t2Ok
+									? t1 < t2 ? [t1, t2] : [t2, t1]
+									: [t1Ok ? t1 : t2]
+								: null
+					};
+				}
+	
+				if (isZero(d1)) {
+					return isZero(d2)
+							? type(isZero(d3) ? 'line' : 'quadratic')
+							: type(serpentine, d3 / (3 * d2));
+				}
+				var d = 3 * d2 * d2 - 4 * d1 * d3;
+				if (isZero(d)) {
+					return type('cusp', d2 / (2 * d1));
+				}
+				var f1 = d > 0 ? Math.sqrt(d / 3) : Math.sqrt(-d),
+					f2 = 2 * d1;
+				return type(d > 0 ? serpentine : 'loop',
+						(d2 + f1) / f2,
+						(d2 - f1) / f2);
+			},
 	
 			getLength: function(v, a, b, ds) {
 				if (a === undefined)
@@ -15540,53 +19141,60 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 			getCurvature: function(v, t) {
 				return evaluate(v, t, 3, false).x;
+			},
+	
+			getPeaks: function(v) {
+				var x0 = v[0], y0 = v[1],
+					x1 = v[2], y1 = v[3],
+					x2 = v[4], y2 = v[5],
+					x3 = v[6], y3 = v[7],
+					ax =     -x0 + 3 * x1 - 3 * x2 + x3,
+					bx =  3 * x0 - 6 * x1 + 3 * x2,
+					cx = -3 * x0 + 3 * x1,
+					ay =     -y0 + 3 * y1 - 3 * y2 + y3,
+					by =  3 * y0 - 6 * y1 + 3 * y2,
+					cy = -3 * y0 + 3 * y1,
+					tMin = 1e-8,
+					tMax = 1 - tMin,
+					roots = [];
+				Numerical.solveCubic(
+						9 * (ax * ax + ay * ay),
+						9 * (ax * bx + by * ay),
+						2 * (bx * bx + by * by) + 3 * (cx * ax + cy * ay),
+						(cx * bx + by * cy),
+						roots, tMin, tMax);
+				return roots.sort();
 			}
 		}};
 	},
 	new function() {
 	
-		function addLocation(locations, param, v1, c1, t1, p1, v2, c2, t2, p2,
-				overlap) {
-			var excludeStart = !overlap && param.excludeStart,
-				excludeEnd = !overlap && param.excludeEnd,
-				tMin = 4e-7,
+		function addLocation(locations, include, c1, t1, c2, t2, overlap) {
+			var excludeStart = !overlap && c1.getPrevious() === c2,
+				excludeEnd = !overlap && c1 !== c2 && c1.getNext() === c2,
+				tMin = 1e-8,
 				tMax = 1 - tMin;
-			if (t1 == null)
-				t1 = Curve.getTimeOf(v1, p1);
 			if (t1 !== null && t1 >= (excludeStart ? tMin : 0) &&
 				t1 <= (excludeEnd ? tMax : 1)) {
-				if (t2 == null)
-					t2 = Curve.getTimeOf(v2, p2);
 				if (t2 !== null && t2 >= (excludeEnd ? tMin : 0) &&
 					t2 <= (excludeStart ? tMax : 1)) {
-					var renormalize = param.renormalize;
-					if (renormalize) {
-						var res = renormalize(t1, t2);
-						t1 = res[0];
-						t2 = res[1];
-					}
-					var loc1 = new CurveLocation(c1, t1,
-							p1 || Curve.getPoint(v1, t1), overlap),
-						loc2 = new CurveLocation(c2, t2,
-							p2 || Curve.getPoint(v2, t2), overlap),
-						flip = loc1.getPath() === loc2.getPath()
-							&& loc1.getIndex() > loc2.getIndex(),
-						loc = flip ? loc2 : loc1,
-						include = param.include;
+					var loc1 = new CurveLocation(c1, t1, null, overlap),
+						loc2 = new CurveLocation(c2, t2, null, overlap);
 					loc1._intersection = loc2;
 					loc2._intersection = loc1;
-					if (!include || include(loc)) {
-						CurveLocation.insert(locations, loc, true);
+					if (!include || include(loc1)) {
+						CurveLocation.insert(locations, loc1, true);
 					}
 				}
 			}
 		}
 	
-		function addCurveIntersections(v1, v2, c1, c2, locations, param, tMin, tMax,
-				uMin, uMax, flip, recursion, calls) {
-			if (++recursion >= 48 || ++calls > 4096)
+		function addCurveIntersections(v1, v2, c1, c2, locations, include, flip,
+				recursion, calls, tMin, tMax, uMin, uMax) {
+			if (++calls >= 4096 || ++recursion >= 40)
 				return calls;
-			var q0x = v2[0], q0y = v2[1], q3x = v2[6], q3y = v2[7],
+			var fatLineEpsilon = 1e-9,
+				q0x = v2[0], q0y = v2[1], q3x = v2[6], q3y = v2[7],
 				getSignedDistance = Line.getSignedDistance,
 				d1 = getSignedDistance(q0x, q0y, q3x, q3y, v2[2], v2[3]),
 				d2 = getSignedDistance(q0x, q0y, q3x, q3y, v2[4], v2[5]),
@@ -15610,15 +19218,12 @@ return /******/ (function(modules) { // webpackBootstrap
 				return calls;
 			var tMinNew = tMin + (tMax - tMin) * tMinClip,
 				tMaxNew = tMin + (tMax - tMin) * tMaxClip;
-			if (Math.max(uMax - uMin, tMaxNew - tMinNew)
-					< 1e-10) {
+			if (Math.max(uMax - uMin, tMaxNew - tMinNew) < fatLineEpsilon) {
 				var t = (tMinNew + tMaxNew) / 2,
 					u = (uMin + uMax) / 2;
-				v1 = c1.getValues();
-				v2 = c2.getValues();
-				addLocation(locations, param,
-						flip ? v2 : v1, flip ? c2 : c1, flip ? u : t, null,
-						flip ? v1 : v2, flip ? c1 : c2, flip ? t : u, null);
+				addLocation(locations, include,
+						flip ? c2 : c1, flip ? u : t,
+						flip ? c1 : c2, flip ? t : u);
 			} else {
 				v1 = Curve.getPart(v1, tMinClip, tMaxClip);
 				if (tMaxClip - tMinClip > 0.8) {
@@ -15626,30 +19231,30 @@ return /******/ (function(modules) { // webpackBootstrap
 						var parts = Curve.subdivide(v1, 0.5),
 							t = (tMinNew + tMaxNew) / 2;
 						calls = addCurveIntersections(
-								v2, parts[0], c2, c1, locations, param,
-								uMin, uMax, tMinNew, t, !flip, recursion, calls);
+								v2, parts[0], c2, c1, locations, include, !flip,
+								recursion, calls, uMin, uMax, tMinNew, t);
 						calls = addCurveIntersections(
-								v2, parts[1], c2, c1, locations, param,
-								uMin, uMax, t, tMaxNew, !flip, recursion, calls);
+								v2, parts[1], c2, c1, locations, include, !flip,
+								recursion, calls, uMin, uMax, t, tMaxNew);
 					} else {
 						var parts = Curve.subdivide(v2, 0.5),
 							u = (uMin + uMax) / 2;
 						calls = addCurveIntersections(
-								parts[0], v1, c2, c1, locations, param,
-								uMin, u, tMinNew, tMaxNew, !flip, recursion, calls);
+								parts[0], v1, c2, c1, locations, include, !flip,
+								recursion, calls, uMin, u, tMinNew, tMaxNew);
 						calls = addCurveIntersections(
-								parts[1], v1, c2, c1, locations, param,
-								u, uMax, tMinNew, tMaxNew, !flip, recursion, calls);
+								parts[1], v1, c2, c1, locations, include, !flip,
+								recursion, calls, u, uMax, tMinNew, tMaxNew);
 					}
 				} else {
-					if (uMax - uMin >= 1e-10) {
+					if (uMax - uMin >= fatLineEpsilon) {
 						calls = addCurveIntersections(
-							v2, v1, c2, c1, locations, param,
-							uMin, uMax, tMinNew, tMaxNew, !flip, recursion, calls);
+								v2, v1, c2, c1, locations, include, !flip,
+								recursion, calls, uMin, uMax, tMinNew, tMaxNew);
 					} else {
 						calls = addCurveIntersections(
-							v1, v2, c1, c2, locations, param,
-							tMinNew, tMaxNew, uMin, uMax, flip, recursion, calls);
+								v1, v2, c1, c2, locations, include, flip,
+								recursion, calls, tMinNew, tMaxNew, uMin, uMax);
 					}
 				}
 			}
@@ -15704,248 +19309,253 @@ return /******/ (function(modules) { // webpackBootstrap
 			return null;
 		}
 	
-		function addCurveLineIntersections(v1, v2, c1, c2, locations, param) {
-			var flip = Curve.isStraight(v1),
-				vc = flip ? v2 : v1,
-				vl = flip ? v1 : v2,
-				lx1 = vl[0], ly1 = vl[1],
-				lx2 = vl[6], ly2 = vl[7],
-				ldx = lx2 - lx1,
-				ldy = ly2 - ly1,
-				angle = Math.atan2(-ldy, ldx),
+		function getCurveLineIntersections(v, px, py, vx, vy) {
+			var isZero = Numerical.isZero;
+			if (isZero(vx) && isZero(vy)) {
+				var t = Curve.getTimeOf(v, new Point(px, py));
+				return t === null ? [] : [t];
+			}
+			var angle = Math.atan2(-vy, vx),
 				sin = Math.sin(angle),
 				cos = Math.cos(angle),
-				rvc = [];
-			for(var i = 0; i < 8; i += 2) {
-				var x = vc[i] - lx1,
-					y = vc[i + 1] - ly1;
-				rvc.push(
+				rv = [],
+				roots = [];
+			for (var i = 0; i < 8; i += 2) {
+				var x = v[i] - px,
+					y = v[i + 1] - py;
+				rv.push(
 					x * cos - y * sin,
 					x * sin + y * cos);
 			}
-			var roots = [],
-				count = Curve.solveCubic(rvc, 1, 0, roots, 0, 1);
-			for (var i = 0; i < count; i++) {
-				var tc = roots[i],
-					pc = Curve.getPoint(vc, tc),
-					tl = Curve.getTimeOf(vl, pc);
-				if (tl !== null) {
-					var pl = Curve.getPoint(vl, tl),
-						t1 = flip ? tl : tc,
-						t2 = flip ? tc : tl;
-					if (!param.excludeEnd || t2 > Numerical.CURVETIME_EPSILON) {
-						addLocation(locations, param,
-								v1, c1, t1, flip ? pl : pc,
-								v2, c2, t2, flip ? pc : pl);
-					}
+			Curve.solveCubic(rv, 1, 0, roots, 0, 1);
+			return roots;
+		}
+	
+		function addCurveLineIntersections(v1, v2, c1, c2, locations, include,
+				flip) {
+			var x1 = v2[0], y1 = v2[1],
+				x2 = v2[6], y2 = v2[7],
+				roots = getCurveLineIntersections(v1, x1, y1, x2 - x1, y2 - y1);
+			for (var i = 0, l = roots.length; i < l; i++) {
+				var t1 = roots[i],
+					p1 = Curve.getPoint(v1, t1),
+					t2 = Curve.getTimeOf(v2, p1);
+				if (t2 !== null) {
+					addLocation(locations, include,
+							flip ? c2 : c1, flip ? t2 : t1,
+							flip ? c1 : c2, flip ? t1 : t2);
 				}
 			}
 		}
 	
-		function addLineIntersection(v1, v2, c1, c2, locations, param) {
+		function addLineIntersection(v1, v2, c1, c2, locations, include) {
 			var pt = Line.intersect(
 					v1[0], v1[1], v1[6], v1[7],
 					v2[0], v2[1], v2[6], v2[7]);
 			if (pt) {
-				addLocation(locations, param, v1, c1, null, pt, v2, c2, null, pt);
+				addLocation(locations, include,
+						c1, Curve.getTimeOf(v1, pt),
+						c2, Curve.getTimeOf(v2, pt));
 			}
 		}
 	
-		return { statics: {
-			_getIntersections: function(v1, v2, c1, c2, locations, param) {
-				if (!v2) {
-					return Curve._getSelfIntersection(v1, c1, locations, param);
-				}
-				var epsilon = 1e-7,
-					c1p1x = v1[0], c1p1y = v1[1],
-					c1p2x = v1[6], c1p2y = v1[7],
-					c2p1x = v2[0], c2p1y = v2[1],
-					c2p2x = v2[6], c2p2y = v2[7],
-					c1s1x = (3 * v1[2] + c1p1x) / 4,
-					c1s1y = (3 * v1[3] + c1p1y) / 4,
-					c1s2x = (3 * v1[4] + c1p2x) / 4,
-					c1s2y = (3 * v1[5] + c1p2y) / 4,
-					c2s1x = (3 * v2[2] + c2p1x) / 4,
-					c2s1y = (3 * v2[3] + c2p1y) / 4,
-					c2s2x = (3 * v2[4] + c2p2x) / 4,
-					c2s2y = (3 * v2[5] + c2p2y) / 4,
-					min = Math.min,
-					max = Math.max;
-				if (!(  max(c1p1x, c1s1x, c1s2x, c1p2x) + epsilon >
-						min(c2p1x, c2s1x, c2s2x, c2p2x) &&
-						min(c1p1x, c1s1x, c1s2x, c1p2x) - epsilon <
-						max(c2p1x, c2s1x, c2s2x, c2p2x) &&
-						max(c1p1y, c1s1y, c1s2y, c1p2y) + epsilon >
-						min(c2p1y, c2s1y, c2s2y, c2p2y) &&
-						min(c1p1y, c1s1y, c1s2y, c1p2y) - epsilon <
-						max(c2p1y, c2s1y, c2s2y, c2p2y)))
-					return locations;
-				var overlaps = Curve.getOverlaps(v1, v2);
+		function getCurveIntersections(v1, v2, c1, c2, locations, include) {
+			var epsilon = 1e-12,
+				min = Math.min,
+				max = Math.max;
+	
+			if (max(v1[0], v1[2], v1[4], v1[6]) + epsilon >
+				min(v2[0], v2[2], v2[4], v2[6]) &&
+				min(v1[0], v1[2], v1[4], v1[6]) - epsilon <
+				max(v2[0], v2[2], v2[4], v2[6]) &&
+				max(v1[1], v1[3], v1[5], v1[7]) + epsilon >
+				min(v2[1], v2[3], v2[5], v2[7]) &&
+				min(v1[1], v1[3], v1[5], v1[7]) - epsilon <
+				max(v2[1], v2[3], v2[5], v2[7])) {
+				var overlaps = getOverlaps(v1, v2);
 				if (overlaps) {
 					for (var i = 0; i < 2; i++) {
 						var overlap = overlaps[i];
-						addLocation(locations, param,
-							v1, c1, overlap[0], null,
-							v2, c2, overlap[1], null, true);
+						addLocation(locations, include,
+								c1, overlap[0],
+								c2, overlap[1], true);
 					}
-					return locations;
-				}
-	
-				var straight1 = Curve.isStraight(v1),
-					straight2 = Curve.isStraight(v2),
-					straight = straight1 && straight2,
-					before = locations.length;
-				(straight
-					? addLineIntersection
-					: straight1 || straight2
-						? addCurveLineIntersections
-						: addCurveIntersections)(
-							v1, v2, c1, c2, locations, param,
-							0, 1, 0, 1, 0, 0, 0);
-				if (straight && locations.length > before)
-					return locations;
-				var c1p1 = new Point(c1p1x, c1p1y),
-					c1p2 = new Point(c1p2x, c1p2y),
-					c2p1 = new Point(c2p1x, c2p1y),
-					c2p2 = new Point(c2p2x, c2p2y);
-				if (c1p1.isClose(c2p1, epsilon))
-					addLocation(locations, param, v1, c1, 0, c1p1, v2, c2, 0, c2p1);
-				if (!param.excludeStart && c1p1.isClose(c2p2, epsilon))
-					addLocation(locations, param, v1, c1, 0, c1p1, v2, c2, 1, c2p2);
-				if (!param.excludeEnd && c1p2.isClose(c2p1, epsilon))
-					addLocation(locations, param, v1, c1, 1, c1p2, v2, c2, 0, c2p1);
-				if (c1p2.isClose(c2p2, epsilon))
-					addLocation(locations, param, v1, c1, 1, c1p2, v2, c2, 1, c2p2);
-				return locations;
-			},
-	
-			_getSelfIntersection: function(v1, c1, locations, param) {
-				var p1x = v1[0], p1y = v1[1],
-					h1x = v1[2], h1y = v1[3],
-					h2x = v1[4], h2y = v1[5],
-					p2x = v1[6], p2y = v1[7];
-				var line = new Line(p1x, p1y, p2x, p2y, false),
-					side1 = line.getSide(new Point(h1x, h1y), true),
-					side2 = line.getSide(new Point(h2x, h2y), true);
-				if (side1 === side2) {
-					var edgeSum = (p1x - h2x) * (h1y - p2y)
-								+ (h1x - p2x) * (h2y - p1y);
-					if (edgeSum * side1 > 0)
-						return locations;
-				}
-				var ax = p2x - 3 * h2x + 3 * h1x - p1x,
-					bx = h2x - 2 * h1x + p1x,
-					cx = h1x - p1x,
-					ay = p2y - 3 * h2y + 3 * h1y - p1y,
-					by = h2y - 2 * h1y + p1y,
-					cy = h1y - p1y,
-					ac = ay * cx - ax * cy,
-					ab = ay * bx - ax * by,
-					bc = by * cx - bx * cy;
-				if (ac * ac - 4 * ab * bc < 0) {
-					var roots = [],
-						tSplit,
-						count = Numerical.solveCubic(
-								ax * ax  + ay * ay,
-								3 * (ax * bx + ay * by),
-								2 * (bx * bx + by * by) + ax * cx + ay * cy,
-								bx * cx + by * cy,
-								roots, 0, 1);
-					if (count > 0) {
-						for (var i = 0, maxCurvature = 0; i < count; i++) {
-							var curvature = Math.abs(
-									c1.getCurvatureAtTime(roots[i]));
-							if (curvature > maxCurvature) {
-								maxCurvature = curvature;
-								tSplit = roots[i];
+				} else {
+					var straight1 = Curve.isStraight(v1),
+						straight2 = Curve.isStraight(v2),
+						straight = straight1 && straight2,
+						flip = straight1 && !straight2,
+						before = locations.length;
+					(straight
+						? addLineIntersection
+						: straight1 || straight2
+							? addCurveLineIntersections
+							: addCurveIntersections)(
+								flip ? v2 : v1, flip ? v1 : v2,
+								flip ? c2 : c1, flip ? c1 : c2,
+								locations, include, flip,
+								0, 0, 0, 1, 0, 1);
+					if (!straight || locations.length === before) {
+						for (var i = 0; i < 4; i++) {
+							var t1 = i >> 1,
+								t2 = i & 1,
+								i1 = t1 * 6,
+								i2 = t2 * 6,
+								p1 = new Point(v1[i1], v1[i1 + 1]),
+								p2 = new Point(v2[i2], v2[i2 + 1]);
+							if (p1.isClose(p2, epsilon)) {
+								addLocation(locations, include,
+										c1, t1,
+										c2, t2);
 							}
 						}
-						var parts = Curve.subdivide(v1, tSplit);
-						param.excludeEnd = true;
-						param.renormalize = function(t1, t2) {
-							return [t1 * tSplit, t2 * (1 - tSplit) + tSplit];
-						};
-						Curve._getIntersections(parts[0], parts[1], c1, c1,
-								locations, param);
 					}
 				}
-				return locations;
+			}
+			return locations;
+		}
+	
+		function getLoopIntersection(v1, c1, locations, include) {
+			var info = Curve.classify(v1);
+			if (info.type === 'loop') {
+				var roots = info.roots;
+				addLocation(locations, include,
+						c1, roots[0],
+						c1, roots[1]);
+			}
+		  return locations;
+		}
+	
+		function getIntersections(curves1, curves2, include, matrix1, matrix2,
+				_returnFirst) {
+			var self = !curves2;
+			if (self)
+				curves2 = curves1;
+			var length1 = curves1.length,
+				length2 = curves2.length,
+				values2 = [],
+				arrays = [],
+				locations,
+				current;
+			for (var i = 0; i < length2; i++)
+				values2[i] = curves2[i].getValues(matrix2);
+			for (var i = 0; i < length1; i++) {
+				var curve1 = curves1[i],
+					values1 = self ? values2[i] : curve1.getValues(matrix1),
+					path1 = curve1.getPath();
+				if (path1 !== current) {
+					current = path1;
+					locations = [];
+					arrays.push(locations);
+				}
+				if (self) {
+					getLoopIntersection(values1, curve1, locations, include);
+				}
+				for (var j = self ? i + 1 : 0; j < length2; j++) {
+					if (_returnFirst && locations.length)
+						return locations;
+					getCurveIntersections(values1, values2[j], curve1, curves2[j],
+							locations, include);
+				}
+			}
+			locations = [];
+			for (var i = 0, l = arrays.length; i < l; i++) {
+				locations.push.apply(locations, arrays[i]);
+			}
+			return locations;
+		}
+	
+		function getOverlaps(v1, v2) {
+	
+			function getSquaredLineLength(v) {
+				var x = v[6] - v[0],
+					y = v[7] - v[1];
+				return x * x + y * y;
+			}
+	
+			var abs = Math.abs,
+				getDistance = Line.getDistance,
+				timeEpsilon = 1e-8,
+				geomEpsilon = 1e-7,
+				straight1 = Curve.isStraight(v1),
+				straight2 = Curve.isStraight(v2),
+				straightBoth = straight1 && straight2,
+				flip = getSquaredLineLength(v1) < getSquaredLineLength(v2),
+				l1 = flip ? v2 : v1,
+				l2 = flip ? v1 : v2,
+				px = l1[0], py = l1[1],
+				vx = l1[6] - px, vy = l1[7] - py;
+			if (getDistance(px, py, vx, vy, l2[0], l2[1], true) < geomEpsilon &&
+				getDistance(px, py, vx, vy, l2[6], l2[7], true) < geomEpsilon) {
+				if (!straightBoth &&
+					getDistance(px, py, vx, vy, l1[2], l1[3], true) < geomEpsilon &&
+					getDistance(px, py, vx, vy, l1[4], l1[5], true) < geomEpsilon &&
+					getDistance(px, py, vx, vy, l2[2], l2[3], true) < geomEpsilon &&
+					getDistance(px, py, vx, vy, l2[4], l2[5], true) < geomEpsilon) {
+					straight1 = straight2 = straightBoth = true;
+				}
+			} else if (straightBoth) {
+				return null;
+			}
+			if (straight1 ^ straight2) {
+				return null;
+			}
+	
+			var v = [v1, v2],
+				pairs = [];
+			for (var i = 0; i < 4 && pairs.length < 2; i++) {
+				var i1 = i & 1,
+					i2 = i1 ^ 1,
+					t1 = i >> 1,
+					t2 = Curve.getTimeOf(v[i1], new Point(
+						v[i2][t1 ? 6 : 0],
+						v[i2][t1 ? 7 : 1]));
+				if (t2 != null) {
+					var pair = i1 ? [t1, t2] : [t2, t1];
+					if (!pairs.length ||
+						abs(pair[0] - pairs[0][0]) > timeEpsilon &&
+						abs(pair[1] - pairs[0][1]) > timeEpsilon) {
+						pairs.push(pair);
+					}
+				}
+				if (i > 2 && !pairs.length)
+					break;
+			}
+			if (pairs.length !== 2) {
+				pairs = null;
+			} else if (!straightBoth) {
+				var o1 = Curve.getPart(v1, pairs[0][0], pairs[1][0]),
+					o2 = Curve.getPart(v2, pairs[0][1], pairs[1][1]);
+				if (abs(o2[2] - o1[2]) > geomEpsilon ||
+					abs(o2[3] - o1[3]) > geomEpsilon ||
+					abs(o2[4] - o1[4]) > geomEpsilon ||
+					abs(o2[5] - o1[5]) > geomEpsilon)
+					pairs = null;
+			}
+			return pairs;
+		}
+	
+		return {
+			getIntersections: function(curve) {
+				var v1 = this.getValues(),
+					v2 = curve && curve !== this && curve.getValues();
+				return v2 ? getCurveIntersections(v1, v2, this, curve, [])
+						  : getLoopIntersection(v1, this, []);
 			},
 	
-			getOverlaps: function(v1, v2) {
-				var abs = Math.abs,
-					timeEpsilon = 4e-7,
-					geomEpsilon = 1e-7,
-					straight1 = Curve.isStraight(v1),
-					straight2 = Curve.isStraight(v2),
-					straightBoth = straight1 && straight2;
-	
-				function getSquaredLineLength(v) {
-					var x = v[6] - v[0],
-						y = v[7] - v[1];
-					return x * x + y * y;
-				}
-	
-				var flip = getSquaredLineLength(v1) < getSquaredLineLength(v2),
-					l1 = flip ? v2 : v1,
-					l2 = flip ? v1 : v2,
-					line = new Line(l1[0], l1[1], l1[6], l1[7]);
-				if (line.getDistance(new Point(l2[0], l2[1])) < geomEpsilon &&
-					line.getDistance(new Point(l2[6], l2[7])) < geomEpsilon) {
-					if (!straightBoth &&
-						line.getDistance(new Point(l1[2], l1[3])) < geomEpsilon &&
-						line.getDistance(new Point(l1[4], l1[5])) < geomEpsilon &&
-						line.getDistance(new Point(l2[2], l2[3])) < geomEpsilon &&
-						line.getDistance(new Point(l2[4], l2[5])) < geomEpsilon) {
-						straight1 = straight2 = straightBoth = true;
-					}
-				} else if (straightBoth) {
-					return null;
-				}
-				if (straight1 ^ straight2) {
-					return null;
-				}
-	
-				var v = [v1, v2],
-					pairs = [];
-				for (var i = 0, t1 = 0;
-						i < 2 && pairs.length < 2;
-						i += t1 === 0 ? 0 : 1, t1 = t1 ^ 1) {
-					var t2 = Curve.getTimeOf(v[i ^ 1], new Point(
-							v[i][t1 === 0 ? 0 : 6],
-							v[i][t1 === 0 ? 1 : 7]));
-					if (t2 != null) {
-						var pair = i === 0 ? [t1, t2] : [t2, t1];
-						if (!pairs.length ||
-							abs(pair[0] - pairs[0][0]) > timeEpsilon &&
-							abs(pair[1] - pairs[0][1]) > timeEpsilon)
-							pairs.push(pair);
-					}
-					if (i === 1 && !pairs.length)
-						break;
-				}
-				if (pairs.length !== 2) {
-					pairs = null;
-				} else if (!straightBoth) {
-					var o1 = Curve.getPart(v1, pairs[0][0], pairs[1][0]),
-						o2 = Curve.getPart(v2, pairs[0][1], pairs[1][1]);
-					if (abs(o2[2] - o1[2]) > geomEpsilon ||
-						abs(o2[3] - o1[3]) > geomEpsilon ||
-						abs(o2[4] - o1[4]) > geomEpsilon ||
-						abs(o2[5] - o1[5]) > geomEpsilon)
-						pairs = null;
-				}
-				return pairs;
+			statics: {
+				getOverlaps: getOverlaps,
+				getIntersections: getIntersections,
+				getCurveLineIntersections: getCurveLineIntersections
 			}
-		}};
+		};
 	});
 	
 	var CurveLocation = Base.extend({
 		_class: 'CurveLocation',
-		beans: true,
 	
 		initialize: function CurveLocation(curve, time, point, _overlap, _distance) {
-			if (time > 0.9999996) {
+			if (time >= 0.99999999) {
 				var next = curve.getNext();
 				if (next) {
 					time = 0;
@@ -15978,10 +19588,10 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		getSegment: function() {
-			var curve = this.getCurve(),
-				segment = this._segment;
+			var segment = this._segment;
 			if (!segment) {
-				var time = this.getTime();
+				var curve = this.getCurve(),
+					time = this.getTime();
 				if (time === 0) {
 					segment = curve._segment1;
 				} else if (time === 1) {
@@ -16001,15 +19611,13 @@ return /******/ (function(modules) { // webpackBootstrap
 			var path = this._path,
 				that = this;
 			if (path && path._version !== this._version) {
-				this._time = this._curve = this._offset = null;
+				this._time = this._offset = this._curveOffset = this._curve = null;
 			}
 	
 			function trySegment(segment) {
 				var curve = segment && segment.getCurve();
-				if (curve && (that._time = curve.getTimeOf(that._point))
-						!= null) {
+				if (curve && (that._time = curve.getTimeOf(that._point)) != null) {
 					that._setCurve(curve);
-					that._segment = segment;
 					return curve;
 				}
 			}
@@ -16061,9 +19669,14 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		getCurveOffset: function() {
-			var curve = this.getCurve(),
-				time = this.getTime();
-			return time != null && curve && curve.getPartLength(0, time);
+			var offset = this._curveOffset;
+			if (offset == null) {
+				var curve = this.getCurve(),
+					time = this.getTime();
+				this._curveOffset = offset = time != null && curve
+						&& curve.getPartLength(0, time);
+			}
+			return offset;
 		},
 	
 		getIntersection: function() {
@@ -16076,41 +19689,40 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		divide: function() {
 			var curve = this.getCurve(),
-				res = null;
-			if (curve) {
-				res = curve.divideAtTime(this.getTime());
-				if (res)
-					this._setSegment(res._segment1);
+				res = curve && curve.divideAtTime(this.getTime());
+			if (res) {
+				this._setSegment(res._segment1);
 			}
 			return res;
 		},
 	
 		split: function() {
-			var curve = this.getCurve();
-			return curve ? curve.splitAtTime(this.getTime()) : null;
+			var curve = this.getCurve(),
+				path = curve._path,
+				res = curve && curve.splitAtTime(this.getTime());
+			if (res) {
+				this._setSegment(path.getLastSegment());
+			}
+			return  res;
 		},
 	
 		equals: function(loc, _ignoreOther) {
-			var res = this === loc,
-				epsilon = 1e-7;
-			if (!res && loc instanceof CurveLocation
-					&& this.getPath() === loc.getPath()
-					&& this.getPoint().isClose(loc.getPoint(), epsilon)) {
+			var res = this === loc;
+			if (!res && loc instanceof CurveLocation) {
 				var c1 = this.getCurve(),
 					c2 = loc.getCurve(),
-					abs = Math.abs,
-					diff = abs(
-						((c1.isLast() && c2.isFirst() ? -1 : c1.getIndex())
-								+ this.getTime()) -
-						((c2.isLast() && c1.isFirst() ? -1 : c2.getIndex())
-								+ loc.getTime()));
-				res = (diff < 4e-7
-					|| ((diff = abs(this.getOffset() - loc.getOffset())) < epsilon
-						|| abs(this.getPath().getLength() - diff) < epsilon))
-					&& (_ignoreOther
-						|| (!this._intersection && !loc._intersection
-							|| this._intersection && this._intersection.equals(
-									loc._intersection, true)));
+					p1 = c1._path,
+					p2 = c2._path;
+				if (p1 === p2) {
+					var abs = Math.abs,
+						epsilon = 1e-7,
+						diff = abs(this.getOffset() - loc.getOffset()),
+						i1 = !_ignoreOther && this._intersection,
+						i2 = !_ignoreOther && loc._intersection;
+					res = (diff < epsilon
+							|| p1 && abs(p1.getLength() - diff) < epsilon)
+						&& (!i1 && !i2 || i1 && i2 && i1.equals(i2, true));
+				}
 			}
 			return res;
 		},
@@ -16149,22 +19761,34 @@ return /******/ (function(modules) { // webpackBootstrap
 				return false;
 			var t1 = this.getTime(),
 				t2 = inter.getTime(),
-				tMin = 4e-7,
+				tMin = 1e-8,
 				tMax = 1 - tMin,
-				t1Inside = t1 > tMin && t1 < tMax,
-				t2Inside = t2 > tMin && t2 < tMax;
+				t1Inside = t1 >= tMin && t1 <= tMax,
+				t2Inside = t2 >= tMin && t2 <= tMax;
 			if (t1Inside && t2Inside)
 				return !this.isTouching();
 			var c2 = this.getCurve(),
-				c1 = t1 <= tMin ? c2.getPrevious() : c2,
+				c1 = t1 < tMin ? c2.getPrevious() : c2,
 				c4 = inter.getCurve(),
-				c3 = t2 <= tMin ? c4.getPrevious() : c4;
-			if (t1 >= tMax)
+				c3 = t2 < tMin ? c4.getPrevious() : c4;
+			if (t1 > tMax)
 				c2 = c2.getNext();
-			if (t2 >= tMax)
+			if (t2 > tMax)
 				c4 = c4.getNext();
 			if (!c1 || !c2 || !c3 || !c4)
 				return false;
+	
+			var offsets = [];
+	
+			function addOffsets(curve, end) {
+				var v = curve.getValues(),
+					roots = Curve.classify(v).roots || Curve.getPeaks(v),
+					count = roots.length,
+					t = end && count > 1 ? roots[count - 1]
+							: count > 0 ? roots[0]
+							: 0.5;
+				offsets.push(Curve.getLength(v, end ? t : 0, end ? 1 : t) / 2);
+			}
 	
 			function isInRange(angle, min, max) {
 				return min < max
@@ -16172,13 +19796,16 @@ return /******/ (function(modules) { // webpackBootstrap
 						: angle > min || angle < max;
 			}
 	
-			var lenghts = [];
-			if (!t1Inside)
-				lenghts.push(c1.getLength(), c2.getLength());
-			if (!t2Inside)
-				lenghts.push(c3.getLength(), c4.getLength());
+			if (!t1Inside) {
+				addOffsets(c1, true);
+				addOffsets(c2, false);
+			}
+			if (!t2Inside) {
+				addOffsets(c3, true);
+				addOffsets(c4, false);
+			}
 			var pt = this.getPoint(),
-				offset = Math.min.apply(Math, lenghts) / 64,
+				offset = Math.min.apply(Math, offsets),
 				v2 = t1Inside ? c2.getTangentAtTime(t1)
 						: c2.getPointAt(offset).subtract(pt),
 				v1 = t1Inside ? v2.negate()
@@ -16280,7 +19907,6 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		statics: {
-	
 			create: function(arg) {
 				var data,
 					segments,
@@ -16437,7 +20063,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					this.getBounds({ internal: true, handle: true }))
 						? this._getWinding(point)
 						: {};
-			return !!(this.getFillRule() === 'evenodd'
+			return winding.onPath || !!(this.getFillRule() === 'evenodd'
 					? winding.windingL & 1 || winding.windingR & 1
 					: winding.winding);
 		},
@@ -16447,58 +20073,17 @@ return /******/ (function(modules) { // webpackBootstrap
 				matrix1 = this._matrix._orNullIfIdentity(),
 				matrix2 = self ? matrix1
 					: (_matrix || path._matrix)._orNullIfIdentity();
-			if (!self && !this.getBounds(matrix1).touches(path.getBounds(matrix2)))
-				return [];
-			var curves1 = this.getCurves(),
-				curves2 = self ? curves1 : path.getCurves(),
-				length1 = curves1.length,
-				length2 = self ? length1 : curves2.length,
-				values2 = [],
-				arrays = [],
-				locations,
-				path;
-			for (var i = 0; i < length2; i++)
-				values2[i] = curves2[i].getValues(matrix2);
-			for (var i = 0; i < length1; i++) {
-				var curve1 = curves1[i],
-					values1 = self ? values2[i] : curve1.getValues(matrix1),
-					path1 = curve1.getPath();
-				if (path1 !== path) {
-					path = path1;
-					locations = [];
-					arrays.push(locations);
-				}
-				if (self) {
-					Curve._getSelfIntersection(values1, curve1, locations, {
-						include: include,
-						excludeStart: length1 === 1 &&
-								curve1.getPoint1().equals(curve1.getPoint2())
-					});
-				}
-				for (var j = self ? i + 1 : 0; j < length2; j++) {
-					if (_returnFirst && locations.length)
-						return locations;
-					var curve2 = curves2[j];
-					Curve._getIntersections(
-						values1, values2[j], curve1, curve2, locations,
-						{
-							include: include,
-							excludeStart: self && curve1.getPrevious() === curve2,
-							excludeEnd: self && curve1.getNext() === curve2
-						}
-					);
-				}
-			}
-			locations = [];
-			for (var i = 0, l = arrays.length; i < l; i++) {
-				locations.push.apply(locations, arrays[i]);
-			}
-			return locations;
+			return self || this.getBounds(matrix1).intersects(
+					path.getBounds(matrix2), 1e-12)
+					? Curve.getIntersections(
+							this.getCurves(), !self && path.getCurves(), include,
+							matrix1, matrix2, _returnFirst)
+					: [];
 		},
 	
 		getCrossings: function(path) {
 			return this.getIntersections(path, function(inter) {
-				return inter._overlap || inter.isCrossing();
+				return inter.hasOverlap() || inter.isCrossing();
 			});
 		},
 	
@@ -16555,11 +20140,11 @@ return /******/ (function(modules) { // webpackBootstrap
 			var ok = false;
 			if (path) {
 				var paths1 = this._children || [this],
-					paths2 = path._children.slice() || [path],
+					paths2 = path._children ? path._children.slice() : [path],
 					length1 = paths1.length,
 					length2 = paths2.length,
 					matched = [],
-					count;
+					count = 0;
 				ok = true;
 				for (var i1 = length1 - 1; i1 >= 0 && ok; i1--) {
 					var path1 = paths1[i1];
@@ -16993,14 +20578,21 @@ return /******/ (function(modules) { // webpackBootstrap
 				this.setSelected(true);
 		},
 	
+		divideAt: function(location) {
+			var loc = this.getLocationAt(location),
+				curve;
+			return loc && (curve = loc.getCurve().divideAt(loc.getCurveOffset()))
+					? curve._segment1
+					: null;
+		},
+	
 		splitAt: function(location) {
-			var loc = typeof location === 'number'
-					? this.getLocationAt(location) : location,
+			var loc = this.getLocationAt(location),
 				index = loc && loc.index,
 				time = loc && loc.time,
-				tMin = 4e-7,
+				tMin = 1e-8,
 				tMax = 1 - tMin;
-			if (time >= tMax) {
+			if (time > tMax) {
 				index++;
 				time = 0;
 			}
@@ -17080,7 +20672,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				tolerance = simplify ? 1e-7 : 0;
 			for (var i = curves.length - 1; i >= 0; i--) {
 				var curve = curves[i];
-				if (!curve.hasHandles() && (curve.getLength() < tolerance
+				if (!curve.hasHandles() && (!curve.hasLength(tolerance)
 						|| simplify && curve.isCollinear(curve.getNext())))
 					curve.remove();
 			}
@@ -17334,7 +20926,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				length1 = curves1.length,
 				length2 = curves2.length;
 			if (!length1 || !length2) {
-				return length1 ^ length2;
+				return length1 == length2;
 			}
 			var v1 = curves1[0].getValues(),
 				values2 = [],
@@ -17351,7 +20943,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 			}
 			var abs = Math.abs,
-				epsilon = 4e-7,
+				epsilon = 1e-8,
 				v2 = values2[pos2],
 				start2;
 			while (v1 && v2) {
@@ -17408,7 +21000,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				if (strokeRadius > 0) {
 					join = style.getStrokeJoin();
 					cap = style.getStrokeCap();
-					miterLimit = strokeRadius * style.getMiterLimit();
+					miterLimit = style.getMiterLimit();
 					strokePadding = strokePadding.add(
 						Path._getStrokePadding(strokeRadius, strokeMatrix));
 				} else {
@@ -17447,15 +21039,18 @@ return /******/ (function(modules) { // webpackBootstrap
 			}
 	
 			function checkSegmentStroke(segment) {
-				if (join !== 'round' || cap !== 'round') {
+				var isJoin = closed || segment._index > 0
+						&& segment._index < numSegments - 1;
+				if ((isJoin ? join : cap) === 'round') {
+					return isCloseEnough(segment._point, strokePadding);
+				} else {
 					area = new Path({ internal: true, closed: true });
-					if (closed || segment._index > 0
-							&& segment._index < numSegments - 1) {
-						if (join !== 'round' && (segment._handleIn.isZero()
-								|| segment._handleOut.isZero()))
+					if (isJoin) {
+						if (!segment.isSmooth()) {
 							Path._addBevelJoin(segment, join, strokeRadius,
 								   miterLimit, null, strokeMatrix, addToArea, true);
-					} else if (cap !== 'round') {
+						}
+					} else if (cap === 'square') {
 						Path._addSquareCap(segment, cap, strokeRadius, null,
 								strokeMatrix, addToArea, true);
 					}
@@ -17466,7 +21061,6 @@ return /******/ (function(modules) { // webpackBootstrap
 								&& isCloseEnough(loc.getPoint(), tolerancePadding);
 					}
 				}
-				return isCloseEnough(segment._point, strokePadding);
 			}
 	
 			if (options.ends && !options.segments && !closed) {
@@ -17492,7 +21086,8 @@ return /******/ (function(modules) { // webpackBootstrap
 				if (!loc && join === 'miter' && numSegments > 1) {
 					for (var i = 0; i < numSegments; i++) {
 						var segment = segments[i];
-						if (point.getDistance(segment._point) <= miterLimit
+						if (point.getDistance(segment._point)
+								<= miterLimit * strokeRadius
 								&& checkSegmentStroke(segment)) {
 							loc = segment.getLocation();
 							break;
@@ -17538,18 +21133,23 @@ return /******/ (function(modules) { // webpackBootstrap
 		},
 	
 		getLocationAt: function(offset) {
-			var curves = this.getCurves(),
-				length = 0;
-			for (var i = 0, l = curves.length; i < l; i++) {
-				var start = length,
-					curve = curves[i];
-				length += curve.getLength();
-				if (length > offset) {
-					return curve.getLocationAt(offset - start);
+			if (typeof offset === 'number') {
+				var curves = this.getCurves(),
+					length = 0;
+				for (var i = 0, l = curves.length; i < l; i++) {
+					var start = length,
+						curve = curves[i];
+					length += curve.getLength();
+					if (length > offset) {
+						return curve.getLocationAt(offset - start);
+					}
 				}
+				if (curves.length > 0 && offset <= this.getLength()) {
+					return new CurveLocation(curves[curves.length - 1], 1);
+				}
+			} else if (offset && offset.getPath && offset.getPath() === this) {
+				return offset;
 			}
-			if (curves.length > 0 && offset <= this.getLength())
-				return new CurveLocation(curves[curves.length - 1], 1);
 			return null;
 		}
 	
@@ -17776,7 +21376,9 @@ return /******/ (function(modules) { // webpackBootstrap
 			},
 	
 			arcTo: function() {
-				var current = getCurrentSegment(this),
+				var abs = Math.abs,
+					sqrt = Math.sqrt,
+					current = getCurrentSegment(this),
 					from = current._point,
 					to = Point.read(arguments),
 					through,
@@ -17802,14 +21404,13 @@ return /******/ (function(modules) { // webpackBootstrap
 						pt = from.subtract(middle).rotate(-rotation),
 						x = pt.x,
 						y = pt.y,
-						abs = Math.abs,
 						rx = abs(radius.width),
 						ry = abs(radius.height),
 						rxSq = rx * rx,
 						rySq = ry * ry,
 						xSq = x * x,
 						ySq = y * y;
-					var factor = Math.sqrt(xSq / rxSq + ySq / rySq);
+					var factor = sqrt(xSq / rxSq + ySq / rySq);
 					if (factor > 1) {
 						rx *= factor;
 						ry *= factor;
@@ -17824,8 +21425,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						throw new Error(
 								'Cannot create an arc with the given arguments');
 					center = new Point(rx * y / ry, -ry * x / rx)
-							.multiply((large === clockwise ? -1 : 1)
-								* Math.sqrt(factor))
+							.multiply((large === clockwise ? -1 : 1) * sqrt(factor))
 							.rotate(rotation).add(middle);
 					matrix = new Matrix().translate(center).rotate(rotation)
 							.scale(rx, ry);
@@ -17854,13 +21454,14 @@ return /******/ (function(modules) { // webpackBootstrap
 					extent = vector.getDirectedAngle(to.subtract(center));
 					var centerSide = line.getSide(center);
 					if (centerSide === 0) {
-						extent = throughSide * Math.abs(extent);
+						extent = throughSide * abs(extent);
 					} else if (throughSide === centerSide) {
 						extent += extent < 0 ? 360 : -360;
 					}
 				}
-				var ext = Math.abs(extent),
-					count = ext >= 360 ? 4 : Math.ceil(ext / 90),
+				var epsilon = 1e-7,
+					ext = abs(extent),
+					count = ext >= 360 ? 4 : Math.ceil((ext - epsilon) / 90),
 					inc = extent / count,
 					half = inc * Math.PI / 360,
 					z = 4 / 3 * Math.sin(half) / (1 + Math.cos(half)),
@@ -17997,7 +21598,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			var strokeRadius = strokeWidth / 2,
 				join = style.getStrokeJoin(),
 				cap = style.getStrokeCap(),
-				miterLimit = strokeRadius * style.getMiterLimit(),
+				miterLimit = style.getMiterLimit(),
 				joinBounds = new Rectangle(new Size(strokePadding));
 	
 			function addPoint(point) {
@@ -18010,10 +21611,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			}
 	
 			function addJoin(segment, join) {
-				var handleIn = segment._handleIn,
-					handleOut = segment._handleOut;
-				if (join === 'round' || !handleIn.isZero() && !handleOut.isZero()
-						&& handleIn.isCollinear(handleOut)) {
+				if (join === 'round' || segment.isSmooth()) {
 					addRound(segment);
 				} else {
 					Path._addBevelJoin(segment, join, strokeRadius, miterLimit,
@@ -18072,24 +21670,19 @@ return /******/ (function(modules) { // webpackBootstrap
 				normal1 = normal1.negate();
 				normal2 = normal2.negate();
 			}
-			if (isArea) {
+			if (isArea)
 				addPoint(point);
-				addPoint(point.add(normal1));
-			}
+			addPoint(point.add(normal1));
 			if (join === 'miter') {
 				var corner = new Line(point.add(normal1),
 						new Point(-normal1.y, normal1.x), true
 					).intersect(new Line(point.add(normal2),
 						new Point(-normal2.y, normal2.x), true
 					), true);
-				if (corner && point.getDistance(corner) <= miterLimit) {
+				if (corner && point.getDistance(corner) <= miterLimit * radius) {
 					addPoint(corner);
-					if (!isArea)
-						return;
 				}
 			}
-			if (!isArea)
-				addPoint(point.add(normal1));
 			addPoint(point.add(normal2));
 		},
 	
@@ -18097,14 +21690,15 @@ return /******/ (function(modules) { // webpackBootstrap
 				addPoint, isArea) {
 			var point = segment._point.transform(matrix),
 				loc = segment.getLocation(),
-				normal = loc.getNormal().multiply(radius).transform(strokeMatrix);
-			if (isArea) {
-				addPoint(point.subtract(normal));
-				addPoint(point.add(normal));
-			}
+				normal = loc.getNormal()
+						.multiply(loc.getTime() === 0 ? radius : -radius)
+						.transform(strokeMatrix);
 			if (cap === 'square') {
-				point = point.add(normal.rotate(
-						loc.getTime() === 0 ? -90 : 90));
+				if (isArea) {
+					addPoint(point.subtract(normal));
+					addPoint(point.add(normal));
+				}
+				point = point.add(normal.rotate(-90));
 			}
 			addPoint(point.add(normal));
 			addPoint(point.subtract(normal));
@@ -18122,7 +21716,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				if (style.getStrokeJoin() === 'miter')
 					joinRadius = strokeRadius * style.getMiterLimit();
 				if (style.getStrokeCap() === 'square')
-					joinRadius = Math.max(joinRadius, strokeRadius * Math.sqrt(2));
+					joinRadius = Math.max(joinRadius, strokeRadius * Math.SQRT2);
 				strokePadding = Path._getStrokePadding(strokeRadius, strokeMatrix);
 				joinPadding = Path._getStrokePadding(joinRadius, strokeMatrix);
 			}
@@ -18166,10 +21760,10 @@ return /******/ (function(modules) { // webpackBootstrap
 	
 		function createPath(segments, closed, args) {
 			var props = Base.getNamed(args),
-				path = new Path(props && props.insert === false && Item.NO_INSERT);
+				path = new Path(props && props.insert == false && Item.NO_INSERT);
 			path._add(segments);
 			path._closed = closed;
-			return path.set(props);
+			return path.set(props, { insert: true });
 		}
 	
 		function createEllipse(center, radius, args) {
@@ -18249,7 +21843,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					through = Point.readNamed(arguments, 'through'),
 					to = Point.readNamed(arguments, 'to'),
 					props = Base.getNamed(arguments),
-					path = new Path(props && props.insert === false
+					path = new Path(props && props.insert == false
 							&& Item.NO_INSERT);
 				path.moveTo(from);
 				path.arcTo(through, to);
@@ -18509,26 +22103,26 @@ return /******/ (function(modules) { // webpackBootstrap
 			max = Math.max,
 			abs = Math.abs,
 			operators = {
-				unite:     { 1: true },
-				intersect: { 2: true },
-				subtract:  { 1: true },
-				exclude:   { 1: true }
+				unite:     { '1': true, '2': true },
+				intersect: { '2': true },
+				subtract:  { '1': true },
+				exclude:   { '1': true, '-1': true }
 			};
 	
 		function preparePath(path, resolve) {
 			var res = path.clone(false).reduce({ simplify: true })
 					.transform(null, true, true);
 			return resolve
-				? res.resolveCrossings().reorient(res.getFillRule() === 'nonzero')
-				: res;
+					? res.resolveCrossings().reorient(
+						res.getFillRule() === 'nonzero', true)
+					: res;
 		}
 	
-		function createResult(ctor, paths, reduce, path1, path2, options) {
-			var result = new ctor(Item.NO_INSERT);
+		function createResult(paths, simplify, path1, path2, options) {
+			var result = new CompoundPath(Item.NO_INSERT);
 			result.addChildren(paths, true);
-			if (reduce)
-				result = result.reduce({ simplify: true });
-			if (!(options && options.insert === false)) {
+			result = result.reduce({ simplify: simplify });
+			if (!(options && options.insert == false)) {
 				result.insertAbove(path2 && path1.isSibling(path2)
 						&& path1.getIndex() < path2.getIndex() ? path2 : path1);
 			}
@@ -18536,10 +22130,10 @@ return /******/ (function(modules) { // webpackBootstrap
 			return result;
 		}
 	
-		function computeBoolean(path1, path2, operation, options) {
-			if (options && options.stroke &&
+		function traceBoolean(path1, path2, operation, options) {
+			if (options && (options.trace == false || options.stroke) &&
 					/^(subtract|intersect)$/.test(operation))
-				return computeStrokeBoolean(path1, path2, operation === 'subtract');
+				return splitBoolean(path1, path2, operation);
 			var _path1 = preparePath(path1, true),
 				_path2 = path2 && path1 !== path2 && preparePath(path2, true),
 				operator = operators[operation];
@@ -18555,26 +22149,6 @@ return /******/ (function(modules) { // webpackBootstrap
 				curves = [],
 				paths;
 	
-			if (!crossings.length) {
-				var ok = true;
-				if (paths2) {
-					for (var i1 = 0, l1 = paths1.length; i1 < l1 && ok; i1++) {
-						var bounds1 = paths1[i1].getBounds();
-						for (var i2 = 0, l2 = paths2.length; i2 < l2 && ok; i2++) {
-							var bounds2 = paths2[i2].getBounds();
-							ok = !bounds1._containsRectangle(bounds2) &&
-								 !bounds2._containsRectangle(bounds1);
-						}
-					}
-				}
-				if (ok) {
-					paths = operator.unite || operator.exclude ? [_path1, _path2]
-							: operator.subtract ? [_path1]
-							: operator.intersect ? [new Path(Item.NO_INSERT)]
-							: null;
-				}
-			}
-	
 			function collect(paths) {
 				for (var i = 0, l = paths.length; i < l; i++) {
 					var path = paths[i];
@@ -18584,7 +22158,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 			}
 	
-			if (!paths) {
+			if (crossings.length) {
 				collect(paths1);
 				if (paths2)
 					collect(paths2);
@@ -18595,29 +22169,39 @@ return /******/ (function(modules) { // webpackBootstrap
 				for (var i = 0, l = segments.length; i < l; i++) {
 					var segment = segments[i],
 						inter = segment._intersection;
-					if (segment._winding == null) {
+					if (!segment._winding) {
 						propagateWinding(segment, _path1, _path2, curves, operator);
 					}
 					if (!(inter && inter._overlap))
 						segment._path._overlapsOnly = false;
 				}
 				paths = tracePaths(segments, operator);
+			} else {
+				paths = reorientPaths(
+						paths2 ? paths1.concat(paths2) : paths1.slice(),
+						function(w) {
+							return !!operator[w];
+						});
 			}
 	
-			return createResult(CompoundPath, paths, true, path1, path2, options);
+			return createResult(paths, true, path1, path2, options);
 		}
 	
-		function computeStrokeBoolean(path1, path2, subtract) {
+		function splitBoolean(path1, path2, operation) {
 			var _path1 = preparePath(path1),
 				_path2 = preparePath(path2),
 				crossings = _path1.getCrossings(_path2),
+				subtract = operation === 'subtract',
+				divide = operation === 'divide',
+				added = {},
 				paths = [];
 	
 			function addPath(path) {
-				if (_path2.contains(path.getPointAt(path.getLength() / 2))
-						^ subtract) {
+				if (!added[path._id] && (divide ||
+						_path2.contains(path.getPointAt(path.getLength() / 2))
+							^ subtract)) {
 					paths.unshift(path);
-					return true;
+					return added[path._id] = true;
 				}
 			}
 	
@@ -18630,7 +22214,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 			}
 			addPath(_path1);
-			return createResult(Group, paths, false, path1, path2);
+			return createResult(paths, false, path1, path2);
 		}
 	
 		function linkIntersections(from, to) {
@@ -18650,40 +22234,116 @@ return /******/ (function(modules) { // webpackBootstrap
 			}
 		}
 	
-		function divideLocations(locations, include) {
+		function clearCurveHandles(curves) {
+			for (var i = curves.length - 1; i >= 0; i--)
+				curves[i].clearHandles();
+		}
+	
+		function reorientPaths(paths, isInside, clockwise) {
+			var length = paths && paths.length;
+			if (length) {
+				var lookup = Base.each(paths, function (path, i) {
+						this[path._id] = {
+							container: null,
+							winding: path.isClockwise() ? 1 : -1,
+							index: i
+						};
+					}, {}),
+					sorted = paths.slice().sort(function (a, b) {
+						return abs(b.getArea()) - abs(a.getArea());
+					}),
+					first = sorted[0];
+				if (clockwise == null)
+					clockwise = first.isClockwise();
+				for (var i = 0; i < length; i++) {
+					var path1 = sorted[i],
+						entry1 = lookup[path1._id],
+						point = path1.getInteriorPoint(),
+						containerWinding = 0;
+					for (var j = i - 1; j >= 0; j--) {
+						var path2 = sorted[j];
+						if (path2.contains(point)) {
+							var entry2 = lookup[path2._id];
+							containerWinding = entry2.winding;
+							entry1.winding += containerWinding;
+							entry1.container = entry2.exclude ? entry2.container
+									: path2;
+							break;
+						}
+					}
+					if (isInside(entry1.winding) === isInside(containerWinding)) {
+						entry1.exclude = true;
+						paths[entry1.index] = null;
+					} else {
+						var container = entry1.container;
+						path1.setClockwise(container ? !container.isClockwise()
+								: clockwise);
+					}
+				}
+			}
+			return paths;
+		}
+	
+		function divideLocations(locations, include, clearLater) {
 			var results = include && [],
-				tMin = 4e-7,
+				tMin = 1e-8,
 				tMax = 1 - tMin,
-				noHandles = false,
-				clearCurves = [],
+				clearHandles = false,
+				clearCurves = clearLater || [],
+				clearLookup = clearLater && {},
+				renormalizeLocs,
 				prevCurve,
 				prevTime;
 	
+			function getId(curve) {
+				return curve._path._id + '.' + curve._segment1._index;
+			}
+	
+			for (var i = (clearLater && clearLater.length) - 1; i >= 0; i--) {
+				var curve = clearLater[i];
+				if (curve._path)
+					clearLookup[getId(curve)] = true;
+			}
+	
 			for (var i = locations.length - 1; i >= 0; i--) {
-				var loc = locations[i];
-				if (include) {
-					if (!include(loc))
-						continue;
-					results.unshift(loc);
-				}
-				var curve = loc._curve,
+				var loc = locations[i],
 					time = loc._time,
 					origTime = time,
+					exclude = include && !include(loc),
+					curve = loc._curve,
 					segment;
-				if (curve !== prevCurve) {
-					noHandles = !curve.hasHandles();
-				} else if (prevTime >= tMin && prevTime <= tMax ) {
-					time /= prevTime;
+				if (curve) {
+					if (curve !== prevCurve) {
+						clearHandles = !curve.hasHandles()
+								|| clearLookup && clearLookup[getId(curve)];
+						renormalizeLocs = [];
+						prevTime = null;
+						prevCurve = curve;
+					} else if (prevTime >= tMin) {
+						time /= prevTime;
+					}
 				}
+				if (exclude) {
+					if (renormalizeLocs)
+						renormalizeLocs.push(loc);
+					continue;
+				} else if (include) {
+					results.unshift(loc);
+				}
+				prevTime = origTime;
 				if (time < tMin) {
 					segment = curve._segment1;
 				} else if (time > tMax) {
 					segment = curve._segment2;
 				} else {
 					var newCurve = curve.divideAtTime(time, true);
-					if (noHandles)
+					if (clearHandles)
 						clearCurves.push(curve, newCurve);
 					segment = newCurve._segment1;
+					for (var j = renormalizeLocs.length - 1; j >= 0; j--) {
+						var l = renormalizeLocs[j];
+						l._time = (l._time - time) / (1 - time);
+					}
 				}
 				loc._setSegment(segment);
 				var inter = segment._intersection,
@@ -18698,47 +22358,45 @@ return /******/ (function(modules) { // webpackBootstrap
 				} else {
 					segment._intersection = dest;
 				}
-				prevCurve = curve;
-				prevTime = origTime;
 			}
-			for (var i = 0, l = clearCurves.length; i < l; i++) {
-				clearCurves[i].clearHandles();
-			}
+			if (!clearLater)
+				clearCurveHandles(clearCurves);
 			return results || locations;
 		}
 	
 		function getWinding(point, curves, dir, closed, dontFlip) {
-			var epsilon = 1e-8,
-				ia = dir ? 1 : 0,
-				io = dir ? 0 : 1,
+			var ia = dir ? 1 : 0,
+				io = ia ^ 1,
 				pv = [point.x, point.y],
 				pa = pv[ia],
 				po = pv[io],
-				paL = pa - epsilon,
-				paR = pa + epsilon,
+				windingEpsilon = 1e-9,
+				qualityEpsilon = 1e-6,
+				paL = pa - windingEpsilon,
+				paR = pa + windingEpsilon,
 				windingL = 0,
 				windingR = 0,
 				pathWindingL = 0,
 				pathWindingR = 0,
 				onPath = false,
-				onPathWinding = 0,
-				onPathCount = 0,
+				onAnyPath = false,
+				quality = 1,
 				roots = [],
 				vPrev,
 				vClose;
 	
 			function addWinding(v) {
-				var o0 = v[io],
+				var o0 = v[io + 0],
 					o3 = v[io + 6];
 				if (po < min(o0, o3) || po > max(o0, o3)) {
 					return;
 				}
-				var a0 = v[ia],
+				var a0 = v[ia + 0],
 					a1 = v[ia + 2],
 					a2 = v[ia + 4],
 					a3 = v[ia + 6];
 				if (o0 === o3) {
-					if (a1 < paR && a3 > paL || a3 < paR && a1 > paL) {
+					if (a0 < paR && a3 > paL || a3 < paR && a0 > paL) {
 						onPath = true;
 					}
 					return;
@@ -18746,10 +22404,10 @@ return /******/ (function(modules) { // webpackBootstrap
 				var t =   po === o0 ? 0
 						: po === o3 ? 1
 						: paL > max(a0, a1, a2, a3) || paR < min(a0, a1, a2, a3)
-						? 0.5
-						: Curve.solveCubic(v, io, po, roots, 0, 1) === 1
+						? 1
+						: Curve.solveCubic(v, io, po, roots, 0, 1) > 0
 							? roots[0]
-							: 0.5,
+							: 1,
 					a =   t === 0 ? a0
 						: t === 1 ? a3
 						: Curve.getPoint(v, t)[dir ? 'y' : 'x'],
@@ -18763,37 +22421,40 @@ return /******/ (function(modules) { // webpackBootstrap
 						pathWindingR += winding;
 					} else {
 						onPath = true;
-						pathWindingL += winding;
-						pathWindingR += winding;
 					}
-				} else if (winding !== windingPrev) {
-					if (a3Prev < paR) {
-						pathWindingL += winding;
+					if (a > pa - qualityEpsilon && a < pa + qualityEpsilon)
+						quality /= 2;
+				} else {
+					if (winding !== windingPrev) {
+						if (a0 < paL) {
+							pathWindingL += winding;
+						} else if (a0 > paR) {
+							pathWindingR += winding;
+						}
+					} else if (a0 != a3Prev) {
+						if (a3Prev < paR && a > paR) {
+							pathWindingR += winding;
+							onPath = true;
+						} else if (a3Prev > paL && a < paL) {
+							pathWindingL += winding;
+							onPath = true;
+						}
 					}
-					if (a3Prev > paL) {
-						pathWindingR += winding;
-					}
-				} else if (a3Prev < paL && a > paL || a3Prev > paR && a < paR) {
-					onPath = true;
-					if (a3Prev < paL) {
-						pathWindingR += winding;
-					} else if (a3Prev > paR) {
-						pathWindingL += winding;
-					}
+					quality = 0;
 				}
 				vPrev = v;
 				return !dontFlip && a > paL && a < paR
 						&& Curve.getTangent(v, t)[dir ? 'x' : 'y'] === 0
-						&& getWinding(point, curves, dir ? 0 : 1, closed, true);
+						&& getWinding(point, curves, !dir, closed, true);
 			}
 	
 			function handleCurve(v) {
-				var o0 = v[io],
+				var o0 = v[io + 0],
 					o1 = v[io + 2],
 					o2 = v[io + 4],
 					o3 = v[io + 6];
 				if (po <= max(o0, o1, o2, o3) && po >= min(o0, o1, o2, o3)) {
-					var a0 = v[ia],
+					var a0 = v[ia + 0],
 						a1 = v[ia + 2],
 						a2 = v[ia + 4],
 						a3 = v[ia + 6],
@@ -18846,32 +22507,27 @@ return /******/ (function(modules) { // webpackBootstrap
 					if (vClose && (res = handleCurve(vClose)))
 						return res;
 					if (onPath && !pathWindingL && !pathWindingR) {
-						var add = path.isClockwise(closed) ^ dir ? 1 : -1;
-						windingL += add;
-						windingR -= add;
-						onPathWinding += add;
-					} else {
-						windingL += pathWindingL;
-						windingR += pathWindingR;
-						pathWindingL = pathWindingR = 0;
+						pathWindingL = pathWindingR = path.isClockwise(closed) ^ dir
+								? 1 : -1;
 					}
-					if (onPath)
-						onPathCount++;
-					onPath = false;
+					windingL += pathWindingL;
+					windingR += pathWindingR;
+					pathWindingL = pathWindingR = 0;
+					if (onPath) {
+						onAnyPath = true;
+						onPath = false;
+					}
 					vClose = null;
 				}
 			}
-			if (!windingL && !windingR) {
-				windingL = windingR = onPathWinding;
-			}
-			windingL = windingL && (2 - abs(windingL) % 2);
-			windingR = windingR && (2 - abs(windingR) % 2);
+			windingL = abs(windingL);
+			windingR = abs(windingR);
 			return {
 				winding: max(windingL, windingR),
 				windingL: windingL,
 				windingR: windingR,
-				onContour: !windingL ^ !windingR,
-				onPathCount: onPathCount
+				quality: quality,
+				onPath: onAnyPath
 			};
 		}
 	
@@ -18887,30 +22543,36 @@ return /******/ (function(modules) { // webpackBootstrap
 				totalLength += length;
 				segment = segment.getNext();
 			} while (segment && !segment._intersection && segment !== start);
-			var length = totalLength / 2;
-			for (var j = 0, l = chain.length; j < l; j++) {
-				var entry = chain[j],
-					curveLength = entry.length;
-				if (length <= curveLength) {
-					var curve = entry.curve,
-						path = curve._path,
-						parent = path._parent,
-						t = curve.getTimeAt(length),
-						pt = curve.getPointAtTime(t),
-						dir = abs(curve.getTangentAtTime(t).normalize().y) < 0.5
-								? 1 : 0;
-					if (parent instanceof CompoundPath)
-						path = parent;
-					winding = !(operator.subtract && path2 && (
-							path === path1 &&
-								path2._getWinding(pt, dir, true).winding ||
-							path === path2 &&
-								!path1._getWinding(pt, dir, true).winding))
-							? getWinding(pt, curves, dir, true)
-							: { winding: 0 };
-					break;
+			var offsets = [0.5, 0.25, 0.75],
+				winding = { winding: 0, quality: -1 },
+				tMin = 1e-8,
+				tMax = 1 - tMin;
+			for (var i = 0; i < offsets.length && winding.quality < 0.5; i++) {
+				var length = totalLength * offsets[i];
+				for (var j = 0, l = chain.length; j < l; j++) {
+					var entry = chain[j],
+						curveLength = entry.length;
+					if (length <= curveLength) {
+						var curve = entry.curve,
+							path = curve._path,
+							parent = path._parent,
+							operand = parent instanceof CompoundPath ? parent : path,
+							t = Numerical.clamp(curve.getTimeAt(length), tMin, tMax),
+							pt = curve.getPointAtTime(t),
+							dir = abs(curve.getTangentAtTime(t).y) < Math.SQRT1_2;
+						var wind = !(operator.subtract && path2 && (
+								operand === path1 &&
+									path2._getWinding(pt, dir, true).winding ||
+								operand === path2 &&
+									!path1._getWinding(pt, dir, true).winding))
+								? getWinding(pt, curves, dir, true)
+								: { winding: 0, quality: 1 };
+						if (wind.quality > winding.quality)
+							winding = wind;
+						break;
+					}
+					length -= curveLength;
 				}
-				length -= curveLength;
 			}
 			for (var j = chain.length - 1; j >= 0; j--) {
 				chain[j].segment._winding = winding;
@@ -18925,7 +22587,8 @@ return /******/ (function(modules) { // webpackBootstrap
 				var winding;
 				return !!(seg && !seg._visited && (!operator
 						|| operator[(winding = seg._winding || {}).winding]
-						|| operator.unite && winding.onContour));
+							&& !(operator.unite && winding.winding === 2
+								&& winding.windingL && winding.windingR)));
 			}
 	
 			function isStart(seg) {
@@ -18945,10 +22608,10 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 			}
 	
-			function getIntersections(segment, collectStarts) {
+			function getCrossingSegments(segment, collectStarts) {
 				var inter = segment._intersection,
 					start = inter,
-					inters = [];
+					crossings = [];
 				if (collectStarts)
 					starts = [segment];
 	
@@ -18961,7 +22624,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						if (other !== segment && (isStart(other) || isStart(next)
 							|| next && (isValid(other) && (isValid(next)
 								|| nextInter && isValid(nextInter._segment))))) {
-							inters.push(inter);
+							crossings.push(other);
 						}
 						if (collectStarts)
 							starts.push(other);
@@ -18975,7 +22638,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						inter = inter._prev;
 					collect(inter, start);
 				}
-				return inters;
+				return crossings;
 			}
 	
 			segments.sort(function(seg1, seg2) {
@@ -18987,7 +22650,7 @@ return /******/ (function(modules) { // webpackBootstrap
 					path2 = seg2._path;
 				return over1 ^ over2
 						? over1 ? 1 : -1
-						: inter1 ^ inter2
+						: !inter1 ^ !inter2
 							? inter1 ? 1 : -1
 							: path1 !== path2
 								? path1._id - path2._id
@@ -19008,10 +22671,8 @@ return /******/ (function(modules) { // webpackBootstrap
 					var path1 = seg._path,
 						path2 = seg._intersection._segment._path;
 					if (path1.compare(path2)) {
-						if ((operator.unite || operator.intersect)
-								&& path1.getArea()) {
+						if (path1.getArea())
 							paths.push(path1.clone(false));
-						}
 						visitPath(path1);
 						visitPath(path2);
 						valid = false;
@@ -19019,9 +22680,8 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 				while (valid) {
 					var first = !path,
-						intersections = getIntersections(seg, first),
-						inter = intersections.shift(),
-						other = inter && inter._segment,
+						crossings = getCrossingSegments(seg, first),
+						other = crossings.shift(),
 						finished = !first && (isStart(seg) || isStart(other)),
 						cross = !finished && other;
 					if (first) {
@@ -19039,10 +22699,11 @@ return /******/ (function(modules) { // webpackBootstrap
 						branch = null;
 					}
 					if (!branch) {
+						if (cross)
+							crossings.push(seg);
 						branch = {
 							start: path._segments.length,
-							segment: seg,
-							intersections: intersections,
+							crossings: crossings,
 							visited: visited = [],
 							handleIn: handleIn
 						};
@@ -19054,16 +22715,19 @@ return /******/ (function(modules) { // webpackBootstrap
 						for (var j = 0, k = visited.length; j < k; j++) {
 							visited[j]._visited = false;
 						}
-						if (inter = branch.intersections.shift()) {
-							seg = inter._segment;
-							visited.length = 0;
-						} else {
-							if (!(branch = branches.pop()) ||
-								!isValid(seg = branch.segment))
-								break;
-							visited = branch.visited;
-						}
-						handleIn = branch.handleIn;
+						visited.length = 0;
+						do {
+							seg = branch && branch.crossings.shift();
+							if (!seg) {
+								branch = branches.pop();
+								if (branch) {
+									visited = branch.visited;
+									handleIn = branch.handleIn;
+								}
+							}
+						} while (branch && !isValid(seg));
+						if (!seg)
+							break;
 					}
 					var next = seg.getNext();
 					path.add(new Segment(seg._point, handleIn,
@@ -19075,7 +22739,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				}
 				if (finished) {
 					if (closed) {
-						path.firstSegment.setHandleIn(handleIn);
+						path.getFirstSegment().setHandleIn(handleIn);
 						path.setClosed(closed);
 					}
 					if (path.getArea() !== 0) {
@@ -19092,26 +22756,28 @@ return /******/ (function(modules) { // webpackBootstrap
 			},
 	
 			unite: function(path, options) {
-				return computeBoolean(this, path, 'unite', options);
+				return traceBoolean(this, path, 'unite', options);
 			},
 	
 			intersect: function(path, options) {
-				return computeBoolean(this, path, 'intersect', options);
+				return traceBoolean(this, path, 'intersect', options);
 			},
 	
-			subtract: function(path) {
-				return computeBoolean(this, path, 'subtract');
+			subtract: function(path, options) {
+				return traceBoolean(this, path, 'subtract', options);
 			},
 	
 			exclude: function(path, options) {
-				return computeBoolean(this, path, 'exclude', options);
+				return traceBoolean(this, path, 'exclude', options);
 			},
 	
 			divide: function(path, options) {
-				return createResult(Group, [
-						this.subtract(path, options),
-						this.intersect(path, options)
-					], true, this, path, options);
+				return options && (options.trace == false || options.stroke)
+						? splitBoolean(this, path, 'divide')
+						: createResult([
+							this.subtract(path, options),
+							this.intersect(path, options)
+						], true, this, path, options);
 			},
 	
 			resolveCrossings: function() {
@@ -19126,24 +22792,24 @@ return /******/ (function(modules) { // webpackBootstrap
 				var hasOverlaps = false,
 					hasCrossings = false,
 					intersections = this.getIntersections(null, function(inter) {
-						return inter._overlap && (hasOverlaps = true) ||
+						return inter.hasOverlap() && (hasOverlaps = true) ||
 								inter.isCrossing() && (hasCrossings = true);
-					});
+					}),
+					clearCurves = hasOverlaps && hasCrossings && [];
 				intersections = CurveLocation.expand(intersections);
 				if (hasOverlaps) {
 					var overlaps = divideLocations(intersections, function(inter) {
-						return inter._overlap;
-					});
+						return inter.hasOverlap();
+					}, clearCurves);
 					for (var i = overlaps.length - 1; i >= 0; i--) {
 						var seg = overlaps[i]._segment,
 							prev = seg.getPrevious(),
 							next = seg.getNext();
-						if (seg._path && hasOverlap(prev) && hasOverlap(next)) {
+						if (hasOverlap(prev) && hasOverlap(next)) {
 							seg.remove();
 							prev._handleOut._set(0, 0);
 							next._handleIn._set(0, 0);
-							var curve = prev.getCurve();
-							if (curve.isStraight() && curve.getLength() === 0) {
+							if (prev !== seg && !prev.getCurve().hasLength()) {
 								next._handleIn.set(prev._handleIn);
 								prev.remove();
 							}
@@ -19153,14 +22819,19 @@ return /******/ (function(modules) { // webpackBootstrap
 				if (hasCrossings) {
 					divideLocations(intersections, hasOverlaps && function(inter) {
 						var curve1 = inter.getCurve(),
-							curve2 = inter._intersection._curve,
-							seg = inter._segment;
-						if (curve1 && curve2 && curve1._path && curve2._path) {
+							seg1 = inter.getSegment(),
+							other = inter._intersection,
+							curve2 = other._curve,
+							seg2 = other._segment;
+						if (curve1 && curve2 && curve1._path && curve2._path)
 							return true;
-						} else if (seg) {
-							seg._intersection = null;
-						}
-					});
+						if (seg1)
+							seg1._intersection = null;
+						if (seg2)
+							seg2._intersection = null;
+					}, clearCurves);
+					if (clearCurves)
+						clearCurveHandles(clearCurves);
 					paths = tracePaths(Base.each(paths, function(path) {
 						this.push.apply(this, path._segments);
 					}, []));
@@ -19186,52 +22857,16 @@ return /******/ (function(modules) { // webpackBootstrap
 				return item;
 			},
 	
-			reorient: function(nonZero) {
-				var children = this._children,
-					length = children && children.length;
-				if (length > 1) {
-					var lookup = Base.each(children, function(path, i) {
-							this[path._id] = {
-								winding: path.isClockwise() ? 1 : -1,
-								index: i
-							};
-						}, {}),
-						sorted = this.removeChildren().sort(function (a, b) {
-							return abs(b.getArea()) - abs(a.getArea());
-						}),
-						first = sorted[0],
-						paths = [];
-					paths[lookup[first._id].index] = first;
-					for (var i1 = 1; i1 < length; i1++) {
-						var path1 = sorted[i1],
-							entry1 = lookup[path1._id],
-							point = path1.getInteriorPoint(),
-							isContained = false,
-							container = null,
-							exclude = false;
-						for (var i2 = i1 - 1; i2 >= 0 && !container; i2--) {
-							var path2 = sorted[i2];
-							if (path2.contains(point)) {
-								var entry2 = lookup[path2._id];
-								if (nonZero && !isContained) {
-									entry1.winding += entry2.winding;
-									if (entry1.winding && entry2.winding) {
-										exclude = entry1.exclude = true;
-										break;
-									}
-								}
-								isContained = true;
-								container = !entry2.exclude && path2;
-							}
-						}
-						if (!exclude) {
-							path1.setClockwise(container
-									? !container.isClockwise()
-									: first.isClockwise());
-							paths[entry1.index] = path1;
-						}
-					}
-					this.setChildren(paths);
+			reorient: function(nonZero, clockwise) {
+				var children = this._children;
+				if (children && children.length) {
+					this.setChildren(reorientPaths(this.removeChildren(),
+							function(w) {
+								return !!(nonZero ? w : w & 1);
+							},
+							clockwise));
+				} else if (clockwise !== undefined) {
+					this.setClockwise(clockwise);
 				}
 				return this;
 			},
@@ -19491,7 +23126,8 @@ return /******/ (function(modules) { // webpackBootstrap
 			}
 	
 			var detC0C1 = C[0][0] * C[1][1] - C[1][0] * C[0][1],
-				alpha1, alpha2;
+				alpha1,
+				alpha2;
 			if (abs(detC0C1) > epsilon) {
 				var detC0X = C[0][0] * X[1]    - C[1][0] * X[0],
 					detXC1 = X[0]    * C[1][1] - X[1]    * C[0][1];
@@ -19500,13 +23136,9 @@ return /******/ (function(modules) { // webpackBootstrap
 			} else {
 				var c0 = C[0][0] + C[0][1],
 					c1 = C[1][0] + C[1][1];
-				if (abs(c0) > epsilon) {
-					alpha1 = alpha2 = X[0] / c0;
-				} else if (abs(c1) > epsilon) {
-					alpha1 = alpha2 = X[1] / c1;
-				} else {
-					alpha1 = alpha2 = 0;
-				}
+				alpha1 = alpha2 = abs(c0) > epsilon ? X[0] / c0
+								: abs(c1) > epsilon ? X[1] / c1
+								: 0;
 			}
 	
 			var segLength = pt2.getDistance(pt1),
@@ -19556,9 +23188,7 @@ return /******/ (function(modules) { // webpackBootstrap
 				pt2 = this.evaluate(1, curve2, u),
 				diff = pt.subtract(point),
 				df = pt1.dot(pt1) + diff.dot(pt2);
-			if (Math.abs(df) < 1e-6)
-				return u;
-			return u - diff.dot(pt1) / df;
+			return Numerical.isZero(df) ? u : u - diff.dot(pt1) / df;
 		},
 	
 		evaluate: function(degree, curve, t) {
@@ -19700,10 +23330,10 @@ return /******/ (function(modules) { // webpackBootstrap
 				x = 0;
 			if (justification !== 'left')
 				x -= width / (justification === 'center' ? 2: 1);
-			var bounds = new Rectangle(x,
+			var rect = new Rectangle(x,
 						numLines ? - 0.75 * leading : 0,
 						width, numLines * leading);
-			return matrix ? matrix._transformBounds(bounds, bounds) : bounds;
+			return matrix ? matrix._transformBounds(rect, rect) : rect;
 		}
 	});
 	
@@ -20140,7 +23770,7 @@ return /******/ (function(modules) { // webpackBootstrap
 							+ components.join(',') + ')';
 			},
 	
-			toCanvasStyle: function(ctx) {
+			toCanvasStyle: function(ctx, matrix) {
 				if (this._canvasStyle)
 					return this._canvasStyle;
 				if (this._type !== 'gradient')
@@ -20150,10 +23780,17 @@ return /******/ (function(modules) { // webpackBootstrap
 					stops = gradient._stops,
 					origin = components[1],
 					destination = components[2],
+					highlight = components[3],
+					inverse = matrix && matrix.inverted(),
 					canvasGradient;
+				if (inverse) {
+					origin = inverse._transformPoint(origin);
+					destination = inverse._transformPoint(destination);
+					if (highlight)
+						highlight = inverse._transformPoint(highlight);
+				}
 				if (gradient._radial) {
-					var radius = destination.getDistance(origin),
-						highlight = components[3];
+					var radius = destination.getDistance(origin);
 					if (highlight) {
 						var vector = highlight.subtract(origin);
 						if (vector.getLength() > radius)
@@ -20167,8 +23804,10 @@ return /******/ (function(modules) { // webpackBootstrap
 							destination.x, destination.y);
 				}
 				for (var i = 0, l = stops.length; i < l; i++) {
-					var stop = stops[i];
-					canvasGradient.addColorStop(stop._offset || i / (l - 1),
+					var stop = stops[i],
+						offset = stop._offset;
+					canvasGradient.addColorStop(
+							offset == null ? i / (l - 1) : offset,
 							stop._color.toCanvasStyle());
 				}
 				return this._canvasStyle = canvasGradient;
@@ -20551,7 +24190,6 @@ return /******/ (function(modules) { // webpackBootstrap
 		return fields;
 	}, {
 		set: function(style) {
-			this._values = {};
 			var isStyle = style instanceof Style,
 				values = isStyle ? style._values : style;
 			if (values) {
@@ -21370,8 +25008,8 @@ return /******/ (function(modules) { // webpackBootstrap
 						point, prevPoint)
 				|| hitItem && hitItem !== dragItem
 					&& !hitItem.isDescendant(dragItem)
-					&& emitMouseEvent(hitItem, null, fallbacks[type] || type, event,
-						point, prevPoint, dragItem)
+					&& emitMouseEvent(hitItem, null, type, event, point, prevPoint,
+						dragItem)
 				|| emitMouseEvent(view, dragItem || hitItem || view, type, event,
 						point, prevPoint));
 		}
@@ -21455,7 +25093,13 @@ return /******/ (function(modules) { // webpackBootstrap
 						dblClick = hitItem === clickItem
 							&& (Date.now() - clickTime < 300);
 						downItem = clickItem = hitItem;
-						dragItem = !prevented && hitItem;
+						if (!prevented && hitItem) {
+							var item = hitItem;
+							while (item && !item.responds('mousedrag'))
+								item = item._parent;
+							if (item)
+								dragItem = hitItem;
+						}
 						downPoint = point;
 					} else if (mouse.up) {
 						if (!prevented && hitItem === downItem) {
@@ -22077,7 +25721,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			var ctx = canvas.getContext('2d');
 			if (!ctx) {
 				throw new Error('Canvas ' + canvas +
-						' is unable toprovide a 2D context.');
+						' is unable to provide a 2D context.');
 			}
 			if (canvas.width === width && canvas.height === height) {
 				if (clear)
@@ -22477,9 +26121,9 @@ return /******/ (function(modules) { // webpackBootstrap
 					if (!Numerical.isZero(scale.x - 1)
 							|| !Numerical.isZero(scale.y - 1))
 						parts.push('scale(' + formatter.point(scale) +')');
-					if (skew && skew.x)
+					if (skew.x)
 						parts.push('skewX(' + formatter.number(skew.x) + ')');
-					if (skew && skew.y)
+					if (skew.y)
 						parts.push('skewY(' + formatter.number(skew.y) + ')');
 					attrs.transform = parts.join(' ');
 				} else {
@@ -22520,7 +26164,7 @@ return /******/ (function(modules) { // webpackBootstrap
 			attrs.y -= size.height / 2;
 			attrs.width = size.width;
 			attrs.height = size.height;
-			attrs.href = options.embedImages === false && image && image.src
+			attrs.href = options.embedImages == false && image && image.src
 					|| item.toDataURL();
 			return SvgElement.create('image', attrs, formatter);
 		}
@@ -22540,8 +26184,9 @@ return /******/ (function(modules) { // webpackBootstrap
 				if (length > 2) {
 					type = item._closed ? 'polygon' : 'polyline';
 					var parts = [];
-					for(var i = 0; i < length; i++)
+					for (var i = 0; i < length; i++) {
 						parts.push(formatter.point(segments[i]._point));
+					}
 					attrs.points = parts.join(' ');
 				} else {
 					type = 'line';
@@ -22652,9 +26297,10 @@ return /******/ (function(modules) { // webpackBootstrap
 				for (var i = 0, l = stops.length; i < l; i++) {
 					var stop = stops[i],
 						stopColor = stop._color,
-						alpha = stopColor.getAlpha();
+						alpha = stopColor.getAlpha(),
+						offset = stop._offset;
 					attrs = {
-						offset: stop._offset || i / (l - 1)
+						offset: offset == null ? i / (l - 1) : offset
 					};
 					if (stopColor)
 						attrs['stop-color'] = stopColor.toCSS(true);
@@ -22736,8 +26382,8 @@ return /******/ (function(modules) { // webpackBootstrap
 		function getDefinition(item, type) {
 			if (!definitions)
 				definitions = { ids: {}, svgs: {} };
-			var id = item._id || item.__id || (item.__id = UID.get('svg'));
-			return item && definitions.svgs[type + '-' + id];
+			return item && definitions.svgs[type + '-'
+					+ (item._id || item.__id || (item.__id = UID.get('svg')))];
 		}
 	
 		function setDefinition(item, node, type) {
@@ -22811,6 +26457,7 @@ return /******/ (function(modules) { // webpackBootstrap
 						? new Rectangle([0, 0], view.getViewSize())
 						: bounds === 'content'
 							? Item._getBounds(children, matrix, { stroke: true })
+								.rect
 							: Rectangle.read([bounds], 0, { readNull: true }),
 					attrs = {
 						version: '1.1',
@@ -23116,10 +26763,6 @@ return /******/ (function(modules) { // webpackBootstrap
 									.translate(bounds.getPoint())
 									.scale(bounds.getSize()));
 							}
-							if (item instanceof Shape) {
-								color.transform(new Matrix().translate(
-									item.getPosition(true).negate()));
-							}
 						}
 					}
 				}
@@ -23219,17 +26862,19 @@ return /******/ (function(modules) { // webpackBootstrap
 		}
 	
 		function applyAttributes(item, node, isRoot) {
-			var parent = node.parentNode,
-				styles = {
-					node: DomElement.getStyles(node) || {},
-					parent: !isRoot && !/^defs$/i.test(parent.tagName)
-							&& DomElement.getStyles(parent) || {}
-				};
-			Base.each(attributes, function(apply, name) {
-				var value = getAttribute(node, name, styles);
-				item = value !== undefined && apply(item, value, name, node, styles)
-						|| item;
-			});
+			if (node.style) {
+				var parent = node.parentNode,
+					styles = {
+						node: DomElement.getStyles(node) || {},
+						parent: !isRoot && !/^defs$/i.test(parent.tagName)
+								&& DomElement.getStyles(parent) || {}
+					};
+				Base.each(attributes, function(apply, name) {
+					var value = getAttribute(node, name, styles);
+					item = value !== undefined
+							&& apply(item, value, name, node, styles) || item;
+				});
+			}
 			return item;
 		}
 	
@@ -23254,8 +26899,8 @@ return /******/ (function(modules) { // webpackBootstrap
 				parent,
 				next;
 			if (isRoot && isElement) {
-				rootSize = getSize(node, null, null, true)
-						|| paper.getView().getSize();
+				rootSize = paper.getView().getSize();
+				rootSize = getSize(node, null, null, true) || rootSize;
 				container = SvgElement.create('svg', {
 					style: 'stroke-width: 1px; stroke-miterlimit: 10'
 				});
@@ -23386,7 +27031,6 @@ return /******/ (function(modules) { // webpackBootstrap
 	};
 	
 	paper = new (PaperScope.inject(Base.exports, {
-		enumerable: true,
 		Base: Base,
 		Numerical: Numerical,
 		Key: Key,
@@ -23398,8 +27042,9 @@ return /******/ (function(modules) { // webpackBootstrap
 		PlacedSymbol: SymbolItem
 	}))();
 	
-	if (paper.agent.node)
-		__webpack_require__(38)(paper);
+	if (paper.agent.node) {
+		__webpack_require__(6)(paper);
+	}
 	
 	if (true) {
 		!(__WEBPACK_AMD_DEFINE_FACTORY__ = (paper), __WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ? (__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) : __WEBPACK_AMD_DEFINE_FACTORY__), __WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
@@ -23411,26 +27056,26 @@ return /******/ (function(modules) { // webpackBootstrap
 	}.call(this, typeof self === 'object' ? self : null);
 
 
-/***/ },
-/* 37 */
-/***/ function(module, exports) {
+/***/ }),
+/* 5 */
+/***/ (function(module, exports) {
 
 	/* (ignored) */
 
-/***/ },
-/* 38 */
-/***/ function(module, exports) {
+/***/ }),
+/* 6 */
+/***/ (function(module, exports) {
 
 	/* (ignored) */
 
-/***/ },
-/* 39 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ }),
+/* 7 */
+/***/ (function(module, exports, __webpack_require__) {
 
 	var opentype = __webpack_require__(2),
-		paper = __webpack_require__(36),
-		Glyph = __webpack_require__(40),
-		assign = __webpack_require__(42).assign;
+		paper = __webpack_require__(4),
+		Glyph = __webpack_require__(8),
+		assign = __webpack_require__(10).assign;
 	
 	function mergeFont(url, name, user, arrayBuffer, merged, cb) {
 		fetch(
@@ -23686,7 +27331,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		// rewrite the postScriptName to remove invalid characters
 		// TODO: this should be fixed in opentype.js
 		this.ot.names.postScriptName.en = (
-			this.ot.names.postScriptName.en.replace(/[^A-z]/g, '_')
+			this.ot.names.postScriptName.en.replace(/[^A-z0-9]/g, '_')
 		);
 	
 		return this.ot.toArrayBuffer();
@@ -23844,13 +27489,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = Font;
 
 
-/***/ },
-/* 40 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ }),
+/* 8 */
+/***/ (function(module, exports, __webpack_require__) {
 
 	var opentype = __webpack_require__(2),
-		paper = __webpack_require__(36),
-		Outline = __webpack_require__(41);
+		paper = __webpack_require__(4),
+		Outline = __webpack_require__(9);
 	
 	function Glyph( args ) {
 		paper.Group.prototype.constructor.apply( this );
@@ -24128,11 +27773,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = Glyph;
 
 
-/***/ },
-/* 41 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ }),
+/* 9 */
+/***/ (function(module, exports, __webpack_require__) {
 
-	var paper = __webpack_require__(36);
+	var paper = __webpack_require__(4);
 	
 	var Outline = paper.CompoundPath;
 	
@@ -24236,9 +27881,9 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = Outline;
 
 
-/***/ },
-/* 42 */
-/***/ function(module, exports) {
+/***/ }),
+/* 10 */
+/***/ (function(module, exports) {
 
 	/**
 	 * Code refactored from Mozilla Developer Network:
@@ -24288,14 +27933,14 @@ return /******/ (function(modules) { // webpackBootstrap
 	};
 
 
-/***/ },
-/* 43 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ }),
+/* 11 */
+/***/ (function(module, exports, __webpack_require__) {
 
 	/* Extend the Path prototype to add OpenType conversion
 	 * and alias *segments methods and properties to *nodes
 	 */
-	var paper = __webpack_require__(36);
+	var paper = __webpack_require__(4);
 	
 	var proto = paper.PaperScope.prototype.Path.prototype;
 	
@@ -24423,11 +28068,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = paper.Path;
 
 
-/***/ },
-/* 44 */
-/***/ function(module, exports, __webpack_require__) {
+/***/ }),
+/* 12 */
+/***/ (function(module, exports, __webpack_require__) {
 
-	var paper = __webpack_require__(36);
+	var paper = __webpack_require__(4);
 	
 	Object.defineProperty( paper.Segment.prototype, 'x', {
 		get: function() {
@@ -24450,7 +28095,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	module.exports = paper.Segment;
 
 
-/***/ }
+/***/ })
 /******/ ])
 });
 ;

@@ -257,7 +257,7 @@ Font.prototype.toArrayBuffer = function() {
 	// rewrite the postScriptName to remove invalid characters
 	// TODO: this should be fixed in opentype.js
 	this.ot.names.postScriptName.en = (
-		this.ot.names.postScriptName.en.replace(/[^A-z]/g, '_')
+		this.ot.names.postScriptName.en.replace(/[^A-z0-9]/g, '_')
 	);
 
 	return this.ot.toArrayBuffer();

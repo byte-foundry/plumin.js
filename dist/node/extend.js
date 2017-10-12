@@ -15,7 +15,7 @@ var fs = require('fs'),
 
 module.exports = function(paper) {
     if (paper.PaperScript) {
-        var sourceMapSupprt = 'require("source-map-support").install(paper.PaperScript.sourceMapSupport);\n',
+        var sourceMapSupport = 'require("source-map-support").install(paper.PaperScript.sourceMapSupport);\n',
             sourceMaps = {};
 
         paper.PaperScript.sourceMapSupport = {
@@ -32,12 +32,12 @@ module.exports = function(paper) {
             // PaperScope.
             module.exports = function(canvas) {
                 var source = fs.readFileSync(filename, 'utf8'),
-                    code = sourceMapSupprt + source,
+                    code = sourceMapSupport + source,
                     compiled = paper.PaperScript.compile(code, {
                         url: filename,
                         source: source,
                         sourceMaps: true,
-                        offset: -1 // remove sourceMapSupprt...
+                        offset: -1 // remove sourceMapSupport...
                     }),
                     scope = new paper.PaperScope();
                 // Keep track of sourceMaps so retrieveSourceMap() can link them up
@@ -57,8 +57,8 @@ module.exports = function(paper) {
     paper.PaperScope.inject({
         createCanvas: function(width, height, type) {
             // Do not use CanvasProvider.getCanvas(), since we may be changing
-            // the underlying node-canvas and don't want to release it after
-            // back into the pool.
+            // the underlying node-canvas when requesting PDF support, and don't
+            // want to release it after back into the pool.
             var canvas = paper.document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
