@@ -1,6 +1,6 @@
 {
   "name": "plumin.js",
-  "version": "1.10.6",
+  "version": "1.10.7",
   "description": "Create and manipulate fonts using javascript",
   "main": "dist/plumin.js",
   "scripts": {

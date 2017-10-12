@@ -27164,9 +27164,7 @@ return /******/ (function(modules) { // webpackBootstrap
 		// build the default cmap
 		// if multiple glyphs share the same unicode, use the glyph where unicode
 		// and name are equal
-		if ( !this.charMap[glyph.ot.unicode] ||
-				( glyph.name.length === 1 &&
-					glyph.name.charCodeAt(0) === glyph.ot.unicode ) ) {
+		if ( !this.charMap[glyph.ot.unicode] || glyph.name.indexOf('alt') === -1) {
 	
 			this.charMap[glyph.ot.unicode] = glyph;
 		}
