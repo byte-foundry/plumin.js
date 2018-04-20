@@ -4,6 +4,7 @@ language: node_js
 node_js:
 - 'v4.2.3'
 before_script:
-- npm install
+- npm i -g npm@latest
+- npm ci
 after_script:
 - npm test
